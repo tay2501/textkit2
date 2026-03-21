@@ -1,0 +1,117 @@
+name: Feature Request
+description: Suggest an idea to enhance press
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Thank you for suggesting a new feature! ✨
+
+        Before submitting, please search existing issues to see if someone has already suggested this feature.
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Feature Category
+      description: Which area does this feature belong to?
+      options:
+        - CLI Interface & User Experience
+        - Text Transformation
+        - Clipboard Integration
+        - Width Conversion (zen/han)
+        - SQL Formatting
+        - Escape Sequences
+        - Separator Conversion
+        - Performance & Optimization
+        - Configuration & Settings
+        - API & Integration
+        - Developer Tools
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem-statement
+    attributes:
+      label: Problem or Use Case
+      description: What problem does this feature solve?
+      placeholder: |
+        Describe the problem or need this feature addresses.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution
+      description: Describe your ideal solution
+      placeholder: |
+        Provide a detailed description of what you'd like to see implemented.
+
+        Example:
+        "Add a `press trim` command that strips leading/trailing whitespace from clipboard text."
+    validations:
+      required: true
+
+  - type: textarea
+    id: user-workflow
+    attributes:
+      label: User Workflow Example
+      description: Show how users would interact with this feature
+      placeholder: |
+        1. User copies text to clipboard
+        2. User runs: press [command]
+        3. Expected output written back to clipboard
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternative Solutions
+      description: What alternatives have you considered?
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority Level
+      options:
+        - Low - Nice to have, not blocking current work
+        - Medium - Would significantly improve workflow
+        - High - Current workflow is difficult without this
+        - Critical - Blocking important use cases
+    validations:
+      required: true
+
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: Perceived Complexity
+      options:
+        - Simple - Small addition or configuration change
+        - Moderate - New transform within existing framework
+        - Complex - Major new component or significant changes
+        - Not sure
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission Checklist
+      options:
+        - label: I have searched for existing issues that might be related to this feature
+          required: true
+        - label: I have provided sufficient detail to understand this request
+          required: true

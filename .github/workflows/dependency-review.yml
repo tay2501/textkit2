@@ -1,0 +1,30 @@
+name: 'Dependency Review'
+
+on:
+  pull_request:
+    branches: [ "main", "develop" ]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    steps:
+     - name: 'Checkout Repository'
+       uses: actions/checkout@v5
+
+     - name: Dependency Review
+       uses: actions/dependency-review-action@v4
+       with:
+         # Fail on critical and high severity vulnerabilities
+         fail-on-severity: high
+         # Deny licenses that are not OSI approved or permissive
+         deny-licenses: GPL-2.0, LGPL-2.0, LGPL-2.1, AGPL-3.0
+         # Allow specific licenses commonly used in Python ecosystem
+         allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, PSF-2.0
+         # Comment on PR with summary
+         comment-summary-in-pr: always
+         # Warn on dependencies without licenses
+         warn-only: false

@@ -1,0 +1,34 @@
+# Code Owners for press
+#
+# These owners will be automatically requested for review when a PR
+# modifies files in the specified paths.
+
+# Default owner for everything in the repo
+* @tay2501
+
+# CI/CD and GitHub workflows
+/.github/ @tay2501
+/.github/workflows/ @tay2501
+
+# Core press package
+/press/ @tay2501
+
+# Configuration and build files
+/pyproject.toml @tay2501
+/uv.lock @tay2501
+/CLAUDE.md @tay2501
+
+# Documentation
+/README.md @tay2501
+/SPEC.md @tay2501
+/docs/ @tay2501
+
+# Test files
+/test/ @tay2501
+
+# Security-sensitive workflows
+/.github/workflows/security.yml @tay2501
+/.github/workflows/codeql.yml @tay2501
+
+# Release and deployment
+/.github/workflows/release.yml @tay2501

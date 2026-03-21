@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: GitHub Community Support
+    url: https://github.com/orgs/community/discussions
+    about: Please ask and answer questions here.
+  - name: Documentation
+    url: https://github.com/tay2501/press/blob/main/README.md
+    about: Check the documentation for usage instructions.

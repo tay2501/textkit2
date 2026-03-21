@@ -1,0 +1,185 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.claude
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Sphinx documentation
+docs/_build/
+docs/_templates/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# Environments and Sensitive Configuration
+.env
+.env.*
+.envrc
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# API Keys and Credentials (Security Critical)
+**/config/secrets.yml
+**/config/credentials.yml
+secrets.json
+credentials.json
+api_keys.txt
+.secrets
+.credentials
+
+# SSH Keys and Certificates
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre / Pyright
+.pyre/
+pyrightconfig.json
+
+# Ruff / Black cache
+.ruff_cache/
+.black_cache/
+
+# UV specific
+.uv-cache/
+
+# pytest benchmark cache
+.benchmarks/
+
+# Coverage
+test-results/
+test-reports/
+test-output/
+.test-results/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and Editor
+.idea/
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+.vscode/extensions.json
+.vscode/*.log
+
+# Vim / Emacs
+*.swp
+*.swo
+*~
+
+# Personal Backup and Temporary Files
+*.backup
+*.bak
+*.orig
+*.tmp
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# Claude Code and Serena MCP settings
+# Note: .claude/ and CLAUDE.md ARE committed (project configuration)
+.claude/settings.local.json
+.serena/cache/
+
+# Local configuration overrides
+*.local.toml
+config.local.py
+
+# Streamlit / Marimo
+.streamlit/
+.marimo/
+
+# Direnv
+.direnv/
+
+# Work file
+SPEC.md
+CLAUDE.md
