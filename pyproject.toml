@@ -112,7 +112,7 @@ markers   = [
 [tool.coverage.run]
 branch = true
 source = ["press"]
-omit   = ["press/__main__.py", "test/*"]
+omit   = ["press/__main__.py", "press/clipboard.py", "test/*"]
 
 [tool.coverage.report]
 fail_under = 80

@@ -117,11 +117,15 @@ def make_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
 
     # --- width ---
-    p = sub.add_parser("halfwidth", aliases=["hw"], help="Convert full-width characters to half-width")
+    p = sub.add_parser(
+        "halfwidth", aliases=["hw"], help="Convert full-width characters to half-width"
+    )
     _add_io_args(p)
     p.set_defaults(func=lambda a: _run_transform(to_halfwidth, a))
 
-    p = sub.add_parser("fullwidth", aliases=["fw"], help="Convert half-width characters to full-width")
+    p = sub.add_parser(
+        "fullwidth", aliases=["fw"], help="Convert half-width characters to full-width"
+    )
     _add_io_args(p)
     p.set_defaults(func=lambda a: _run_transform(to_fullwidth, a))
 
@@ -153,18 +157,26 @@ def make_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=lambda a: _run_transform(underscore_to_hyphen, a))
 
     # --- SQL ---
-    p = sub.add_parser("sql-in", aliases=["sq"], help="Convert newline-separated values to SQL IN clause")
+    p = sub.add_parser(
+        "sql-in", aliases=["sq"], help="Convert newline-separated values to SQL IN clause"
+    )
     _add_io_args(p)
     p.add_argument("--quote-char", default="'", metavar="CHAR", help="Quote character (default: ')")
     p.add_argument("--wrap", action="store_true", help="Wrap result in parentheses")
-    p.set_defaults(func=lambda a: _run_transform(to_sql_in, a, quote_char=a.quote_char, wrap=a.wrap))
+    p.set_defaults(
+        func=lambda a: _run_transform(to_sql_in, a, quote_char=a.quote_char, wrap=a.wrap)
+    )
 
     # --- unicode escape ---
-    p = sub.add_parser("unicode-decode", aliases=["ud"], help=r"Decode \uXXXX escape sequences to text")
+    p = sub.add_parser(
+        "unicode-decode", aliases=["ud"], help=r"Decode \uXXXX escape sequences to text"
+    )
     _add_io_args(p)
     p.set_defaults(func=lambda a: _run_transform(decode_unicode_escape, a))
 
-    p = sub.add_parser("unicode-encode", aliases=["ue"], help=r"Encode text to \uXXXX escape sequences")
+    p = sub.add_parser(
+        "unicode-encode", aliases=["ue"], help=r"Encode text to \uXXXX escape sequences"
+    )
     _add_io_args(p)
     p.set_defaults(func=lambda a: _run_transform(encode_unicode_escape, a))
 
