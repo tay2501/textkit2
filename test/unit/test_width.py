@@ -1,6 +1,5 @@
 """Tests for full-width / half-width conversion (F-01, F-02)."""
 
-
 from press.transforms.width import to_fullwidth, to_halfwidth
 
 

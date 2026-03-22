@@ -8,18 +8,18 @@ release = "0.1.0"
 
 # -- General configuration -----------------------------------------------------
 extensions = [
-    "myst_parser",           # Markdown support (MyST)
-    "sphinx.ext.autodoc",    # Auto-generate API docs from docstrings
-    "sphinx.ext.viewcode",   # Add "view source" links
-    "sphinx.ext.napoleon",   # NumPy / Google style docstrings
-    "sphinx_copybutton",     # Copy button on code blocks
+    "myst_parser",  # Markdown support (MyST)
+    "sphinx.ext.autodoc",  # Auto-generate API docs from docstrings
+    "sphinx.ext.viewcode",  # Add "view source" links
+    "sphinx.ext.napoleon",  # NumPy / Google style docstrings
+    "sphinx_copybutton",  # Copy button on code blocks
 ]
 
 # MyST options: enable useful extensions
 myst_enable_extensions = [
-    "colon_fence",    # ::: as an alternative to ```
-    "deflist",        # Definition lists
-    "tasklist",       # - [ ] / - [x] checkboxes
+    "colon_fence",  # ::: as an alternative to ```
+    "deflist",  # Definition lists
+    "tasklist",  # - [ ] / - [x] checkboxes
 ]
 
 # File types

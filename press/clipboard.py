@@ -45,6 +45,18 @@ if sys.platform == "win32":
     _user32 = ctypes.windll.user32
     _kernel32 = ctypes.windll.kernel32
 
+    # 64ビット環境でポインタ/HANDLEが正しく扱われるよう型を明示する
+    _user32.OpenClipboard.argtypes = [ctypes.c_void_p]
+    _user32.GetClipboardData.restype = ctypes.c_void_p
+    _user32.GetClipboardData.argtypes = [ctypes.c_uint]
+    _user32.SetClipboardData.argtypes = [ctypes.c_uint, ctypes.c_void_p]
+    _kernel32.GlobalAlloc.restype = ctypes.c_void_p
+    _kernel32.GlobalAlloc.argtypes = [ctypes.c_uint, ctypes.c_size_t]
+    _kernel32.GlobalLock.restype = ctypes.c_void_p
+    _kernel32.GlobalLock.argtypes = [ctypes.c_void_p]
+    _kernel32.GlobalUnlock.argtypes = [ctypes.c_void_p]
+    _kernel32.GlobalFree.argtypes = [ctypes.c_void_p]
+
     CF_UNICODETEXT = 13
     GMEM_MOVEABLE = 0x0002
 
