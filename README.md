@@ -3,80 +3,111 @@
 
 # press
 
-[![PyPI](https://img.shields.io/pypi/v/press)](https://pypi.org/project/press/)
-[![Python](https://img.shields.io/pypi/pyversions/press)](https://pypi.org/project/press/)
+[![Python](https://img.shields.io/badge/python-3.13-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![CI](https://github.com/tay2501/textkit2/actions/workflows/ci.yml/badge.svg)](https://github.com/tay2501/textkit2/actions)
 
-Clipboard text transformer with global hotkeys for Windows.
+Clipboard text transformer for Windows 11.
 
-> Copy text → press a hotkey → paste the transformed result.
+> Copy text → run `press` → paste the transformed result.
 
 ---
 
 ## Install
 
+**Requirements:** Python 3.13, [uv](https://docs.astral.sh/uv/)
+
 ```bash
-uv tool install press
+# Clone and install as a tool
+git clone https://github.com/tay2501/textkit2.git
+cd textkit2
+uv tool install .
 ```
+
+`press` and `px` are both available as command aliases.
+
+For development:
+
+```bash
+uv sync
+uv run press --help
+```
+
+---
 
 ## Quick Start
 
-### CLI
+### CLI (stdin → stdout)
 
 ```bash
 # Full-width → Half-width
-echo "ＴＡＢＬＥ１" | press halfwidth          # → TABLE1
+echo "ＴＡＢＬＥ１" | press halfwidth        # → TABLE1
 
 # Underscore ↔ Hyphen
-echo "USER_ID"      | press hyphen              # → USER-ID
-echo "USER-ID"      | press underscore          # → USER_ID
+echo "USER_ID"     | press hyphen            # → USER-ID
+echo "USER-ID"     | press underscore        # → USER_ID
 
 # SQL IN clause
-printf "USER1\nUSER2\nUSER3" | press sql-in     # → 'USER1','USER2','USER3'
+printf "USER1\nUSER2\nUSER3" | press sql-in  # → 'USER1','USER2','USER3'
 
 # Unicode escape ↔ text
 echo '\u30c6\u30b9\u30c8' | press unicode-decode  # → テスト
 echo "テスト"              | press unicode-encode  # → \u30c6\u30b9\u30c8
 
 # Normalize whitespace / line endings
-echo "  USER_ID  "  | press normalize            # → USER_ID
-cat file.txt        | press crlf                 # → CRLF unified
+echo "  USER_ID  "  | press normalize        # → USER_ID
+cat file.txt        | press crlf             # all line endings → CRLF
+cat file.txt        | press lf               # all line endings → LF
 ```
 
-### Clipboard shortcut (`-c` in, `-C` out)
+### Clipboard in-place (`-c` read, `-C` write)
 
 ```bash
-press halfwidth   -c -C   # transform clipboard in-place
-press sql-in      -c -C
-press hold                # protect clipboard from overwrite (toggle)
-press clear               # wipe clipboard
+press halfwidth  -c -C   # transform clipboard in-place
+press sql-in     -c -C
+press normalize  -c -C
 ```
 
-### Daemon — global hotkeys (always-on)
+---
 
-```bash
-press daemon start        # start background daemon
+## Transforms
 
-# Default hotkey: Ctrl+Shift+F10, then:
-#   W → halfwidth    F → fullwidth    N → normalize
-#   S → sql-in       D → dict lookup  E → unicode-decode
-#   H → hold toggle  Z → clear
+| Command | Alias | Description |
+|---|---|---|
+| `halfwidth` | `hw` | Full-width → half-width (`ＴＡＢＬＥ１` → `TABLE1`) |
+| `fullwidth` | `fw` | Half-width → full-width (`TABLE1` → `ＴＡＢＬＥ１`) |
+| `normalize` | `norm` | Strip leading/trailing whitespace and blank lines |
+| `crlf` | | Unify all line endings to `\r\n` |
+| `lf` | | Unify all line endings to `\n` |
+| `cr` | | Unify all line endings to `\r` |
+| `hyphen` | `hy` | Underscores → hyphens (`USER_ID` → `USER-ID`) |
+| `underscore` | `us` | Hyphens → underscores (`USER-ID` → `USER_ID`) |
+| `sql-in` | `sq` | Newline list → SQL `IN` clause (`'A','B','C'`) |
+| `unicode-decode` | `ud` | Decode `\uXXXX` sequences to text |
+| `unicode-encode` | `ue` | Encode text to `\uXXXX` sequences |
 
-press daemon status
-press daemon stop
-```
+### Common options
 
-### Custom dictionary (no-pattern replacements)
+| Flag | Description |
+|---|---|
+| `-c` / `--clip-in` | Read input from clipboard |
+| `-C` / `--clip-out` | Write output to clipboard (also prints to stdout) |
+| `-v` / `--verbose` | Show before/after on stderr |
+| `-q` / `--quiet` | Suppress all stderr output |
+| `--fallback` | Return original text on failure (exit 0) |
 
-```bash
-# ~/.press/dict/default.tsv
-# FOOBER01<TAB>TABLE_HOGEHOGE
+---
 
-press dict add FOOBER01 TABLE_HOGEHOGE
-press dict -c -C          # forward lookup from clipboard
-press dict -r -c -C       # reverse lookup
-```
+## Roadmap (Phase 2)
+
+The following features are planned but not yet implemented:
+
+- **Daemon mode** — background process with system tray icon
+- **Global hotkeys** — `Ctrl+Shift+F10` → key chord transforms clipboard in any app
+- **Clipboard utilities** — `hold` (protect from overwrite), `clear` (wipe)
+- **Dictionary lookup** — TSV-based custom string substitution (`dict`)
+- **HTML decode** — `&lt;` → `<` (`html-decode`)
+- **Encoding repair** — fix mojibake from wrong charset (`fix-encoding`)
 
 ---
 
