@@ -167,7 +167,7 @@ temp/
 # Claude Code and Serena MCP settings
 # Note: .claude/ and CLAUDE.md ARE committed (project configuration)
 .claude/settings.local.json
-.serena/cache/
+.serena/
 
 # Local configuration overrides
 *.local.toml

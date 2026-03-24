@@ -5,6 +5,8 @@ import sys
 from collections.abc import Callable
 from typing import Any
 
+import argcomplete
+
 from press.transforms.escape import (
     decode_html_entities,
     decode_unicode_escape,
@@ -15,6 +17,9 @@ from press.transforms.separator import hyphen_to_underscore, underscore_to_hyphe
 from press.transforms.sql import to_sql_in
 from press.transforms.whitespace import normalize_whitespace
 from press.transforms.width import to_fullwidth, to_halfwidth
+
+# Convenience alias for the subparsers action type
+type _SubParsers = argparse._SubParsersAction[argparse.ArgumentParser]
 
 
 def _version() -> str:
@@ -107,16 +112,7 @@ def _add_io_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("input", nargs="?", default=None, help="Input text (default: stdin)")
 
 
-def make_parser() -> argparse.ArgumentParser:
-    """Build and return the top-level argument parser."""
-    parser = argparse.ArgumentParser(
-        prog="press",
-        description="Clipboard text transformation tool",
-    )
-    parser.add_argument("--version", action="version", version=f"press {_version()}")
-    sub = parser.add_subparsers(dest="command", metavar="COMMAND")
-
-    # --- width ---
+def _register_width_commands(sub: _SubParsers) -> None:
     p = sub.add_parser(
         "halfwidth", aliases=["hw"], help="Convert full-width characters to half-width"
     )
@@ -129,25 +125,28 @@ def make_parser() -> argparse.ArgumentParser:
     _add_io_args(p)
     p.set_defaults(func=lambda a: _run_transform(to_fullwidth, a))
 
-    # --- whitespace ---
+
+def _register_whitespace_commands(sub: _SubParsers) -> None:
     p = sub.add_parser("normalize", aliases=["norm"], help="Normalize whitespace and blank lines")
     _add_io_args(p)
     p.set_defaults(func=lambda a: _run_transform(normalize_whitespace, a))
 
-    # --- line endings ---
-    p = sub.add_parser("crlf", help="Convert line endings to CRLF (\\r\\n)")
+
+def _register_lineending_commands(sub: _SubParsers) -> None:
+    p = sub.add_parser("crlf", help=r"Convert line endings to CRLF (\r\n)")
     _add_io_args(p)
     p.set_defaults(func=lambda a: _run_transform(to_crlf, a))
 
-    p = sub.add_parser("lf", help="Convert line endings to LF (\\n)")
+    p = sub.add_parser("lf", help=r"Convert line endings to LF (\n)")
     _add_io_args(p)
     p.set_defaults(func=lambda a: _run_transform(to_lf, a))
 
-    p = sub.add_parser("cr", help="Convert line endings to CR (\\r)")
+    p = sub.add_parser("cr", help=r"Convert line endings to CR (\r)")
     _add_io_args(p)
     p.set_defaults(func=lambda a: _run_transform(to_cr, a))
 
-    # --- separators ---
+
+def _register_separator_commands(sub: _SubParsers) -> None:
     p = sub.add_parser("underscore", aliases=["us"], help="Convert hyphens to underscores")
     _add_io_args(p)
     p.set_defaults(func=lambda a: _run_transform(hyphen_to_underscore, a))
@@ -156,7 +155,8 @@ def make_parser() -> argparse.ArgumentParser:
     _add_io_args(p)
     p.set_defaults(func=lambda a: _run_transform(underscore_to_hyphen, a))
 
-    # --- SQL ---
+
+def _register_sql_commands(sub: _SubParsers) -> None:
     p = sub.add_parser(
         "sql-in", aliases=["sq"], help="Convert newline-separated values to SQL IN clause"
     )
@@ -167,7 +167,8 @@ def make_parser() -> argparse.ArgumentParser:
         func=lambda a: _run_transform(to_sql_in, a, quote_char=a.quote_char, wrap=a.wrap)
     )
 
-    # --- unicode escape ---
+
+def _register_escape_commands(sub: _SubParsers) -> None:
     p = sub.add_parser(
         "unicode-decode", aliases=["ud"], help=r"Decode \uXXXX escape sequences to text"
     )
@@ -180,12 +181,12 @@ def make_parser() -> argparse.ArgumentParser:
     _add_io_args(p)
     p.set_defaults(func=lambda a: _run_transform(encode_unicode_escape, a))
 
-    # --- HTML ---
     p = sub.add_parser("html-decode", aliases=["hd"], help="Decode HTML entities (e.g. &amp; → &)")
     _add_io_args(p)
     p.set_defaults(func=lambda a: _run_transform(decode_html_entities, a))
 
-    # --- daemon (Phase 2 stub) ---
+
+def _register_daemon_commands(sub: _SubParsers) -> None:
     daemon_p = sub.add_parser("daemon", help="Manage press daemon (not yet implemented)")
     daemon_p.add_argument(
         "action",
@@ -193,6 +194,24 @@ def make_parser() -> argparse.ArgumentParser:
         help="Daemon action",
     )
     daemon_p.set_defaults(func=_handle_daemon)
+
+
+def make_parser() -> argparse.ArgumentParser:
+    """Build and return the top-level argument parser."""
+    parser = argparse.ArgumentParser(
+        prog="press",
+        description="Clipboard text transformation tool",
+    )
+    parser.add_argument("--version", action="version", version=f"press {_version()}")
+    sub = parser.add_subparsers(dest="command", metavar="COMMAND")
+
+    _register_width_commands(sub)
+    _register_whitespace_commands(sub)
+    _register_lineending_commands(sub)
+    _register_separator_commands(sub)
+    _register_sql_commands(sub)
+    _register_escape_commands(sub)
+    _register_daemon_commands(sub)
 
     return parser
 
@@ -221,6 +240,7 @@ def main() -> None:
         sys.stderr.reconfigure(encoding="utf-8")
 
     parser = make_parser()
+    argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
     if args.command is None:
