@@ -2,6 +2,8 @@
 
 import re
 
+_WHITESPACE_RE = re.compile(r"[ \t]+")
+
 
 def normalize_whitespace(text: str) -> str:
     """Normalize whitespace in text.
@@ -26,7 +28,7 @@ def normalize_whitespace(text: str) -> str:
         # Replace full-width space (U+3000) with regular space
         line = line.replace("\u3000", " ")
         # Collapse any whitespace run (tabs, multiple spaces) to single space
-        line = re.sub(r"[ \t]+", " ", line)
+        line = _WHITESPACE_RE.sub(" ", line)
         # Strip leading/trailing spaces
         line = line.strip()
         if line:

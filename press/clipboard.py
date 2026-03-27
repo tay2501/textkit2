@@ -47,9 +47,15 @@ if sys.platform == "win32":
 
     # 64ビット環境でポインタ/HANDLEが正しく扱われるよう型を明示する
     _user32.OpenClipboard.argtypes = [ctypes.c_void_p]
+    _user32.OpenClipboard.restype = ctypes.wintypes.BOOL
+    _user32.CloseClipboard.argtypes = []
+    _user32.CloseClipboard.restype = ctypes.wintypes.BOOL
+    _user32.EmptyClipboard.argtypes = []
+    _user32.EmptyClipboard.restype = ctypes.wintypes.BOOL
     _user32.GetClipboardData.restype = ctypes.c_void_p
     _user32.GetClipboardData.argtypes = [ctypes.c_uint]
     _user32.SetClipboardData.argtypes = [ctypes.c_uint, ctypes.c_void_p]
+    _user32.SetClipboardData.restype = ctypes.c_void_p
     _kernel32.GlobalAlloc.restype = ctypes.c_void_p
     _kernel32.GlobalAlloc.argtypes = [ctypes.c_uint, ctypes.c_size_t]
     _kernel32.GlobalLock.restype = ctypes.c_void_p

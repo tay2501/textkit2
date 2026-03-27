@@ -48,7 +48,7 @@ _DEFAULT_BINDINGS: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HotkeysConfig:
     """Hotkey prefix and key-to-command binding map."""
 
@@ -56,7 +56,7 @@ class HotkeysConfig:
     bindings: dict[str, str] = field(default_factory=lambda: dict(_DEFAULT_BINDINGS))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SqlInConfig:
     """Options for the SQL IN-clause generator."""
 
@@ -64,7 +64,7 @@ class SqlInConfig:
     wrap: bool = False
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DictionaryConfig:
     """Dictionary lookup configuration."""
 
@@ -73,7 +73,7 @@ class DictionaryConfig:
     case_sensitive: bool = True
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class UiConfig:
     """UI / tray notification settings."""
 
@@ -81,7 +81,7 @@ class UiConfig:
     hold_icon: bool = True
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PressConfig:
     """Top-level configuration object for press."""
 
@@ -108,7 +108,9 @@ def _parse_hotkeys(data: dict[str, Any]) -> HotkeysConfig:
     default = HotkeysConfig()
     prefix: str = data.get("prefix", default.prefix)
     raw_bindings = data.get("bindings")
-    bindings: dict[str, str] = dict(raw_bindings) if raw_bindings is not None else dict(_DEFAULT_BINDINGS)
+    bindings: dict[str, str] = (
+        dict(raw_bindings) if raw_bindings is not None else dict(_DEFAULT_BINDINGS)
+    )
     return HotkeysConfig(prefix=prefix, bindings=bindings)
 
 
