@@ -101,6 +101,7 @@ ignore = ["TRY003", "ERA001"]
 python_version     = "3.13"
 strict             = true
 warn_unreachable   = true
+enable_error_code  = ["truthy-bool", "redundant-expr", "possibly-undefined"]
 
 [[tool.mypy.overrides]]
 module = ["pystray.*", "pynput.*", "win32.*", "pywintypes", "jaconv.*"]
