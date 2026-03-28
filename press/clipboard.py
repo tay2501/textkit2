@@ -131,11 +131,11 @@ if sys.platform == "win32":
 
 else:
 
-    def _win_get_text() -> str:  # type: ignore[misc]
+    def _win_get_text() -> str:
         raise OSError("Clipboard access is only supported on Windows")
 
-    def _win_set_text(text: str) -> None:  # type: ignore[misc]
+    def _win_set_text(text: str) -> None:
         raise OSError("Clipboard access is only supported on Windows")
 
-    def _win_clear() -> None:  # type: ignore[misc]
+    def _win_clear() -> None:
         raise OSError("Clipboard access is only supported on Windows")

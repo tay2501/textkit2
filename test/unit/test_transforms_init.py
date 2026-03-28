@@ -17,7 +17,7 @@ class TestLazyLoading:
     def test_unknown_attribute_raises(self) -> None:
         """Accessing a name not in __all__ must raise AttributeError."""
         with pytest.raises(AttributeError, match="has no attribute 'no_such_fn'"):
-            _ = _t.no_such_fn  # type: ignore[attr-defined]
+            _ = _t.no_such_fn
 
     def test_cached_after_first_access(self) -> None:
         """Attribute should be cached in module __dict__ after first access."""
