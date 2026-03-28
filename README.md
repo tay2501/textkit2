@@ -159,6 +159,27 @@ press normalize  -c -C
 
 ---
 
+## Design Philosophy
+
+press follows a **hybrid CLI design** modeled after [uv](https://docs.astral.sh/uv/) and [ruff](https://docs.astral.sh/ruff/):
+
+- **Transform commands** — short and fast (`press hw`, `px sn`). These are the 90% case.
+- **Management commands** — explicit and safe (`press daemon start`). These are rare, low-frequency operations.
+
+All transforms are pure functions with no side effects. I/O is handled exclusively by the CLI layer:
+
+```
+stdin / clipboard / positional arg
+        ↓
+   transform fn(text) → str
+        ↓
+   stdout + optional clipboard write
+```
+
+Error messages follow the format `press <subcommand>: error: <message>` so they are machine-parseable and consistent with tools like git and cargo.
+
+---
+
 ## Roadmap (Phase 2)
 
 The following features are planned but not yet implemented:

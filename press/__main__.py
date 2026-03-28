@@ -50,11 +50,12 @@ def _run_transform(
     **kwargs: Any,
 ) -> int:
     """Read → transform → write.  Returns an exit code (0 = success, 1 = error)."""
+    _cmd = getattr(args, "command", "press")
     try:
         text = _read_input(args)
     except Exception as exc:
         if not getattr(args, "quiet", False):
-            print(f"press: failed to read input: {exc}", file=sys.stderr)
+            print(f"press {_cmd}: error: failed to read input: {exc}", file=sys.stderr)
         return 1
 
     try:
@@ -64,7 +65,7 @@ def _run_transform(
             _write_output(text, args)
             return 0
         if not getattr(args, "quiet", False):
-            print(f"press: {exc}", file=sys.stderr)
+            print(f"press {_cmd}: error: {exc}", file=sys.stderr)
         return 1
 
     if getattr(args, "verbose", False) and not getattr(args, "quiet", False):
@@ -391,7 +392,7 @@ def make_parser() -> argparse.ArgumentParser:
 
 def _handle_daemon(args: argparse.Namespace) -> int:
     print(
-        f"press: daemon {args.action} is not yet implemented",
+        f"press daemon: error: {args.action} is not yet implemented",
         file=sys.stderr,
     )
     return 1
