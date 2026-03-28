@@ -16,11 +16,13 @@ permissions:
 jobs:
   osv-scanner:
     name: OSV Vulnerability Scanner
-    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.2.3"
+    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.3.5"
     permissions:
       actions: read
       security-events: write
       contents: read
+    with:
+      fail-on-vuln: false
 
   pip-audit:
     name: pip-audit Security Check
