@@ -1,0 +1,25 @@
+version: 2
+updates:
+  # GitHub Actions の自動バージョン更新
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+    commit-message:
+      prefix: "ci"
+
+  # Python 依存関係（pyproject.toml）
+  # Note: uv.lock は Dependabot 非対応のため、PR マージ後に手動で `uv lock` が必要
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+    commit-message:
+      prefix: "build"
+    groups:
+      dev-dependencies:
+        dependency-type: "development"

@@ -73,15 +73,14 @@ jobs:
 
       - name: Run Bandit security linter
         run: |
-          uvx --from "bandit[toml]" bandit -r . -f json -o bandit-report.json --exclude ./test,./tests,./.venv || true
+          uvx --from "bandit[toml]" bandit -r . -f sarif -o bandit-report.sarif --exclude ./test,./tests,./.venv || true
 
-      - name: Upload Bandit report
-        uses: actions/upload-artifact@v7
+      - name: Upload Bandit SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
-          name: bandit-report
-          path: bandit-report.json
-          retention-days: 30
+          sarif_file: bandit-report.sarif
+          category: bandit
 
   semgrep:
     name: Semgrep Security Analysis
@@ -95,11 +94,11 @@ jobs:
 
       - name: Run Semgrep
         run: |
-          semgrep --config=auto --json --output=semgrep-report.json . || true
+          semgrep --config=auto --sarif --output=semgrep-report.sarif . || true
 
-      - name: Upload Semgrep report
-        uses: actions/upload-artifact@v7
+      - name: Upload Semgrep SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
-          name: semgrep-report
-          path: semgrep-report.json
+          sarif_file: semgrep-report.sarif
+          category: semgrep
