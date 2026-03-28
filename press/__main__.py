@@ -5,19 +5,6 @@ import sys
 from collections.abc import Callable
 from typing import Any
 
-import argcomplete
-
-from press.transforms.escape import (
-    decode_html_entities,
-    decode_unicode_escape,
-    encode_unicode_escape,
-)
-from press.transforms.lineending import to_cr, to_crlf, to_lf
-from press.transforms.separator import hyphen_to_underscore, underscore_to_hyphen
-from press.transforms.sql import to_sql_in
-from press.transforms.whitespace import normalize_whitespace
-from press.transforms.width import to_fullwidth, to_halfwidth
-
 # Convenience alias for the subparsers action type
 type _SubParsers = argparse._SubParsersAction[argparse.ArgumentParser]
 
@@ -117,43 +104,91 @@ def _register_width_commands(sub: _SubParsers) -> None:
         "halfwidth", aliases=["hw"], help="Convert full-width characters to half-width"
     )
     _add_io_args(p)
-    p.set_defaults(func=lambda a: _run_transform(to_halfwidth, a))
+
+    def _hw(a: argparse.Namespace) -> int:
+        from press.transforms.width import to_halfwidth
+
+        return _run_transform(to_halfwidth, a)
+
+    p.set_defaults(func=_hw)
 
     p = sub.add_parser(
         "fullwidth", aliases=["fw"], help="Convert half-width characters to full-width"
     )
     _add_io_args(p)
-    p.set_defaults(func=lambda a: _run_transform(to_fullwidth, a))
+
+    def _fw(a: argparse.Namespace) -> int:
+        from press.transforms.width import to_fullwidth
+
+        return _run_transform(to_fullwidth, a)
+
+    p.set_defaults(func=_fw)
 
 
 def _register_whitespace_commands(sub: _SubParsers) -> None:
     p = sub.add_parser("normalize", aliases=["norm"], help="Normalize whitespace and blank lines")
     _add_io_args(p)
-    p.set_defaults(func=lambda a: _run_transform(normalize_whitespace, a))
+
+    def _norm(a: argparse.Namespace) -> int:
+        from press.transforms.whitespace import normalize_whitespace
+
+        return _run_transform(normalize_whitespace, a)
+
+    p.set_defaults(func=_norm)
 
 
 def _register_lineending_commands(sub: _SubParsers) -> None:
     p = sub.add_parser("crlf", help=r"Convert line endings to CRLF (\r\n)")
     _add_io_args(p)
-    p.set_defaults(func=lambda a: _run_transform(to_crlf, a))
+
+    def _crlf(a: argparse.Namespace) -> int:
+        from press.transforms.lineending import to_crlf
+
+        return _run_transform(to_crlf, a)
+
+    p.set_defaults(func=_crlf)
 
     p = sub.add_parser("lf", help=r"Convert line endings to LF (\n)")
     _add_io_args(p)
-    p.set_defaults(func=lambda a: _run_transform(to_lf, a))
+
+    def _lf(a: argparse.Namespace) -> int:
+        from press.transforms.lineending import to_lf
+
+        return _run_transform(to_lf, a)
+
+    p.set_defaults(func=_lf)
 
     p = sub.add_parser("cr", help=r"Convert line endings to CR (\r)")
     _add_io_args(p)
-    p.set_defaults(func=lambda a: _run_transform(to_cr, a))
+
+    def _cr(a: argparse.Namespace) -> int:
+        from press.transforms.lineending import to_cr
+
+        return _run_transform(to_cr, a)
+
+    p.set_defaults(func=_cr)
 
 
 def _register_separator_commands(sub: _SubParsers) -> None:
     p = sub.add_parser("underscore", aliases=["us"], help="Convert hyphens to underscores")
     _add_io_args(p)
-    p.set_defaults(func=lambda a: _run_transform(hyphen_to_underscore, a))
+
+    def _us(a: argparse.Namespace) -> int:
+        from press.transforms.separator import hyphen_to_underscore
+
+        return _run_transform(hyphen_to_underscore, a)
+
+    p.set_defaults(func=_us)
 
     p = sub.add_parser("hyphen", aliases=["hy"], help="Convert underscores to hyphens")
     _add_io_args(p)
-    p.set_defaults(func=lambda a: _run_transform(underscore_to_hyphen, a))
+
+    def _hy(a: argparse.Namespace) -> int:
+        from press.transforms.separator import underscore_to_hyphen
+
+        return _run_transform(underscore_to_hyphen, a)
+
+    p.set_defaults(func=_hy)
 
 
 def _register_sql_commands(sub: _SubParsers) -> None:
@@ -163,9 +198,13 @@ def _register_sql_commands(sub: _SubParsers) -> None:
     _add_io_args(p)
     p.add_argument("--quote-char", default="'", metavar="CHAR", help="Quote character (default: ')")
     p.add_argument("--wrap", action="store_true", help="Wrap result in parentheses")
-    p.set_defaults(
-        func=lambda a: _run_transform(to_sql_in, a, quote_char=a.quote_char, wrap=a.wrap)
-    )
+
+    def _sq(a: argparse.Namespace) -> int:
+        from press.transforms.sql import to_sql_in
+
+        return _run_transform(to_sql_in, a, quote_char=a.quote_char, wrap=a.wrap)
+
+    p.set_defaults(func=_sq)
 
 
 def _register_escape_commands(sub: _SubParsers) -> None:
@@ -173,17 +212,35 @@ def _register_escape_commands(sub: _SubParsers) -> None:
         "unicode-decode", aliases=["ud"], help=r"Decode \uXXXX escape sequences to text"
     )
     _add_io_args(p)
-    p.set_defaults(func=lambda a: _run_transform(decode_unicode_escape, a))
+
+    def _ud(a: argparse.Namespace) -> int:
+        from press.transforms.escape import decode_unicode_escape
+
+        return _run_transform(decode_unicode_escape, a)
+
+    p.set_defaults(func=_ud)
 
     p = sub.add_parser(
         "unicode-encode", aliases=["ue"], help=r"Encode text to \uXXXX escape sequences"
     )
     _add_io_args(p)
-    p.set_defaults(func=lambda a: _run_transform(encode_unicode_escape, a))
+
+    def _ue(a: argparse.Namespace) -> int:
+        from press.transforms.escape import encode_unicode_escape
+
+        return _run_transform(encode_unicode_escape, a)
+
+    p.set_defaults(func=_ue)
 
     p = sub.add_parser("html-decode", aliases=["hd"], help="Decode HTML entities (e.g. &amp; → &)")
     _add_io_args(p)
-    p.set_defaults(func=lambda a: _run_transform(decode_html_entities, a))
+
+    def _hd(a: argparse.Namespace) -> int:
+        from press.transforms.escape import decode_html_entities
+
+        return _run_transform(decode_html_entities, a)
+
+    p.set_defaults(func=_hd)
 
 
 def _register_daemon_commands(sub: _SubParsers) -> None:
@@ -240,6 +297,8 @@ def main() -> None:
         sys.stderr.reconfigure(encoding="utf-8")
 
     parser = make_parser()
+    import argcomplete
+
     argcomplete.autocomplete(parser)
     args = parser.parse_args()
 

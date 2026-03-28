@@ -27,16 +27,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
         with:
           version: "latest"
           enable-cache: true
 
       - name: Set up Python
-        run: uv python install 3.12
+        run: uv python install 3.13
 
       - name: Install dependencies
         run: |
@@ -44,11 +44,10 @@ jobs:
 
       - name: Run pip-audit security check
         run: |
-          uv pip install pip-audit
           uv run pip-audit --format json --output pip-audit-report.json || true
 
       - name: Upload pip-audit report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: pip-audit-report
@@ -59,28 +58,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
         with:
           version: "latest"
           enable-cache: true
 
       - name: Set up Python
-        run: uv python install 3.12
-
-      - name: Install dependencies with bandit
-        run: |
-          uv sync --dev
-          uv pip install bandit[toml]
+        run: uv python install 3.13
 
       - name: Run Bandit security linter
         run: |
-          uv run bandit -r . -f json -o bandit-report.json --exclude ./test,./tests,./.venv || true
+          uvx --from "bandit[toml]" bandit -r . -f json -o bandit-report.json --exclude ./test,./tests,./.venv || true
 
       - name: Upload Bandit report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: bandit-report
@@ -95,14 +89,14 @@ jobs:
     if: (github.actor != 'dependabot[bot]')
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Run Semgrep
         run: |
           semgrep --config=auto --json --output=semgrep-report.json . || true
 
       - name: Upload Semgrep report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: semgrep-report

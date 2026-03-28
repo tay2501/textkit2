@@ -25,7 +25,7 @@ dependencies = [
 daemon = [
     "pystray==0.19.5",
     "pynput>=1.8.1",
-    "pywin32>=311",
+    "pywin32>=311; sys_platform == 'win32'",
     "Pillow>=12.1.0",
     "psutil>=7.0",
 ]
@@ -41,6 +41,16 @@ Changelog     = "https://github.com/tay2501/textkit2/blob/main/CHANGELOG.md"
 "Bug Tracker" = "https://github.com/tay2501/textkit2/issues"
 
 [dependency-groups]
+build = [
+    "pyinstaller>=6.19",
+]
+docs = [
+    "sphinx>=9.1",
+    "furo>=2025.12.19",
+    "myst-parser>=5.0",
+    "sphinx-copybutton>=0.5.2",
+    "sphinx-autobuild>=2025.8.25",
+]
 dev = [
     "pytest>=9.0",
     "pytest-mock>=3.14",
