@@ -72,6 +72,11 @@ echo "テスト"              | press unicode-encode  # → \u30c6\u30b9\u30c8
 # HTML entities
 echo '&lt;div&gt;' | press html-decode      # → <div>
 
+# Dictionary lookup
+press dict add FOOBER01 TABLE_HOGEHOGE --file ~/my.tsv
+echo "FOOBER01" | press dict --file ~/my.tsv  # → TABLE_HOGEHOGE
+echo "TABLE_HOGEHOGE" | press dict -r --file ~/my.tsv  # → FOOBER01 (reverse)
+
 # Normalize whitespace / line endings
 echo "  USER_ID  "  | press normalize        # → USER_ID
 cat file.txt        | press crlf             # all line endings → CRLF
@@ -139,6 +144,24 @@ press normalize  -c -C
 | `unicode-encode` | `ue` | Encode text to `\uXXXX` sequences |
 | `html-decode` | `hd` | Decode HTML entities (`&amp;` → `&`) |
 
+### Dictionary
+
+| Command | Description |
+|---|---|
+| `press dict [--file PATH] [-r]` | TSV dictionary lookup — exact match per line (`-r` for reverse) |
+| `press dict list [--file PATH]` | List all entries in the dictionary file |
+| `press dict add KEY VALUE [--file PATH]` | Add an entry to the dictionary |
+| `press dict remove KEY [--file PATH]` | Remove an entry from the dictionary |
+
+Default dictionary file: `%APPDATA%\press\dict\default.tsv` (Windows) / `~/.config/press/dict/default.tsv`
+
+TSV format:
+```
+# comment lines are ignored
+FOOBER01	TABLE_HOGEHOGE
+USER-ID	USER_ID
+```
+
 ### SQL & JSON
 
 | Command | Alias | Description |
@@ -187,7 +210,6 @@ The following features are planned but not yet implemented:
 - **Daemon mode** — background process with system tray icon
 - **Global hotkeys** — `Ctrl+Shift+F10` → key chord transforms clipboard in any app
 - **Clipboard utilities** — `hold` (protect from overwrite), `clear` (wipe)
-- **Dictionary lookup** — TSV-based custom string substitution (`dict`)
 - **Encoding repair** — fix mojibake from wrong charset (`fix-encoding`)
 
 ---

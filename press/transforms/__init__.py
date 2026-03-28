@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover
     from press.transforms.case import to_camel_case, to_kebab_case, to_pascal_case, to_snake_case
+    from press.transforms.dictionary import dict_forward, dict_reverse, load_tsv
     from press.transforms.encode import base64_decode, base64_encode, url_decode, url_encode
     from press.transforms.escape import (
         decode_html_entities,
@@ -25,10 +26,13 @@ __all__ = [
     "base64_encode",
     "decode_html_entities",
     "decode_unicode_escape",
+    "dict_forward",
+    "dict_reverse",
     "encode_unicode_escape",
     "hyphen_to_underscore",
     "json_compress",
     "json_format",
+    "load_tsv",
     "normalize_whitespace",
     "to_camel_case",
     "to_cr",
@@ -50,7 +54,10 @@ _LAZY: dict[str, tuple[str, str]] = {
     "base64_encode": ("press.transforms.encode", "base64_encode"),
     "decode_html_entities": ("press.transforms.escape", "decode_html_entities"),
     "decode_unicode_escape": ("press.transforms.escape", "decode_unicode_escape"),
+    "dict_forward": ("press.transforms.dictionary", "dict_forward"),
+    "dict_reverse": ("press.transforms.dictionary", "dict_reverse"),
     "encode_unicode_escape": ("press.transforms.escape", "encode_unicode_escape"),
+    "load_tsv": ("press.transforms.dictionary", "load_tsv"),
     "hyphen_to_underscore": ("press.transforms.separator", "hyphen_to_underscore"),
     "json_compress": ("press.transforms.json_fmt", "json_compress"),
     "json_format": ("press.transforms.json_fmt", "json_format"),

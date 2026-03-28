@@ -357,6 +357,138 @@ def _register_json_commands(sub: _SubParsers) -> None:
     p.set_defaults(func=_jc)
 
 
+def _add_dict_io_args(parser: argparse.ArgumentParser) -> None:
+    """Attach I/O options for the dict transform subcommand (no positional input)."""
+    parser.add_argument("-c", "--clip-in", action="store_true", help="Read input from clipboard")
+    parser.add_argument(
+        "-C",
+        "--clip-out",
+        action="store_true",
+        help="Write output to clipboard (also prints to stdout)",
+    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="Show before/after on stderr")
+    parser.add_argument("-q", "--quiet", action="store_true", help="Suppress all stderr output")
+    parser.add_argument(
+        "--fallback",
+        action="store_true",
+        help="On transform error, output original text and exit 0",
+    )
+
+
+def _register_dict_commands(sub: _SubParsers) -> None:
+    """Register the ``dict`` command group and its management subcommands."""
+    dict_p = sub.add_parser("dict", help="Dictionary-based text replacement (F-08, F-09)")
+    dict_p.add_argument(
+        "-r",
+        "--reverse",
+        action="store_true",
+        help="Apply reverse lookup (value→key instead of key→value)",
+    )
+    dict_p.add_argument(
+        "--file",
+        metavar="PATH",
+        default=None,
+        help="TSV dictionary file (default: platform config path)",
+    )
+    _add_dict_io_args(dict_p)
+
+    dict_sub = dict_p.add_subparsers(dest="dict_action", metavar="ACTION")
+
+    # --- dict list ---
+    list_p = dict_sub.add_parser("list", help="List all dictionary entries")
+    list_p.add_argument(
+        "--file",
+        metavar="PATH",
+        default=None,
+        help="TSV dictionary file (default: platform config path)",
+    )
+
+    # --- dict add ---
+    add_p = dict_sub.add_parser("add", help="Add an entry to the dictionary")
+    add_p.add_argument("key", help="Entry key")
+    add_p.add_argument("value", help="Entry value")
+    add_p.add_argument(
+        "--file",
+        metavar="PATH",
+        default=None,
+        help="TSV dictionary file (default: platform config path)",
+    )
+
+    # --- dict remove ---
+    rm_p = dict_sub.add_parser("remove", aliases=["rm"], help="Remove an entry from the dictionary")
+    rm_p.add_argument("key", help="Key to remove")
+    rm_p.add_argument(
+        "--file",
+        metavar="PATH",
+        default=None,
+        help="TSV dictionary file (default: platform config path)",
+    )
+
+    def _dict_handler(a: argparse.Namespace) -> int:
+        from pathlib import Path
+
+        from press.dictionary import add_entry, default_dict_path, list_entries, remove_entry
+        from press.transforms.dictionary import dict_forward, dict_reverse, load_tsv
+
+        # Resolve the --file argument from whichever parser captured it
+        raw_file: str | None = getattr(a, "file", None)
+        dict_path = Path(raw_file) if raw_file else default_dict_path()
+
+        action: str | None = getattr(a, "dict_action", None)
+
+        if action == "list":
+            try:
+                entries = list_entries(dict_path)
+            except FileNotFoundError:
+                print(
+                    f"press dict: error: dict file not found: {dict_path}",
+                    file=sys.stderr,
+                )
+                return 2
+            for key, value in entries:
+                sys.stdout.write(f"{key}\t{value}\n")
+            return 0
+
+        if action == "add":
+            add_entry(a.key, a.value, dict_path)
+            return 0
+
+        if action in ("remove", "rm"):
+            try:
+                found = remove_entry(a.key, dict_path)
+            except FileNotFoundError:
+                print(
+                    f"press dict: error: dict file not found: {dict_path}",
+                    file=sys.stderr,
+                )
+                return 2
+            if not found:
+                print(
+                    f"press dict remove: error: key not found: {a.key}",
+                    file=sys.stderr,
+                )
+                return 1
+            return 0
+
+        # No subcommand — run as a transform
+        try:
+            table = load_tsv(dict_path)
+        except FileNotFoundError:
+            print(
+                f"press dict: error: dict file not found: {dict_path}",
+                file=sys.stderr,
+            )
+            return 2
+
+        fn = dict_reverse if getattr(a, "reverse", False) else dict_forward
+        return _run_transform(fn, a, table=table)
+
+    dict_p.set_defaults(func=_dict_handler)
+    list_p.set_defaults(func=_dict_handler)
+    add_p.set_defaults(func=_dict_handler)
+    rm_p.set_defaults(func=_dict_handler)
+
+
 def _register_daemon_commands(sub: _SubParsers) -> None:
     daemon_p = sub.add_parser("daemon", help="Manage press daemon (not yet implemented)")
     daemon_p.add_argument(
@@ -385,6 +517,7 @@ def make_parser() -> argparse.ArgumentParser:
     _register_case_commands(sub)
     _register_encode_commands(sub)
     _register_json_commands(sub)
+    _register_dict_commands(sub)
     _register_daemon_commands(sub)
 
     return parser
