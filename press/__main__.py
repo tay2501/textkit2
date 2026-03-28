@@ -243,6 +243,119 @@ def _register_escape_commands(sub: _SubParsers) -> None:
     p.set_defaults(func=_hd)
 
 
+def _register_case_commands(sub: _SubParsers) -> None:
+    p = sub.add_parser("snake", aliases=["sn"], help="Convert to snake_case")
+    _add_io_args(p)
+
+    def _sn(a: argparse.Namespace) -> int:
+        from press.transforms.case import to_snake_case
+
+        return _run_transform(to_snake_case, a)
+
+    p.set_defaults(func=_sn)
+
+    p = sub.add_parser("camel", aliases=["cm"], help="Convert to camelCase")
+    _add_io_args(p)
+
+    def _cm(a: argparse.Namespace) -> int:
+        from press.transforms.case import to_camel_case
+
+        return _run_transform(to_camel_case, a)
+
+    p.set_defaults(func=_cm)
+
+    p = sub.add_parser("pascal", aliases=["pc"], help="Convert to PascalCase")
+    _add_io_args(p)
+
+    def _pc(a: argparse.Namespace) -> int:
+        from press.transforms.case import to_pascal_case
+
+        return _run_transform(to_pascal_case, a)
+
+    p.set_defaults(func=_pc)
+
+    p = sub.add_parser("kebab", aliases=["kb"], help="Convert to kebab-case")
+    _add_io_args(p)
+
+    def _kb(a: argparse.Namespace) -> int:
+        from press.transforms.case import to_kebab_case
+
+        return _run_transform(to_kebab_case, a)
+
+    p.set_defaults(func=_kb)
+
+
+def _register_encode_commands(sub: _SubParsers) -> None:
+    p = sub.add_parser("base64-encode", aliases=["be"], help="Encode text to Base64")
+    _add_io_args(p)
+
+    def _be(a: argparse.Namespace) -> int:
+        from press.transforms.encode import base64_encode
+
+        return _run_transform(base64_encode, a)
+
+    p.set_defaults(func=_be)
+
+    p = sub.add_parser("base64-decode", aliases=["bd"], help="Decode Base64 to text")
+    _add_io_args(p)
+
+    def _bd(a: argparse.Namespace) -> int:
+        from press.transforms.encode import base64_decode
+
+        return _run_transform(base64_decode, a)
+
+    p.set_defaults(func=_bd)
+
+    p = sub.add_parser("url-encode", aliases=["ue2"], help="Percent-encode URL text")
+    _add_io_args(p)
+
+    def _ue2(a: argparse.Namespace) -> int:
+        from press.transforms.encode import url_encode
+
+        return _run_transform(url_encode, a)
+
+    p.set_defaults(func=_ue2)
+
+    p = sub.add_parser("url-decode", aliases=["ud2"], help="Decode percent-encoded URL text")
+    _add_io_args(p)
+
+    def _ud2(a: argparse.Namespace) -> int:
+        from press.transforms.encode import url_decode
+
+        return _run_transform(url_decode, a)
+
+    p.set_defaults(func=_ud2)
+
+
+def _register_json_commands(sub: _SubParsers) -> None:
+    p = sub.add_parser("json-format", aliases=["jf"], help="Pretty-print JSON")
+    _add_io_args(p)
+    p.add_argument(
+        "--indent",
+        type=int,
+        default=2,
+        metavar="N",
+        help="Indentation spaces (default: 2)",
+    )
+
+    def _jf(a: argparse.Namespace) -> int:
+        from press.transforms.json_fmt import json_format
+
+        return _run_transform(json_format, a, indent=a.indent)
+
+    p.set_defaults(func=_jf)
+
+    p = sub.add_parser("json-compress", aliases=["jc"], help="Compress JSON to single line")
+    _add_io_args(p)
+
+    def _jc(a: argparse.Namespace) -> int:
+        from press.transforms.json_fmt import json_compress
+
+        return _run_transform(json_compress, a)
+
+    p.set_defaults(func=_jc)
+
+
 def _register_daemon_commands(sub: _SubParsers) -> None:
     daemon_p = sub.add_parser("daemon", help="Manage press daemon (not yet implemented)")
     daemon_p.add_argument(
@@ -268,6 +381,9 @@ def make_parser() -> argparse.ArgumentParser:
     _register_separator_commands(sub)
     _register_sql_commands(sub)
     _register_escape_commands(sub)
+    _register_case_commands(sub)
+    _register_encode_commands(sub)
+    _register_json_commands(sub)
     _register_daemon_commands(sub)
 
     return parser
