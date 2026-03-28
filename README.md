@@ -135,6 +135,7 @@ press normalize  -c -C
 | `base64-decode` | `bd` | Decode Base64 to text |
 | `url-encode` | `ue2` | Percent-encode URL text |
 | `url-decode` | `ud2` | Decode percent-encoded URL text |
+| `fix-encoding` | `fe` | Repair mojibake — re-detect and re-decode the original encoding (`--threshold N`) |
 
 ### Escape Sequences
 
@@ -217,7 +218,6 @@ The following features are planned but not yet implemented:
 - **Daemon mode** — background process with system tray icon
 - **Global hotkeys** — `Ctrl+Shift+F10` → key chord transforms clipboard in any app
 - **Clipboard HOLD** — protect clipboard from overwrite (`hold` command, requires daemon)
-- **Encoding repair** — fix mojibake from wrong charset (`fix-encoding`)
 
 ---
 

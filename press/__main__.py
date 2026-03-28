@@ -328,6 +328,29 @@ def _register_encode_commands(sub: _SubParsers) -> None:
     p.set_defaults(func=_ud2)
 
 
+def _register_encoding_repair_commands(sub: _SubParsers) -> None:
+    p = sub.add_parser(
+        "fix-encoding",
+        aliases=["fe"],
+        help="Repair mojibake text by detecting and re-decoding the original encoding (F-15)",
+    )
+    _add_io_args(p)
+    p.add_argument(
+        "--threshold",
+        type=float,
+        default=0.7,
+        metavar="N",
+        help="Minimum confidence to accept detected encoding (default: 0.7)",
+    )
+
+    def _fe(a: argparse.Namespace) -> int:
+        from press.transforms.encoding_repair import fix_encoding
+
+        return _run_transform(fix_encoding, a, confidence_threshold=a.threshold)
+
+    p.set_defaults(func=_fe)
+
+
 def _register_json_commands(sub: _SubParsers) -> None:
     p = sub.add_parser("json-format", aliases=["jf"], help="Pretty-print JSON")
     _add_io_args(p)
@@ -542,6 +565,7 @@ def make_parser() -> argparse.ArgumentParser:
     _register_escape_commands(sub)
     _register_case_commands(sub)
     _register_encode_commands(sub)
+    _register_encoding_repair_commands(sub)
     _register_json_commands(sub)
     _register_dict_commands(sub)
     _register_clipboard_util_commands(sub)
