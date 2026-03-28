@@ -144,6 +144,13 @@ press normalize  -c -C
 | `unicode-encode` | `ue` | Encode text to `\uXXXX` sequences |
 | `html-decode` | `hd` | Decode HTML entities (`&amp;` → `&`) |
 
+### Clipboard Utilities
+
+| Command | Alias | Description |
+|---|---|---|
+| `clear` | `cl` | Clear the clipboard |
+| `hold` | | Hold clipboard contents — protect from overwrite *(Phase 4, not yet implemented)* |
+
 ### Dictionary
 
 | Command | Description |
@@ -209,7 +216,7 @@ The following features are planned but not yet implemented:
 
 - **Daemon mode** — background process with system tray icon
 - **Global hotkeys** — `Ctrl+Shift+F10` → key chord transforms clipboard in any app
-- **Clipboard utilities** — `hold` (protect from overwrite), `clear` (wipe)
+- **Clipboard HOLD** — protect clipboard from overwrite (`hold` command, requires daemon)
 - **Encoding repair** — fix mojibake from wrong charset (`fix-encoding`)
 
 ---

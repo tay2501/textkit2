@@ -34,6 +34,19 @@ def set_clipboard_text(text: str) -> None:
     raise OSError("Clipboard access is only supported on Windows")
 
 
+def clear_clipboard() -> None:
+    """Clear the system clipboard (remove all contents).
+
+    Raises:
+        RuntimeError: If clipboard access fails.
+        OSError: On non-Windows platforms where clipboard access is unavailable.
+    """
+    if sys.platform == "win32":
+        _win_clear()
+        return
+    raise OSError("Clipboard access is only supported on Windows")
+
+
 # ---------------------------------------------------------------------------
 # Windows implementation via ctypes
 # ---------------------------------------------------------------------------
@@ -108,10 +121,21 @@ if sys.platform == "win32":
         finally:
             _user32.CloseClipboard()
 
+    def _win_clear() -> None:
+        if not _user32.OpenClipboard(None):
+            raise RuntimeError("Failed to open clipboard")
+        try:
+            _user32.EmptyClipboard()
+        finally:
+            _user32.CloseClipboard()
+
 else:
 
     def _win_get_text() -> str:  # type: ignore[misc]
         raise OSError("Clipboard access is only supported on Windows")
 
     def _win_set_text(text: str) -> None:  # type: ignore[misc]
+        raise OSError("Clipboard access is only supported on Windows")
+
+    def _win_clear() -> None:  # type: ignore[misc]
         raise OSError("Clipboard access is only supported on Windows")

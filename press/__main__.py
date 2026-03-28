@@ -489,6 +489,32 @@ def _register_dict_commands(sub: _SubParsers) -> None:
     rm_p.set_defaults(func=_dict_handler)
 
 
+def _register_clipboard_util_commands(sub: _SubParsers) -> None:
+    p = sub.add_parser("clear", aliases=["cl"], help="Clear the clipboard")
+    p.add_argument("-q", "--quiet", action="store_true", help="Suppress all stderr output")
+
+    def _cl(a: argparse.Namespace) -> int:
+        from press.clipboard import clear_clipboard
+
+        try:
+            clear_clipboard()
+        except Exception as exc:
+            if not getattr(a, "quiet", False):
+                print(f"press clear: error: {exc}", file=sys.stderr)
+            return 1
+        return 0
+
+    p.set_defaults(func=_cl)
+
+    p = sub.add_parser("hold", help="Hold clipboard contents (not yet implemented)")
+
+    def _hold(a: argparse.Namespace) -> int:
+        print("press hold: error: hold is not yet implemented", file=sys.stderr)
+        return 1
+
+    p.set_defaults(func=_hold)
+
+
 def _register_daemon_commands(sub: _SubParsers) -> None:
     daemon_p = sub.add_parser("daemon", help="Manage press daemon (not yet implemented)")
     daemon_p.add_argument(
@@ -518,6 +544,7 @@ def make_parser() -> argparse.ArgumentParser:
     _register_encode_commands(sub)
     _register_json_commands(sub)
     _register_dict_commands(sub)
+    _register_clipboard_util_commands(sub)
     _register_daemon_commands(sub)
 
     return parser
