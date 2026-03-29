@@ -73,11 +73,11 @@ jobs:
 
       - name: Run Bandit security linter
         run: |
-          uvx --from "bandit[toml]" bandit -r . -f sarif -o bandit-report.sarif --exclude ./test,./tests,./.venv || true
+          uvx --from "bandit[toml]" bandit -r press/ -f sarif -o bandit-report.sarif || true
 
       - name: Upload Bandit SARIF to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        if: always() && hashFiles('bandit-report.sarif') != ''
         with:
           sarif_file: bandit-report.sarif
           category: bandit
@@ -97,8 +97,8 @@ jobs:
           semgrep --config=auto --sarif --output=semgrep-report.sarif . || true
 
       - name: Upload Semgrep SARIF to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        if: always() && hashFiles('semgrep-report.sarif') != ''
         with:
           sarif_file: semgrep-report.sarif
           category: semgrep
