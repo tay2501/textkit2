@@ -35,8 +35,7 @@ def fix_encoding(text: str, *, confidence_threshold: float = 0.7) -> str:
     # Validate confidence_threshold
     if confidence_threshold > 1.0:
         raise ValueError(
-            f"fix-encoding: low confidence ({confidence_threshold:.2f} > 1.0) "
-            "for any encoding"
+            f"fix-encoding: low confidence ({confidence_threshold:.2f} > 1.0) for any encoding"
         )
 
     raw_bytes = text.encode("latin-1")
