@@ -10,11 +10,11 @@ type _SubParsers = argparse._SubParsersAction[argparse.ArgumentParser]
 
 
 def _version() -> str:
-    try:
-        from importlib.metadata import version
+    from importlib.metadata import PackageNotFoundError, version
 
+    try:
         return version("press")
-    except Exception:
+    except PackageNotFoundError:
         return "unknown"
 
 
@@ -459,52 +459,53 @@ def _register_dict_commands(sub: _SubParsers) -> None:
 
         action: str | None = getattr(a, "dict_action", None)
 
-        if action == "list":
-            try:
-                entries = list_entries(dict_path)
-            except FileNotFoundError:
-                print(
-                    f"press dict: error: dict file not found: {dict_path}",
-                    file=sys.stderr,
-                )
-                return 2
-            for key, value in entries:
-                sys.stdout.write(f"{key}\t{value}\n")
-            return 0
+        match action:
+            case "list":
+                try:
+                    entries = list_entries(dict_path)
+                except FileNotFoundError:
+                    print(
+                        f"press dict: error: dict file not found: {dict_path}",
+                        file=sys.stderr,
+                    )
+                    return 2
+                for key, value in entries:
+                    sys.stdout.write(f"{key}\t{value}\n")
+                return 0
 
-        if action == "add":
-            add_entry(a.key, a.value, dict_path)
-            return 0
+            case "add":
+                add_entry(a.key, a.value, dict_path)
+                return 0
 
-        if action in ("remove", "rm"):
-            try:
-                found = remove_entry(a.key, dict_path)
-            except FileNotFoundError:
-                print(
-                    f"press dict: error: dict file not found: {dict_path}",
-                    file=sys.stderr,
-                )
-                return 2
-            if not found:
-                print(
-                    f"press dict remove: error: key not found: {a.key}",
-                    file=sys.stderr,
-                )
-                return 1
-            return 0
+            case "remove" | "rm":
+                try:
+                    found = remove_entry(a.key, dict_path)
+                except FileNotFoundError:
+                    print(
+                        f"press dict: error: dict file not found: {dict_path}",
+                        file=sys.stderr,
+                    )
+                    return 2
+                if not found:
+                    print(
+                        f"press dict remove: error: key not found: {a.key}",
+                        file=sys.stderr,
+                    )
+                    return 1
+                return 0
 
-        # No subcommand — run as a transform
-        try:
-            table = load_tsv(dict_path)
-        except FileNotFoundError:
-            print(
-                f"press dict: error: dict file not found: {dict_path}",
-                file=sys.stderr,
-            )
-            return 2
-
-        fn = dict_reverse if getattr(a, "reverse", False) else dict_forward
-        return _run_transform(fn, a, table=table)
+            case _:
+                # No subcommand — run as a transform
+                try:
+                    table = load_tsv(dict_path)
+                except FileNotFoundError:
+                    print(
+                        f"press dict: error: dict file not found: {dict_path}",
+                        file=sys.stderr,
+                    )
+                    return 2
+                fn = dict_reverse if getattr(a, "reverse", False) else dict_forward
+                return _run_transform(fn, a, table=table)
 
     dict_p.set_defaults(func=_dict_handler)
     list_p.set_defaults(func=_dict_handler)

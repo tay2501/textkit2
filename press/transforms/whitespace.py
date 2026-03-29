@@ -22,16 +22,9 @@ def normalize_whitespace(text: str) -> str:
     # Normalize line endings to LF first for consistent processing
     normalized = text.replace("\r\n", "\n").replace("\r", "\n")
 
-    lines = normalized.split("\n")
-    cleaned: list[str] = []
-    for line in lines:
-        # Replace full-width space (U+3000) with regular space
+    def _clean(line: str) -> str:
         line = line.replace("\u3000", " ")
-        # Collapse any whitespace run (tabs, multiple spaces) to single space
         line = _WHITESPACE_RE.sub(" ", line)
-        # Strip leading/trailing spaces
-        line = line.strip()
-        if line:
-            cleaned.append(line)
+        return line.strip()
 
-    return "\n".join(cleaned)
+    return "\n".join(cleaned for line in normalized.split("\n") if (cleaned := _clean(line)))

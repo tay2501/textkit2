@@ -24,6 +24,5 @@ def to_sql_in(text: str, *, quote_char: str = "'", wrap: bool = False) -> str:
     if not values:
         raise ValueError("Input is empty — no values to convert")
 
-    quoted = [f"{quote_char}{v}{quote_char}" for v in values]
-    result = ",".join(quoted)
+    result = ",".join(f"{quote_char}{v}{quote_char}" for v in values)
     return f"({result})" if wrap else result
