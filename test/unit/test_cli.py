@@ -274,8 +274,8 @@ class TestHtmlDecode:
 # ---------------------------------------------------------------------------
 
 
-class TestDaemonStub:
-    def test_daemon_not_implemented(self) -> None:
+class TestDaemonStatus:
+    def test_daemon_status_not_running(self) -> None:
         result = _run("daemon", "status")
         assert result.returncode == 1
-        assert "not" in result.stderr.lower() or "implement" in result.stderr.lower()
+        assert "not running" in result.stdout.lower()

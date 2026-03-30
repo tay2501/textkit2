@@ -105,7 +105,7 @@ warn_unreachable   = true
 enable_error_code  = ["truthy-bool", "redundant-expr", "possibly-undefined"]
 
 [[tool.mypy.overrides]]
-module = ["pystray.*", "pynput.*", "win32.*", "pywintypes", "jaconv.*"]
+module = ["pystray.*", "pynput.*", "win32.*", "pywintypes", "jaconv.*", "PIL.*", "psutil.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

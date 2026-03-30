@@ -79,6 +79,7 @@ class UiConfig:
 
     startup_notification: bool = True
     hold_icon: bool = True
+    notify_level: str = "off"  # "off" | "success" | "error" | "all"
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,9 +160,12 @@ def _parse_ui(data: dict[str, Any]) -> UiConfig:
         A :class:`UiConfig` with per-field defaults applied.
     """
     default = UiConfig()
+    raw_level = data.get("notify_level", default.notify_level)
+    notify_level = raw_level if raw_level in ("off", "success", "error", "all") else "off"
     return UiConfig(
         startup_notification=data.get("startup_notification", default.startup_notification),
         hold_icon=data.get("hold_icon", default.hold_icon),
+        notify_level=notify_level,
     )
 
 

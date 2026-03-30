@@ -540,7 +540,7 @@ def _register_clipboard_util_commands(sub: _SubParsers) -> None:
 
 
 def _register_daemon_commands(sub: _SubParsers) -> None:
-    daemon_p = sub.add_parser("daemon", help="Manage press daemon (not yet implemented)")
+    daemon_p = sub.add_parser("daemon", help="Manage press background daemon")
     daemon_p.add_argument(
         "action",
         choices=["start", "stop", "status", "restart"],
@@ -576,11 +576,28 @@ def make_parser() -> argparse.ArgumentParser:
 
 
 def _handle_daemon(args: argparse.Namespace) -> int:
-    print(
-        f"press daemon: error: {args.action} is not yet implemented",
-        file=sys.stderr,
-    )
-    return 1
+    match args.action:
+        case "start":
+            from press.daemon import run_daemon
+
+            run_daemon()
+            return 0
+        case "stop":
+            from press.daemon import stop_daemon
+
+            return stop_daemon()
+        case "status":
+            from press.daemon import daemon_status
+
+            return daemon_status()
+        case "restart":
+            from press.daemon import run_daemon, stop_daemon
+
+            stop_daemon()
+            run_daemon()
+            return 0
+        case _:
+            return 1
 
 
 # ---------------------------------------------------------------------------
