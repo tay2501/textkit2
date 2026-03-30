@@ -109,6 +109,11 @@ module = ["pystray.*", "pynput.*", "win32.*", "pywintypes", "jaconv.*", "PIL.*",
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+# Platform-specific branches are unreachable on non-target platforms by design
+module = "press.daemon"
+warn_unreachable = false
+
+[[tool.mypy.overrides]]
 module = "test.*"
 disallow_untyped_defs = false
 

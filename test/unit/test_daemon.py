@@ -76,8 +76,8 @@ class TestNormalizeKey:
 
         from press.daemon import _normalize_key
 
-        assert _normalize_key(kb.Key.shift) == "shift"  # type: ignore[attr-defined]
-        assert _normalize_key(kb.Key.ctrl) == "ctrl"  # type: ignore[attr-defined]
+        assert _normalize_key(kb.Key.shift) == "shift"
+        assert _normalize_key(kb.Key.ctrl) == "ctrl"
 
     def test_none_returns_none(self) -> None:
         from press.daemon import _normalize_key
@@ -133,7 +133,7 @@ class TestCommandDispatcherHold:
             mock_icon = MagicMock()
             d.set_icon(mock_icon)
             # notify_level must be "error" or "all" to see notify calls
-            object.__setattr__(d._config.ui, "notify_level", "error")  # type: ignore[arg-type]
+            object.__setattr__(d._config.ui, "notify_level", "error")
             d.dispatch("hold")
             mock_icon.notify.assert_called_once()
             args = mock_icon.notify.call_args[0]
@@ -245,7 +245,7 @@ class TestLeaderKeyListenerOnPress:
         ll, q = self._make_listener()
         from pynput import keyboard as kb
 
-        ll._on_press(kb.Key.shift)  # type: ignore[attr-defined]
+        ll._on_press(kb.Key.shift)
         ll._on_press(self._keycode("u"))
         assert q.get_nowait() == ("dispatch", "underscore")
 
@@ -253,8 +253,8 @@ class TestLeaderKeyListenerOnPress:
         ll, q = self._make_listener()
         from pynput import keyboard as kb
 
-        ll._on_press(kb.Key.shift)  # type: ignore[attr-defined]
-        ll._on_release(kb.Key.shift)  # type: ignore[attr-defined]
+        ll._on_press(kb.Key.shift)
+        ll._on_release(kb.Key.shift)
         ll._on_press(self._keycode("u"))
         item = q.get_nowait()
         # "u" alone is not in bindings → unknown_key (shift+u binding doesn't match)

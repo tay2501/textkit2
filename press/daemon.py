@@ -102,22 +102,21 @@ def _acquire_mutex() -> int | None:
     Returns ``None`` when another instance already holds the mutex, or on
     non-Windows platforms.
     """
-    if sys.platform != "win32":
-        return None  # pragma: no cover
-    kernel32 = ctypes.windll.kernel32
-    handle = kernel32.CreateMutexW(None, True, _MUTEX_NAME)
-    if kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
-        if handle:
-            kernel32.CloseHandle(handle)
-        return None
-    return int(handle)
+    if sys.platform == "win32":
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.CreateMutexW(None, True, _MUTEX_NAME)
+        if kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+            if handle:
+                kernel32.CloseHandle(handle)
+            return None
+        return int(handle)
+    return None  # pragma: no cover
 
 
 def _release_mutex(handle: int) -> None:
     """Close the mutex HANDLE."""
-    if sys.platform != "win32":
-        return  # pragma: no cover
-    ctypes.windll.kernel32.CloseHandle(handle)
+    if sys.platform == "win32":
+        ctypes.windll.kernel32.CloseHandle(handle)
 
 
 # ---------------------------------------------------------------------------
