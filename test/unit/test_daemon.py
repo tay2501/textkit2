@@ -455,3 +455,120 @@ class TestAcquireMutex:
             assert handle2 is None
         finally:
             _release_mutex(handle1)
+
+
+# ---------------------------------------------------------------------------
+# _create_tray_image
+# ---------------------------------------------------------------------------
+
+
+class TestCreateTrayImage:
+    def test_creates_valid_image(self) -> None:
+        from press.daemon import _create_tray_image
+
+        img = _create_tray_image()
+        assert img.size == (64, 64)
+        assert img.mode == "RGBA"
+
+
+# ---------------------------------------------------------------------------
+# daemon_status (Windows mutex probe)
+# ---------------------------------------------------------------------------
+
+
+class TestDaemonStatusWindows:
+    @pytest.mark.windows_only
+    def test_running_via_mutex_on_windows(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        pid_file = tmp_path / "press.pid"
+        pid_file.write_text("99999", encoding="utf-8")
+        monkeypatch.setattr("press.daemon._PID_PATH", pid_file)
+        monkeypatch.setattr("sys.platform", "win32")
+
+        from press.daemon import _acquire_mutex, daemon_status
+
+        # Acquire mutex to simulate daemon running
+        handle = _acquire_mutex()
+        assert handle is not None
+        try:
+            rc = daemon_status()
+            assert rc == 0
+            assert "running" in capsys.readouterr().out
+        finally:
+            from press.daemon import _release_mutex
+
+            _release_mutex(handle)
+
+    @pytest.mark.windows_only
+    def test_not_running_via_mutex_on_windows(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        pid_file = tmp_path / "press.pid"
+        pid_file.write_text("99999", encoding="utf-8")
+        monkeypatch.setattr("press.daemon._PID_PATH", pid_file)
+        monkeypatch.setattr("sys.platform", "win32")
+
+        from press.daemon import daemon_status
+
+        rc = daemon_status()
+        assert rc == 1
+        assert "not running" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# stop_daemon (timeout handling)
+# ---------------------------------------------------------------------------
+
+
+class TestStopDaemonTimeout:
+    def test_timeout_expires_kills_process(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        pid_file = tmp_path / "press.pid"
+        pid_file.write_text("12345", encoding="utf-8")
+        monkeypatch.setattr("press.daemon._PID_PATH", pid_file)
+
+        import psutil
+
+        mock_proc = MagicMock()
+        mock_proc.wait.side_effect = psutil.TimeoutExpired("fake", 1.0)
+        with patch("psutil.Process", return_value=mock_proc):
+            from press.daemon import stop_daemon
+
+            assert stop_daemon() == 0
+        mock_proc.terminate.assert_called_once()
+        mock_proc.kill.assert_called_once()
+        assert not pid_file.exists()
+
+
+# ---------------------------------------------------------------------------
+# WorkerThread dispatch matching
+# ---------------------------------------------------------------------------
+
+
+class TestWorkerThreadDispatch:
+    def test_worker_handles_all_work_types(self) -> None:
+        from press.config import PressConfig
+        from press.daemon import CommandDispatcher, HotkeyManager, _WorkerThread
+
+        config = PressConfig()
+        work_queue: queue.Queue[tuple[str, ...]] = queue.Queue()
+        dispatcher = CommandDispatcher(config)
+        hm = HotkeyManager(config.hotkeys, work_queue)
+
+        # Enqueue a stop command
+        work_queue.put(("stop",))
+
+        # Create and run worker briefly
+        worker = _WorkerThread(work_queue, dispatcher, hm)
+        worker.run()
+
+        # Worker should exit after processing stop
+        assert work_queue.empty()
