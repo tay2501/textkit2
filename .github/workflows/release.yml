@@ -37,7 +37,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv sync --all-extras --dev
+          uv sync --all-extras --dev --frozen
 
       - name: Run tests
         run: |
@@ -98,7 +98,7 @@ jobs:
         run: uv python install 3.13
 
       - name: Install dependencies
-        run: uv sync --group build
+        run: uv sync --group build --extra daemon
 
       - name: Build Windows executable
         shell: bash
