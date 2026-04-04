@@ -124,7 +124,7 @@ class TestCommandDispatcherHalfwidth:
 
 
 class TestCommandDispatcherHold:
-    def test_hold_notifies_not_implemented(self) -> None:
+    def test_hold_stores_clipboard_text(self) -> None:
         from press.config import PressConfig
         from press.daemon import CommandDispatcher
 
@@ -132,12 +132,9 @@ class TestCommandDispatcherHold:
             d = CommandDispatcher(PressConfig())
             mock_icon = MagicMock()
             d.set_icon(mock_icon)
-            # notify_level must be "error" or "all" to see notify calls
-            object.__setattr__(d._config.ui, "notify_level", "error")
+            assert d._held_text is None
             d.dispatch("hold")
-            mock_icon.notify.assert_called_once()
-            args = mock_icon.notify.call_args[0]
-            assert "hold" in args[1].lower() or "not yet implemented" in args[0].lower()
+            assert d._held_text == "x"
 
 
 class TestCommandDispatcherNotifyLevel:

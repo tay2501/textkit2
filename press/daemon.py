@@ -43,11 +43,16 @@ _MODIFIER_TOKENS = frozenset({"ctrl", "shift", "alt", "cmd", "win", "meta"})
 # ---------------------------------------------------------------------------
 
 
-def _create_tray_image() -> Image:
-    """Return a 64x64 RGBA PIL image used as the system-tray icon."""
+def _create_tray_image(holding: bool = False) -> Image:
+    """Return a 64x64 RGBA PIL image used as the system-tray icon.
+
+    Args:
+        holding: When ``True``, the background is red to indicate hold state.
+    """
     from PIL import Image, ImageDraw, ImageFont
 
-    img = Image.new("RGBA", (_ICON_SIZE, _ICON_SIZE), (30, 30, 30, 255))
+    bg_color = (180, 30, 30, 255) if holding else (30, 30, 30, 255)
+    img = Image.new("RGBA", (_ICON_SIZE, _ICON_SIZE), bg_color)
     draw = ImageDraw.Draw(img)
     font = ImageFont.load_default(size=40)
     bbox = draw.textbbox((0, 0), "P", font=font)
@@ -134,6 +139,7 @@ class CommandDispatcher:
     def __init__(self, config: PressConfig) -> None:
         self._config = config
         self._icon: pystray.Icon | None = None
+        self._held_text: str | None = None  # Phase 4: in-memory hold state
 
     def set_icon(self, icon: pystray.Icon) -> None:
         """Bind the tray icon used for notifications."""
@@ -155,6 +161,9 @@ class CommandDispatcher:
             if command == "clear":
                 clear_clipboard()
                 self._notify_success(command, "")
+                return
+            if command == "hold":
+                self._toggle_hold()
                 return
             text = get_clipboard_text()
             result = self._transform(command, text)
@@ -219,8 +228,6 @@ class CommandDispatcher:
                 from press.transforms.escape import encode_unicode_escape
 
                 return encode_unicode_escape(text)
-            case "hold":
-                raise NotImplementedError("hold is not yet implemented (Phase 4)")
             case _:
                 raise ValueError(f"unknown command: {command!r}")
 
@@ -252,6 +259,29 @@ class CommandDispatcher:
 
         with contextlib.suppress(Exception):
             self._icon.notify(message, title)
+
+    def _toggle_hold(self) -> None:
+        """Toggle in-memory hold state and update the tray icon."""
+        from press.clipboard import get_clipboard_text, set_clipboard_text
+
+        if self._held_text is None:
+            self._held_text = get_clipboard_text()
+            self._update_icon(holding=True)
+            self._notify_success("hold", "")
+        else:
+            set_clipboard_text(self._held_text)
+            self._held_text = None
+            self._update_icon(holding=False)
+            self._notify_success("hold-release", "")
+
+    def _update_icon(self, *, holding: bool) -> None:
+        """Swap the tray icon to reflect hold state."""
+        if self._icon is None or not self._config.ui.hold_icon:
+            return
+        import contextlib
+
+        with contextlib.suppress(Exception):
+            self._icon.icon = _create_tray_image(holding=holding)
 
 
 # ---------------------------------------------------------------------------

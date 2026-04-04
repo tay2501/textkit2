@@ -37,13 +37,37 @@ class TestClearClipboard:
         assert result.stderr == ""
 
 
-class TestHoldStub:
-    def test_hold_exits_one(self) -> None:
+@pytest.mark.windows_only
+class TestHoldCommand:
+    def _seed_clipboard(self, text: str) -> None:
+        """Put *text* into the clipboard so hold has something to save."""
+        result = subprocess.run(
+            [sys.executable, "-c", f"import press.clipboard as c; c.set_clipboard_text({text!r})"],
+            capture_output=True,
+            text=True,
+            env={**__import__("os").environ, "PYTHONUTF8": "1"},
+        )
+        assert result.returncode == 0, result.stderr
+
+    def test_hold_prints_held_to_stderr(self) -> None:
+        """hold with non-empty clipboard prints 'press hold: held' to stderr."""
+        self._seed_clipboard("test hold content")
         result = subprocess.run(
             [sys.executable, "-m", "press", "hold"],
             capture_output=True,
             text=True,
             env={**__import__("os").environ, "PYTHONUTF8": "1"},
         )
-        assert result.returncode == 1
-        assert "not yet implemented" in result.stderr
+        assert result.returncode == 0
+        assert "press hold:" in result.stderr
+
+    def test_hold_quiet_suppresses_stderr(self) -> None:
+        self._seed_clipboard("test hold quiet")
+        result = subprocess.run(
+            [sys.executable, "-m", "press", "hold", "-q"],
+            capture_output=True,
+            text=True,
+            env={**__import__("os").environ, "PYTHONUTF8": "1"},
+        )
+        assert result.returncode == 0
+        assert result.stderr == ""
