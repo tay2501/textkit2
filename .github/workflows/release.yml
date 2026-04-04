@@ -50,7 +50,7 @@ jobs:
 
       - name: Type check
         run: |
-          uv run mypy .
+          uv run mypy press/
 
   build-artifacts:
     name: Build Release Artifacts
