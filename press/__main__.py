@@ -3,7 +3,10 @@
 import argparse
 import sys
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from press.commands import SimpleCommand
 
 # Convenience alias for the subparsers action type
 type _SubParsers = argparse._SubParsersAction[argparse.ArgumentParser]
@@ -100,96 +103,23 @@ def _add_io_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("input", nargs="?", default=None, help="Input text (default: stdin)")
 
 
-def _register_width_commands(sub: _SubParsers) -> None:
-    p = sub.add_parser(
-        "halfwidth", aliases=["hw"], help="Convert full-width characters to half-width"
-    )
+def _register_simple_command(sub: _SubParsers, cmd: "SimpleCommand") -> None:
+    """Register one simple transform command from the central registry.
+
+    "Simple" means: no extra CLI arguments beyond the standard I/O flags.
+    The transform function signature is ``fn(text: str) -> str``.
+    """
+    import importlib
+
+    p = sub.add_parser(cmd.name, aliases=list(cmd.aliases), help=cmd.help)
     _add_io_args(p)
 
-    def _hw(a: argparse.Namespace) -> int:
-        from press.transforms.width import to_halfwidth
+    # Bind cmd as a default argument to avoid the loop late-binding pitfall.
+    def _handler(a: argparse.Namespace, _cmd: "SimpleCommand" = cmd) -> int:
+        fn = getattr(importlib.import_module(_cmd.module), _cmd.fn)
+        return _run_transform(fn, a)
 
-        return _run_transform(to_halfwidth, a)
-
-    p.set_defaults(func=_hw)
-
-    p = sub.add_parser(
-        "fullwidth", aliases=["fw"], help="Convert half-width characters to full-width"
-    )
-    _add_io_args(p)
-
-    def _fw(a: argparse.Namespace) -> int:
-        from press.transforms.width import to_fullwidth
-
-        return _run_transform(to_fullwidth, a)
-
-    p.set_defaults(func=_fw)
-
-
-def _register_whitespace_commands(sub: _SubParsers) -> None:
-    p = sub.add_parser("normalize", aliases=["norm"], help="Normalize whitespace and blank lines")
-    _add_io_args(p)
-
-    def _norm(a: argparse.Namespace) -> int:
-        from press.transforms.whitespace import normalize_whitespace
-
-        return _run_transform(normalize_whitespace, a)
-
-    p.set_defaults(func=_norm)
-
-
-def _register_lineending_commands(sub: _SubParsers) -> None:
-    p = sub.add_parser("crlf", help=r"Convert line endings to CRLF (\r\n)")
-    _add_io_args(p)
-
-    def _crlf(a: argparse.Namespace) -> int:
-        from press.transforms.lineending import to_crlf
-
-        return _run_transform(to_crlf, a)
-
-    p.set_defaults(func=_crlf)
-
-    p = sub.add_parser("lf", help=r"Convert line endings to LF (\n)")
-    _add_io_args(p)
-
-    def _lf(a: argparse.Namespace) -> int:
-        from press.transforms.lineending import to_lf
-
-        return _run_transform(to_lf, a)
-
-    p.set_defaults(func=_lf)
-
-    p = sub.add_parser("cr", help=r"Convert line endings to CR (\r)")
-    _add_io_args(p)
-
-    def _cr(a: argparse.Namespace) -> int:
-        from press.transforms.lineending import to_cr
-
-        return _run_transform(to_cr, a)
-
-    p.set_defaults(func=_cr)
-
-
-def _register_separator_commands(sub: _SubParsers) -> None:
-    p = sub.add_parser("underscore", aliases=["us"], help="Convert hyphens to underscores")
-    _add_io_args(p)
-
-    def _us(a: argparse.Namespace) -> int:
-        from press.transforms.separator import hyphen_to_underscore
-
-        return _run_transform(hyphen_to_underscore, a)
-
-    p.set_defaults(func=_us)
-
-    p = sub.add_parser("hyphen", aliases=["hy"], help="Convert underscores to hyphens")
-    _add_io_args(p)
-
-    def _hy(a: argparse.Namespace) -> int:
-        from press.transforms.separator import underscore_to_hyphen
-
-        return _run_transform(underscore_to_hyphen, a)
-
-    p.set_defaults(func=_hy)
+    p.set_defaults(func=_handler)
 
 
 def _register_sql_commands(sub: _SubParsers) -> None:
@@ -206,126 +136,6 @@ def _register_sql_commands(sub: _SubParsers) -> None:
         return _run_transform(to_sql_in, a, quote_char=a.quote_char, wrap=a.wrap)
 
     p.set_defaults(func=_sq)
-
-
-def _register_escape_commands(sub: _SubParsers) -> None:
-    p = sub.add_parser(
-        "unicode-decode", aliases=["ud"], help=r"Decode \uXXXX escape sequences to text"
-    )
-    _add_io_args(p)
-
-    def _ud(a: argparse.Namespace) -> int:
-        from press.transforms.escape import decode_unicode_escape
-
-        return _run_transform(decode_unicode_escape, a)
-
-    p.set_defaults(func=_ud)
-
-    p = sub.add_parser(
-        "unicode-encode", aliases=["ue"], help=r"Encode text to \uXXXX escape sequences"
-    )
-    _add_io_args(p)
-
-    def _ue(a: argparse.Namespace) -> int:
-        from press.transforms.escape import encode_unicode_escape
-
-        return _run_transform(encode_unicode_escape, a)
-
-    p.set_defaults(func=_ue)
-
-    p = sub.add_parser("html-decode", aliases=["hd"], help="Decode HTML entities (e.g. &amp; → &)")
-    _add_io_args(p)
-
-    def _hd(a: argparse.Namespace) -> int:
-        from press.transforms.escape import decode_html_entities
-
-        return _run_transform(decode_html_entities, a)
-
-    p.set_defaults(func=_hd)
-
-
-def _register_case_commands(sub: _SubParsers) -> None:
-    p = sub.add_parser("snake", aliases=["sn"], help="Convert to snake_case")
-    _add_io_args(p)
-
-    def _sn(a: argparse.Namespace) -> int:
-        from press.transforms.case import to_snake_case
-
-        return _run_transform(to_snake_case, a)
-
-    p.set_defaults(func=_sn)
-
-    p = sub.add_parser("camel", aliases=["cm"], help="Convert to camelCase")
-    _add_io_args(p)
-
-    def _cm(a: argparse.Namespace) -> int:
-        from press.transforms.case import to_camel_case
-
-        return _run_transform(to_camel_case, a)
-
-    p.set_defaults(func=_cm)
-
-    p = sub.add_parser("pascal", aliases=["pc"], help="Convert to PascalCase")
-    _add_io_args(p)
-
-    def _pc(a: argparse.Namespace) -> int:
-        from press.transforms.case import to_pascal_case
-
-        return _run_transform(to_pascal_case, a)
-
-    p.set_defaults(func=_pc)
-
-    p = sub.add_parser("kebab", aliases=["kb"], help="Convert to kebab-case")
-    _add_io_args(p)
-
-    def _kb(a: argparse.Namespace) -> int:
-        from press.transforms.case import to_kebab_case
-
-        return _run_transform(to_kebab_case, a)
-
-    p.set_defaults(func=_kb)
-
-
-def _register_encode_commands(sub: _SubParsers) -> None:
-    p = sub.add_parser("base64-encode", aliases=["be"], help="Encode text to Base64")
-    _add_io_args(p)
-
-    def _be(a: argparse.Namespace) -> int:
-        from press.transforms.encode import base64_encode
-
-        return _run_transform(base64_encode, a)
-
-    p.set_defaults(func=_be)
-
-    p = sub.add_parser("base64-decode", aliases=["bd"], help="Decode Base64 to text")
-    _add_io_args(p)
-
-    def _bd(a: argparse.Namespace) -> int:
-        from press.transforms.encode import base64_decode
-
-        return _run_transform(base64_decode, a)
-
-    p.set_defaults(func=_bd)
-
-    p = sub.add_parser("url-encode", aliases=["ue2"], help="Percent-encode URL text")
-    _add_io_args(p)
-
-    def _ue2(a: argparse.Namespace) -> int:
-        from press.transforms.encode import url_encode
-
-        return _run_transform(url_encode, a)
-
-    p.set_defaults(func=_ue2)
-
-    p = sub.add_parser("url-decode", aliases=["ud2"], help="Decode percent-encoded URL text")
-    _add_io_args(p)
-
-    def _ud2(a: argparse.Namespace) -> int:
-        from press.transforms.encode import url_decode
-
-        return _run_transform(url_decode, a)
-
-    p.set_defaults(func=_ud2)
 
 
 def _register_encoding_repair_commands(sub: _SubParsers) -> None:
@@ -351,7 +161,7 @@ def _register_encoding_repair_commands(sub: _SubParsers) -> None:
     p.set_defaults(func=_fe)
 
 
-def _register_json_commands(sub: _SubParsers) -> None:
+def _register_json_format_command(sub: _SubParsers) -> None:
     p = sub.add_parser("json-format", aliases=["jf"], help="Pretty-print JSON")
     _add_io_args(p)
     p.add_argument(
@@ -368,16 +178,6 @@ def _register_json_commands(sub: _SubParsers) -> None:
         return _run_transform(json_format, a, indent=a.indent)
 
     p.set_defaults(func=_jf)
-
-    p = sub.add_parser("json-compress", aliases=["jc"], help="Compress JSON to single line")
-    _add_io_args(p)
-
-    def _jc(a: argparse.Namespace) -> int:
-        from press.transforms.json_fmt import json_compress
-
-        return _run_transform(json_compress, a)
-
-    p.set_defaults(func=_jc)
 
 
 def _add_dict_io_args(parser: argparse.ArgumentParser) -> None:
@@ -563,6 +363,8 @@ def _register_daemon_commands(sub: _SubParsers) -> None:
 
 def make_parser() -> argparse.ArgumentParser:
     """Build and return the top-level argument parser."""
+    from press.commands import SIMPLE_COMMANDS
+
     parser = argparse.ArgumentParser(
         prog="press",
         description="Clipboard text transformation tool",
@@ -570,16 +372,16 @@ def make_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"press {_version()}")
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
 
-    _register_width_commands(sub)
-    _register_whitespace_commands(sub)
-    _register_lineending_commands(sub)
-    _register_separator_commands(sub)
+    # Simple commands: no extra arguments beyond the standard I/O flags
+    for cmd in SIMPLE_COMMANDS:
+        _register_simple_command(sub, cmd)
+
+    # Parametric commands: require extra CLI arguments
     _register_sql_commands(sub)
-    _register_escape_commands(sub)
-    _register_case_commands(sub)
-    _register_encode_commands(sub)
     _register_encoding_repair_commands(sub)
-    _register_json_commands(sub)
+    _register_json_format_command(sub)
+
+    # Special-purpose commands
     _register_dict_commands(sub)
     _register_clipboard_util_commands(sub)
     _register_daemon_commands(sub)

@@ -16,6 +16,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     import pystray
     from PIL.Image import Image
     from pynput import keyboard
@@ -178,39 +180,22 @@ class CommandDispatcher:
     # Internal
 
     def _transform(self, command: str, text: str) -> str:
+        import importlib
+        from typing import cast
+
+        from press.commands import SIMPLE_COMMAND_INDEX
+
+        # Simple commands: resolved dynamically via the central registry
+        if command in SIMPLE_COMMAND_INDEX:
+            spec = SIMPLE_COMMAND_INDEX[command]
+            fn = cast(
+                "Callable[[str], str]",
+                getattr(importlib.import_module(spec.module), spec.fn),
+            )
+            return fn(text)
+
+        # Parametric / special commands retain explicit handling
         match command:
-            case "halfwidth":
-                from press.transforms.width import to_halfwidth
-
-                return to_halfwidth(text)
-            case "fullwidth":
-                from press.transforms.width import to_fullwidth
-
-                return to_fullwidth(text)
-            case "normalize":
-                from press.transforms.whitespace import normalize_whitespace
-
-                return normalize_whitespace(text)
-            case "crlf":
-                from press.transforms.lineending import to_crlf
-
-                return to_crlf(text)
-            case "lf":
-                from press.transforms.lineending import to_lf
-
-                return to_lf(text)
-            case "cr":
-                from press.transforms.lineending import to_cr
-
-                return to_cr(text)
-            case "hyphen":
-                from press.transforms.separator import underscore_to_hyphen
-
-                return underscore_to_hyphen(text)
-            case "underscore":
-                from press.transforms.separator import hyphen_to_underscore
-
-                return hyphen_to_underscore(text)
             case "sql-in":
                 from press.transforms.sql import to_sql_in
 
@@ -220,14 +205,6 @@ class CommandDispatcher:
                 return self._run_dict(text, reverse=False)
             case "dict_reverse":
                 return self._run_dict(text, reverse=True)
-            case "unicode-decode":
-                from press.transforms.escape import decode_unicode_escape
-
-                return decode_unicode_escape(text)
-            case "unicode-encode":
-                from press.transforms.escape import encode_unicode_escape
-
-                return encode_unicode_escape(text)
             case _:
                 raise ValueError(f"unknown command: {command!r}")
 
