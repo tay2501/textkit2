@@ -27,9 +27,11 @@ Brief description of the changes.
 
 ### Components Modified
 - [ ] `press/` - Core package
+- [ ] `press/commands.py` - Command registry (add here for new simple transforms)
 - [ ] `press/transforms/` - Text transformation modules
 - [ ] `press/clipboard.py` - Clipboard integration
 - [ ] `press/__main__.py` - CLI entry point
+- [ ] `press/daemon.py` - Daemon / hotkey dispatch
 - [ ] `test/` - Tests
 - [ ] `docs/` - Documentation
 - [ ] CI/GitHub workflows

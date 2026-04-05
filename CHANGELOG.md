@@ -9,14 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned
-- Phase 4: `press hold` — clipboard HOLD/restore via daemon hotkey
+### Changed
+- `press/commands.py` added as the central command registry: `SimpleCommand` dataclass +
+  `SIMPLE_COMMANDS` tuple + `SIMPLE_COMMAND_INDEX` dict shared by CLI and daemon
+- `__main__.py`: removed 10 `_register_*()` boilerplate functions; replaced with
+  `_register_simple_command()` factory + loop over `SIMPLE_COMMANDS` (−218 lines)
+- `daemon.py`: `CommandDispatcher._transform()` match block collapsed from 32 lines to
+  18 lines via `SIMPLE_COMMAND_INDEX` lookup; only parametric/special commands remain explicit
 
 ---
 
 ## [0.2.0] - 2026-04-04
 
 ### Added
+- **Phase 4**: Clipboard HOLD/release (`press hold`)
+  - CLI: file-based toggle at `%APPDATA%\press\hold` — persists across processes
+  - Daemon: in-memory hold state with tray icon colour change (red = holding)
+  - Default hotkey binding: `h` → hold toggle via `_DEFAULT_BINDINGS`
 - **Phase 3**: System-tray daemon with global hotkey support (`press daemon start/stop/status/restart`)
   - Leader-key pattern: `Ctrl+Shift+F10` → binding key → transform applied to clipboard in-place
   - pystray 0.19.5 tray icon with right-click menu
@@ -27,7 +36,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Tray notifications controlled by `[ui] notify_level` config (`off`/`success`/`error`/`all`)
 - `fix-encoding` (`fe`) subcommand — mojibake repair via charset-normalizer (F-15)
 - `html-decode` (`hd`) subcommand — HTML entity decoding (`&amp;` → `&`)
-- `UiConfig.hold_icon` setting (preparation for Phase 4)
 - Typed TOML configuration loader (`press/config.py`) with frozen dataclasses and `slots=True`
 - PEP 562 lazy loading in `transforms/__init__.py` for fast startup on HDD/EDR systems
 - `argcomplete` shell completion support
