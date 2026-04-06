@@ -53,6 +53,11 @@ SIMPLE_COMMANDS: tuple[SimpleCommand, ...] = (
     SimpleCommand("camel",          "press.transforms.case",       "to_camel_case",         ("cm",),   "Convert to camelCase"),
     SimpleCommand("pascal",         "press.transforms.case",       "to_pascal_case",        ("pc",),   "Convert to PascalCase"),
     SimpleCommand("kebab",          "press.transforms.case",       "to_kebab_case",         ("kb",),   "Convert to kebab-case"),
+    SimpleCommand("upper",          "press.transforms.case",       "to_upper",              ("up",),   "Convert all characters to UPPERCASE"),
+    SimpleCommand("lower",          "press.transforms.case",       "to_lower",              ("lo",),   "Convert all characters to lowercase"),
+    SimpleCommand("title",          "press.transforms.case",       "to_title",              ("tt",),   "Capitalize the first letter of each word (Title Case)"),
+    SimpleCommand("capitalize",     "press.transforms.case",       "to_capitalize",         ("cap",),  "Capitalize the first letter of each line, lowercase rest"),
+    SimpleCommand("swapcase",       "press.transforms.case",       "to_swapcase",           ("sw",),   "Swap upper and lower case characters"),
     # --- encode ---
     SimpleCommand("base64-encode",  "press.transforms.encode",     "base64_encode",         ("be",),   "Encode text to Base64"),
     SimpleCommand("base64-decode",  "press.transforms.encode",     "base64_decode",         ("bd",),   "Decode Base64 to text"),

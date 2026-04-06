@@ -1,6 +1,16 @@
-"""Tests for case conversion transforms (F-13 to F-16)."""
+"""Tests for case conversion transforms (F-13 to F-21)."""
 
-from press.transforms.case import to_camel_case, to_kebab_case, to_pascal_case, to_snake_case
+from press.transforms.case import (
+    to_camel_case,
+    to_capitalize,
+    to_kebab_case,
+    to_lower,
+    to_pascal_case,
+    to_snake_case,
+    to_swapcase,
+    to_title,
+    to_upper,
+)
 
 
 class TestToSnakeCase:
@@ -134,3 +144,125 @@ class TestToKebabCase:
 
     def test_pascal_case(self) -> None:
         assert to_kebab_case("PascalCase") == "pascal-case"
+
+
+class TestToUpper:
+    def test_basic(self) -> None:
+        assert to_upper("hello world") == "HELLO WORLD"
+
+    def test_already_upper(self) -> None:
+        assert to_upper("HELLO") == "HELLO"
+
+    def test_mixed(self) -> None:
+        assert to_upper("Hello World") == "HELLO WORLD"
+
+    def test_empty(self) -> None:
+        assert to_upper("") == ""
+
+    def test_multiline(self) -> None:
+        assert to_upper("hello\nworld") == "HELLO\nWORLD"
+
+    def test_empty_line_preserved(self) -> None:
+        assert to_upper("hello\n\nworld") == "HELLO\n\nWORLD"
+
+    def test_numbers_unchanged(self) -> None:
+        assert to_upper("hello123") == "HELLO123"
+
+
+class TestToLower:
+    def test_basic(self) -> None:
+        assert to_lower("HELLO WORLD") == "hello world"
+
+    def test_already_lower(self) -> None:
+        assert to_lower("hello") == "hello"
+
+    def test_mixed(self) -> None:
+        assert to_lower("Hello World") == "hello world"
+
+    def test_empty(self) -> None:
+        assert to_lower("") == ""
+
+    def test_multiline(self) -> None:
+        assert to_lower("HELLO\nWORLD") == "hello\nworld"
+
+    def test_empty_line_preserved(self) -> None:
+        assert to_lower("HELLO\n\nWORLD") == "hello\n\nworld"
+
+    def test_numbers_unchanged(self) -> None:
+        assert to_lower("HELLO123") == "hello123"
+
+
+class TestToTitle:
+    def test_basic(self) -> None:
+        assert to_title("hello world") == "Hello World"
+
+    def test_apostrophe(self) -> None:
+        # string.capwords() does NOT capitalize after apostrophe (unlike str.title())
+        assert to_title("they're here") == "They're Here"
+
+    def test_already_title(self) -> None:
+        assert to_title("Hello World") == "Hello World"
+
+    def test_all_upper(self) -> None:
+        assert to_title("HELLO WORLD") == "Hello World"
+
+    def test_empty(self) -> None:
+        assert to_title("") == ""
+
+    def test_multiline(self) -> None:
+        assert to_title("hello world\nfoo bar") == "Hello World\nFoo Bar"
+
+    def test_empty_line_preserved(self) -> None:
+        assert to_title("hello world\n\nfoo bar") == "Hello World\n\nFoo Bar"
+
+    def test_single_word(self) -> None:
+        assert to_title("hello") == "Hello"
+
+
+class TestToCapitalize:
+    def test_basic(self) -> None:
+        assert to_capitalize("hello world") == "Hello world"
+
+    def test_all_upper(self) -> None:
+        assert to_capitalize("HELLO WORLD") == "Hello world"
+
+    def test_already_capitalized(self) -> None:
+        assert to_capitalize("Hello world") == "Hello world"
+
+    def test_empty(self) -> None:
+        assert to_capitalize("") == ""
+
+    def test_multiline(self) -> None:
+        assert to_capitalize("hello world\nfoo bar") == "Hello world\nFoo bar"
+
+    def test_empty_line_preserved(self) -> None:
+        assert to_capitalize("hello world\n\nfoo bar") == "Hello world\n\nFoo bar"
+
+    def test_single_word(self) -> None:
+        assert to_capitalize("hello") == "Hello"
+
+
+class TestToSwapcase:
+    def test_basic(self) -> None:
+        assert to_swapcase("Hello World") == "hELLO wORLD"
+
+    def test_all_lower(self) -> None:
+        assert to_swapcase("hello") == "HELLO"
+
+    def test_all_upper(self) -> None:
+        assert to_swapcase("HELLO") == "hello"
+
+    def test_involution(self) -> None:
+        assert to_swapcase(to_swapcase("Hello World")) == "Hello World"
+
+    def test_empty(self) -> None:
+        assert to_swapcase("") == ""
+
+    def test_multiline(self) -> None:
+        assert to_swapcase("Hello\nWorld") == "hELLO\nwORLD"
+
+    def test_empty_line_preserved(self) -> None:
+        assert to_swapcase("Hello\n\nWorld") == "hELLO\n\nwORLD"
+
+    def test_numbers_unchanged(self) -> None:
+        assert to_swapcase("Hello123") == "hELLO123"

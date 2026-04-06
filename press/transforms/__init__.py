@@ -6,7 +6,17 @@ import importlib
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover
-    from press.transforms.case import to_camel_case, to_kebab_case, to_pascal_case, to_snake_case
+    from press.transforms.case import (
+        to_camel_case,
+        to_capitalize,
+        to_kebab_case,
+        to_lower,
+        to_pascal_case,
+        to_snake_case,
+        to_swapcase,
+        to_title,
+        to_upper,
+    )
     from press.transforms.dictionary import dict_forward, dict_reverse, load_tsv
     from press.transforms.encode import base64_decode, base64_encode, url_decode, url_encode
     from press.transforms.encoding_repair import fix_encoding
@@ -37,15 +47,20 @@ __all__ = [
     "load_tsv",
     "normalize_whitespace",
     "to_camel_case",
+    "to_capitalize",
     "to_cr",
     "to_crlf",
     "to_fullwidth",
     "to_halfwidth",
     "to_kebab_case",
     "to_lf",
+    "to_lower",
     "to_pascal_case",
     "to_snake_case",
     "to_sql_in",
+    "to_swapcase",
+    "to_title",
+    "to_upper",
     "underscore_to_hyphen",
     "url_decode",
     "url_encode",
@@ -66,15 +81,20 @@ _LAZY: dict[str, tuple[str, str]] = {
     "json_format": ("press.transforms.json_fmt", "json_format"),
     "normalize_whitespace": ("press.transforms.whitespace", "normalize_whitespace"),
     "to_camel_case": ("press.transforms.case", "to_camel_case"),
+    "to_capitalize": ("press.transforms.case", "to_capitalize"),
     "to_cr": ("press.transforms.lineending", "to_cr"),
     "to_crlf": ("press.transforms.lineending", "to_crlf"),
     "to_fullwidth": ("press.transforms.width", "to_fullwidth"),
     "to_halfwidth": ("press.transforms.width", "to_halfwidth"),
     "to_kebab_case": ("press.transforms.case", "to_kebab_case"),
     "to_lf": ("press.transforms.lineending", "to_lf"),
+    "to_lower": ("press.transforms.case", "to_lower"),
     "to_pascal_case": ("press.transforms.case", "to_pascal_case"),
     "to_snake_case": ("press.transforms.case", "to_snake_case"),
     "to_sql_in": ("press.transforms.sql", "to_sql_in"),
+    "to_swapcase": ("press.transforms.case", "to_swapcase"),
+    "to_title": ("press.transforms.case", "to_title"),
+    "to_upper": ("press.transforms.case", "to_upper"),
     "underscore_to_hyphen": ("press.transforms.separator", "underscore_to_hyphen"),
     "url_decode": ("press.transforms.encode", "url_decode"),
     "url_encode": ("press.transforms.encode", "url_encode"),

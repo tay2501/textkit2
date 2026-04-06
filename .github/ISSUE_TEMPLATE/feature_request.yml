@@ -19,6 +19,7 @@ body:
         - CLI Interface & User Experience
         - Text Transformation
         - Clipboard Integration
+        - Case Conversion (upper/lower/title/etc.)
         - Width Conversion (zen/han)
         - SQL Formatting
         - Escape Sequences

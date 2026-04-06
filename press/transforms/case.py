@@ -1,15 +1,21 @@
-"""Case conversion transforms (F-13 to F-16).
+"""Case conversion transforms (F-13 to F-21).
 
 Supported conversions:
     F-13  to_snake_case  — camelCase / PascalCase / kebab-case → snake_case
     F-14  to_camel_case  — snake_case / kebab-case / PascalCase → camelCase
     F-15  to_pascal_case — snake_case / kebab-case / camelCase  → PascalCase
     F-16  to_kebab_case  — snake_case / camelCase / PascalCase  → kebab-case
+    F-17  to_upper      — Convert all characters to UPPERCASE
+    F-18  to_lower      — Convert all characters to lowercase
+    F-19  to_title      — Capitalize the first letter of each word (Title Case)
+    F-20  to_capitalize — Capitalize the first letter of each line, lowercase rest
+    F-21  to_swapcase   — Swap upper and lower case characters
 """
 
 from __future__ import annotations
 
 import re
+import string
 
 
 def _split_words(text: str) -> list[str]:
@@ -132,3 +138,68 @@ def to_kebab_case(text: str) -> str:
         Text with each line converted to kebab-case.
     """
     return _transform_lines(text, joiner="-", capitalize_first=False, capitalize_rest=False)
+
+
+def to_upper(text: str) -> str:
+    """Convert all characters to UPPERCASE.
+
+    Args:
+        text: Input text.
+
+    Returns:
+        Text with all characters converted to uppercase.
+    """
+    return text.upper()
+
+
+def to_lower(text: str) -> str:
+    """Convert all characters to lowercase.
+
+    Args:
+        text: Input text.
+
+    Returns:
+        Text with all characters converted to lowercase.
+    """
+    return text.lower()
+
+
+def to_title(text: str) -> str:
+    """Convert each line to Title Case.
+
+    Uses string.capwords() instead of str.title() to correctly handle
+    apostrophes (e.g. "they're" → "They're", not "They'Re").
+    Each line is converted independently.
+
+    Args:
+        text: Input text; each line is converted independently.
+
+    Returns:
+        Text with each line converted to Title Case.
+    """
+    return "\n".join(string.capwords(line) if line else "" for line in text.split("\n"))
+
+
+def to_capitalize(text: str) -> str:
+    """Capitalize the first letter of each line, lowercase the rest.
+
+    Args:
+        text: Input text; each line is converted independently.
+
+    Returns:
+        Text with the first character of each line uppercased and the
+        remaining characters lowercased.
+    """
+    return "\n".join(line.capitalize() if line else "" for line in text.split("\n"))
+
+
+def to_swapcase(text: str) -> str:
+    """Swap upper and lower case characters.
+
+    Args:
+        text: Input text.
+
+    Returns:
+        Text with uppercase characters converted to lowercase and vice versa.
+    """
+    return text.swapcase()

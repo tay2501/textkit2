@@ -47,11 +47,18 @@ echo "ＴＡＢＬＥ１" | press halfwidth        # → TABLE1
 echo "USER_ID"     | press hyphen            # → USER-ID
 echo "USER-ID"     | press underscore        # → USER_ID
 
-# Case conversion
+# Case: identifier conversion
 echo "my_variable" | press camel            # → myVariable
 echo "myVariable"  | press snake            # → my_variable
 echo "my_variable" | press pascal           # → MyVariable
 echo "my_variable" | press kebab            # → my-variable
+
+# Case: upper / lower / title / capitalize / swapcase
+echo "hello world"   | press upper         # → HELLO WORLD
+echo "HELLO WORLD"   | press lower         # → hello world
+echo "they're here"  | press title         # → They're Here
+echo "HELLO WORLD"   | press capitalize    # → Hello world
+echo "Hello World"   | press swapcase      # → hELLO wORLD
 
 # Encoding
 echo "Hello World" | press base64-encode    # → SGVsbG8gV29ybGQ=
@@ -126,6 +133,11 @@ press normalize  -c -C
 | `camel` | `cm` | Convert to `camelCase` (`my_variable` → `myVariable`) |
 | `pascal` | `pc` | Convert to `PascalCase` (`my_variable` → `MyVariable`) |
 | `kebab` | `kb` | Convert to `kebab-case` (`my_variable` → `my-variable`) |
+| `upper` | `up` | Convert to `UPPERCASE` (`hello world` → `HELLO WORLD`) |
+| `lower` | `lo` | Convert to `lowercase` (`HELLO WORLD` → `hello world`) |
+| `title` | `tt` | Convert to `Title Case` (`they're here` → `They're Here`) |
+| `capitalize` | `cap` | Capitalize first letter of each line (`HELLO WORLD` → `Hello world`) |
+| `swapcase` | `sw` | Swap upper/lower case (`Hello World` → `hELLO wORLD`) |
 
 ### Encoding
 

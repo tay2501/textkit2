@@ -50,6 +50,7 @@ body:
         - CLI Interface (press commands)
         - Clipboard integration
         - Text transforms (whitespace, lineending, etc.)
+        - Case conversion (upper/lower/title/etc.)
         - Width conversion (zen/han)
         - SQL formatting
         - Escape sequences
