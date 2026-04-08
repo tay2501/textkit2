@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from PIL.Image import Image
     from pynput import keyboard
 
+    from press.clipboard import ClipboardGuard
     from press.config import HotkeysConfig, PressConfig
 
 __all__ = ["daemon_status", "run_daemon", "stop_daemon"]
@@ -141,7 +142,12 @@ class CommandDispatcher:
     def __init__(self, config: PressConfig) -> None:
         self._config = config
         self._icon: pystray.Icon | None = None
-        self._held_text: str | None = None  # Phase 4: in-memory hold state
+        # Dual-layer clipboard guard (Windows only; None on other platforms)
+        self._guard: ClipboardGuard | None = None
+        if sys.platform == "win32":
+            from press.clipboard import ClipboardGuard as _Guard
+
+            self._guard = _Guard(config.hold)
 
     def set_icon(self, icon: pystray.Icon) -> None:
         """Bind the tray icon used for notifications."""
@@ -238,16 +244,19 @@ class CommandDispatcher:
             self._icon.notify(message, title)
 
     def _toggle_hold(self) -> None:
-        """Toggle in-memory hold state and update the tray icon."""
-        from press.clipboard import get_clipboard_text, set_clipboard_text
+        """Toggle dual-layer clipboard guard and update the tray icon."""
+        if self._guard is None:
+            return  # non-Windows: no-op
 
-        if self._held_text is None:
-            self._held_text = get_clipboard_text()
+        if not self._guard.is_active:
+            from press.clipboard import get_clipboard_text
+
+            text = get_clipboard_text()
+            self._guard.engage(text)
             self._update_icon(holding=True)
             self._notify_success("hold", "")
         else:
-            set_clipboard_text(self._held_text)
-            self._held_text = None
+            self._guard.release()
             self._update_icon(holding=False)
             self._notify_success("hold-release", "")
 

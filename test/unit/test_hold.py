@@ -159,69 +159,77 @@ class TestHoldPath:
 
 
 class TestCommandDispatcherToggleHoldInMemory:
-    """_toggle_hold uses _held_text (None = not held, str = held)."""
+    """_toggle_hold delegates to ClipboardGuard (None = not held, str = held)."""
+
+    def _make_dispatcher_with_mock_guard(
+        self,
+    ) -> tuple[object, object]:
+        """Return (dispatcher, mock_guard) with Guard methods patched."""
+        from press.config import PressConfig
+        from press.daemon import CommandDispatcher
+
+        d = CommandDispatcher(PressConfig())
+        mock_guard = MagicMock()
+        mock_guard.is_active = False
+        mock_guard.protected_text = None
+        d._guard = mock_guard  # type: ignore[assignment]
+        return d, mock_guard
 
     def test_hold_sets_held_text(self) -> None:
-        from press.config import PressConfig
-        from press.daemon import CommandDispatcher
+        """engage() is called with clipboard text; guard becomes active."""
 
         with patch("press.clipboard.get_clipboard_text", return_value="clipboard data"):
-            d = CommandDispatcher(PressConfig())
-            assert d._held_text is None
+            d, mock_guard = self._make_dispatcher_with_mock_guard()
+
+            # Simulate guard not active initially
+            mock_guard.is_active = False
             d._toggle_hold()
-            assert d._held_text == "clipboard data"
+
+            mock_guard.engage.assert_called_once_with("clipboard data")
 
     def test_hold_calls_update_icon_with_holding_true(self) -> None:
-        from press.config import PressConfig
-        from press.daemon import CommandDispatcher
 
         with patch("press.clipboard.get_clipboard_text", return_value="clipboard data"):
-            d = CommandDispatcher(PressConfig())
+            d, mock_guard = self._make_dispatcher_with_mock_guard()
+            mock_guard.is_active = False
             d._update_icon = MagicMock()  # type: ignore[method-assign]
             d._toggle_hold()
             d._update_icon.assert_called_once_with(holding=True)
 
     def test_release_restores_clipboard(self) -> None:
-        from press.config import PressConfig
-        from press.daemon import CommandDispatcher
+        """release() is called when guard is active; clipboard is not touched by dispatcher."""
 
-        with (
-            patch("press.clipboard.get_clipboard_text", return_value="held data"),
-            patch("press.clipboard.set_clipboard_text") as mock_set,
-        ):
-            d = CommandDispatcher(PressConfig())
-            d._toggle_hold()  # hold
-            mock_set.reset_mock()
-            d._toggle_hold()  # release
-            mock_set.assert_called_once_with("held data")
+        d, mock_guard = self._make_dispatcher_with_mock_guard()
+        # Simulate guard already active (hold state)
+        mock_guard.is_active = True
+
+        d._toggle_hold()  # release
+
+        mock_guard.release.assert_called_once()
 
     def test_release_clears_held_text(self) -> None:
-        from press.config import PressConfig
-        from press.daemon import CommandDispatcher
+        """After release(), guard.is_active becomes False (simulated via mock)."""
 
-        with (
-            patch("press.clipboard.get_clipboard_text", return_value="held data"),
-            patch("press.clipboard.set_clipboard_text"),
-        ):
-            d = CommandDispatcher(PressConfig())
-            d._toggle_hold()  # hold
-            assert d._held_text == "held data"
-            d._toggle_hold()  # release
-            assert d._held_text is None
+        d, mock_guard = self._make_dispatcher_with_mock_guard()
+
+        # First call: engage
+        mock_guard.is_active = False
+        with patch("press.clipboard.get_clipboard_text", return_value="held data"):
+            d._toggle_hold()
+        mock_guard.engage.assert_called_once_with("held data")
+
+        # Second call: release — mock transitions to inactive
+        mock_guard.is_active = True
+        d._toggle_hold()
+        mock_guard.release.assert_called_once()
 
     def test_release_calls_update_icon_with_holding_false(self) -> None:
-        from press.config import PressConfig
-        from press.daemon import CommandDispatcher
 
-        with (
-            patch("press.clipboard.get_clipboard_text", return_value="held data"),
-            patch("press.clipboard.set_clipboard_text"),
-        ):
-            d = CommandDispatcher(PressConfig())
-            d._toggle_hold()  # hold
-            d._update_icon = MagicMock()  # type: ignore[method-assign]
-            d._toggle_hold()  # release
-            d._update_icon.assert_called_once_with(holding=False)
+        d, mock_guard = self._make_dispatcher_with_mock_guard()
+        mock_guard.is_active = True  # guard is currently active
+        d._update_icon = MagicMock()  # type: ignore[method-assign]
+        d._toggle_hold()  # triggers release path
+        d._update_icon.assert_called_once_with(holding=False)
 
 
 class TestCommandDispatcherDispatchHold:
@@ -235,18 +243,25 @@ class TestCommandDispatcherDispatchHold:
             d = CommandDispatcher(PressConfig())
             mock_icon = MagicMock()
             d.set_icon(mock_icon)
+            # Patch guard to avoid real Win32 calls
+            mock_guard = MagicMock()
+            mock_guard.is_active = False
+            d._guard = mock_guard  # type: ignore[assignment]
             # Should not raise
             d.dispatch("hold")
 
     def test_dispatch_hold_hold_state_changes(self) -> None:
+        """dispatch("hold") transitions guard from inactive to active."""
         from press.config import PressConfig
         from press.daemon import CommandDispatcher
 
         with patch("press.clipboard.get_clipboard_text", return_value="text"):
             d = CommandDispatcher(PressConfig())
-            assert d._held_text is None
+            mock_guard = MagicMock()
+            mock_guard.is_active = False
+            d._guard = mock_guard  # type: ignore[assignment]
             d.dispatch("hold")
-            assert d._held_text == "text"
+            mock_guard.engage.assert_called_once_with("text")
 
 
 # ---------------------------------------------------------------------------

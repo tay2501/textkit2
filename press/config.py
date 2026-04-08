@@ -13,6 +13,7 @@ from typing import Any
 
 __all__ = [
     "DictionaryConfig",
+    "HoldConfig",
     "HotkeysConfig",
     "PressConfig",
     "SqlInConfig",
@@ -83,6 +84,14 @@ class UiConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class HoldConfig:
+    """Options for the dual-layer clipboard hold protection."""
+
+    monitor_clipboard: bool = True  # Layer 1: Win32 WM_CLIPBOARDUPDATE watcher
+    intercept_paste_keys: bool = True  # Layer 2: pynput Ctrl+V / Shift+Insert hook
+
+
+@dataclass(frozen=True, slots=True)
 class PressConfig:
     """Top-level configuration object for press."""
 
@@ -90,6 +99,7 @@ class PressConfig:
     sql_in: SqlInConfig = field(default_factory=SqlInConfig)
     dictionary: DictionaryConfig = field(default_factory=DictionaryConfig)
     ui: UiConfig = field(default_factory=UiConfig)
+    hold: HoldConfig = field(default_factory=HoldConfig)
 
 
 # ---------------------------------------------------------------------------
@@ -150,6 +160,22 @@ def _parse_dictionary(data: dict[str, Any]) -> DictionaryConfig:
     )
 
 
+def _parse_hold(data: dict[str, Any]) -> HoldConfig:
+    """Build :class:`HoldConfig` from the ``[hold]`` TOML table.
+
+    Args:
+        data: Mapping parsed from the ``[hold]`` section.
+
+    Returns:
+        A :class:`HoldConfig` with per-field defaults applied.
+    """
+    default = HoldConfig()
+    return HoldConfig(
+        monitor_clipboard=data.get("monitor_clipboard", default.monitor_clipboard),
+        intercept_paste_keys=data.get("intercept_paste_keys", default.intercept_paste_keys),
+    )
+
+
 def _parse_ui(data: dict[str, Any]) -> UiConfig:
     """Build :class:`UiConfig` from the ``[ui]`` TOML table.
 
@@ -205,5 +231,6 @@ def load_config(path: Path | None = None) -> PressConfig:
     sql_in = _parse_sql_in(raw.get("sql_in", {}))
     dictionary = _parse_dictionary(raw.get("dictionary", {}))
     ui = _parse_ui(raw.get("ui", {}))
+    hold = _parse_hold(raw.get("hold", {}))
 
-    return PressConfig(hotkeys=hotkeys, sql_in=sql_in, dictionary=dictionary, ui=ui)
+    return PressConfig(hotkeys=hotkeys, sql_in=sql_in, dictionary=dictionary, ui=ui, hold=hold)

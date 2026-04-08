@@ -125,6 +125,7 @@ class TestCommandDispatcherHalfwidth:
 
 class TestCommandDispatcherHold:
     def test_hold_stores_clipboard_text(self) -> None:
+        """dispatch("hold") engages the guard with the clipboard text."""
         from press.config import PressConfig
         from press.daemon import CommandDispatcher
 
@@ -132,9 +133,13 @@ class TestCommandDispatcherHold:
             d = CommandDispatcher(PressConfig())
             mock_icon = MagicMock()
             d.set_icon(mock_icon)
-            assert d._held_text is None
+            mock_guard = MagicMock()
+            mock_guard.is_active = False
+            d._guard = mock_guard  # type: ignore[assignment]
+            # Guard must not be active initially
+            assert d._guard.is_active is False
             d.dispatch("hold")
-            assert d._held_text == "x"
+            mock_guard.engage.assert_called_once_with("x")
 
 
 class TestCommandDispatcherNotifyLevel:
