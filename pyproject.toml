@@ -19,7 +19,7 @@ requires-python = ">=3.13,<3.14"
 dependencies = [
     "jaconv>=0.5.0",
     "argcomplete>=3.6",
-    "charset-normalizer>=3.4.6",
+    "charset-normalizer>=3.4.7",
 ]
 
 [project.optional-dependencies]
