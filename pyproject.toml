@@ -19,7 +19,7 @@ requires-python = ">=3.13,<3.14"
 dependencies = [
     "jaconv>=0.5.0",
     "argcomplete>=3.6",
-    "charset-normalizer>=3.4.6",
+    "charset-normalizer>=3.4.7",
 ]
 
 [project.optional-dependencies]
@@ -27,7 +27,7 @@ daemon = [
     "pystray==0.19.5",
     "pynput>=1.8.1",
     "pywin32>=311; sys_platform == 'win32'",
-    "Pillow>=12.1.0",
+    "Pillow>=12.2.0",
     "psutil>=7.0",
 ]
 
@@ -53,15 +53,15 @@ docs = [
     "sphinx-autobuild>=2025.8.25",
 ]
 dev = [
-    "pytest>=9.0",
+    "pytest>=9.0.3",
     "pytest-mock>=3.14",
     "pytest-benchmark>=5.0",
-    "pytest-cov>=6.0",
+    "pytest-cov>=7.1.0",
     "hypothesis>=6.0",
     "freezegun>=1.5",
     "pip-audit>=2.8",
-    "ruff>=0.15.6",
-    "mypy>=1.19.1",
+    "ruff>=0.15.11",
+    "mypy>=1.20.1",
 ]
 
 [build-system]

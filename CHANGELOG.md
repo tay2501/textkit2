@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `daemon.py`: `CommandDispatcher._transform()` match block collapsed from 32 lines to
   18 lines via `SIMPLE_COMMAND_INDEX` lookup; only parametric/special commands remain explicit
 
+### Dependencies
+- `charset-normalizer` 3.4.6 → 3.4.7
+- `Pillow` 12.1.1 → 12.2.0 (lazy plugin loading: open 2–15×, save 2–9× faster)
+- `mypy` 1.19.1 → 1.20.1 (improved `match`-statement type narrowing)
+- `ruff` 0.15.6 → 0.15.11 (bug fixes)
+- `pytest` 9.0.2 → 9.0.3
+- `pytest-cov` 7.0.0 → 7.1.0
+- `hypothesis` 6.151.9 → 6.152.1
+
 ---
 
 ## [0.2.0] - 2026-04-04
