@@ -27,14 +27,21 @@ def _version() -> str:
 
 
 def _read_input(args: argparse.Namespace) -> str:
-    """Read input from stdin, clipboard, or positional argument."""
+    """Read input: clipboard (TTY default), positional arg, stdin pipe, or '-' sentinel."""
     if getattr(args, "clip_in", False):
         from press.clipboard import get_clipboard_text
 
         return get_clipboard_text()
-    if getattr(args, "input", None) is not None:
-        return str(args.input)
-    return sys.stdin.read()
+    inp = getattr(args, "input", None)
+    if inp is not None and inp != "-":
+        return str(inp)
+    # "-" forces stdin; non-TTY (pipe/redirect) also uses stdin
+    if inp == "-" or not sys.stdin.isatty():
+        return sys.stdin.read()
+    # TTY with no input → clipboard is the default
+    from press.clipboard import get_clipboard_text
+
+    return get_clipboard_text()
 
 
 def _write_output(text: str, args: argparse.Namespace) -> None:
@@ -120,6 +127,65 @@ def _register_simple_command(sub: _SubParsers, cmd: "SimpleCommand") -> None:
         return _run_transform(fn, a)
 
     p.set_defaults(func=_handler)
+
+
+def _register_trim_command(sub: _SubParsers) -> None:
+    p = sub.add_parser("trim", aliases=["tm"], help="Strip trailing whitespace from each line")
+    _add_io_args(p)
+    p.add_argument(
+        "--both",
+        "-b",
+        action="store_true",
+        help="Strip leading and trailing whitespace (str.strip())",
+    )
+
+    def _trim(a: argparse.Namespace) -> int:
+        from press.transforms.lines import trim_lines
+
+        return _run_transform(trim_lines, a, both=a.both)
+
+    p.set_defaults(func=_trim)
+
+
+def _register_dedupe_command(sub: _SubParsers) -> None:
+    p = sub.add_parser("dedupe", aliases=["dq"], help="Remove duplicate lines")
+    _add_io_args(p)
+    p.add_argument("--ignore-case", "-i", action="store_true", help="Case-insensitive comparison")
+    p.add_argument(
+        "--adjacent",
+        "-a",
+        action="store_true",
+        help="Remove only adjacent duplicates (like GNU uniq)",
+    )
+
+    def _dd(a: argparse.Namespace) -> int:
+        from press.transforms.lines import dedupe_lines
+
+        return _run_transform(dedupe_lines, a, ignore_case=a.ignore_case, adjacent=a.adjacent)
+
+    p.set_defaults(func=_dd)
+
+
+def _register_sort_command(sub: _SubParsers) -> None:
+    p = sub.add_parser("sort", aliases=["st"], help="Sort lines")
+    _add_io_args(p)
+    p.add_argument("--reverse", "-r", action="store_true", help="Reverse sort order")
+    p.add_argument(
+        "--numeric",
+        "-n",
+        action="store_true",
+        help="Numeric sort; non-numeric lines go last",
+    )
+    p.add_argument("--ignore-case", "-i", action="store_true", help="Case-insensitive sort")
+
+    def _st(a: argparse.Namespace) -> int:
+        from press.transforms.lines import sort_lines
+
+        return _run_transform(
+            sort_lines, a, reverse=a.reverse, numeric=a.numeric, ignore_case=a.ignore_case
+        )
+
+    p.set_defaults(func=_st)
 
 
 def _register_sql_commands(sub: _SubParsers) -> None:
@@ -377,6 +443,9 @@ def make_parser() -> argparse.ArgumentParser:
         _register_simple_command(sub, cmd)
 
     # Parametric commands: require extra CLI arguments
+    _register_trim_command(sub)
+    _register_dedupe_command(sub)
+    _register_sort_command(sub)
     _register_sql_commands(sub)
     _register_encoding_repair_commands(sub)
     _register_json_format_command(sub)

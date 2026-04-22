@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Line operations** (`press/transforms/lines.py`): three new parametric commands
+  - `trim` / `tm` — strip trailing (and optionally leading) whitespace from each line (`--both`)
+  - `dedupe` / `dq` — remove duplicate lines, insertion-order preserved (`--ignore-case`, `--adjacent`)
+  - `sort` / `st` — locale-aware line sort (`--reverse`, `--numeric`, `--ignore-case`)
+- **TTY clipboard default**: running `press <cmd>` in an interactive terminal without arguments
+  now reads from the clipboard instead of blocking on stdin — matches the
+  "copy → transform → paste" workflow
+- **`-` stdin sentinel**: `press <cmd> -` forces stdin input when running interactively,
+  following the Unix convention used by `cat`, `sort`, `grep`
+
 ### Changed
 - `press/commands.py` added as the central command registry: `SimpleCommand` dataclass +
   `SIMPLE_COMMANDS` tuple + `SIMPLE_COMMAND_INDEX` dict shared by CLI and daemon
