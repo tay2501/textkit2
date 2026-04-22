@@ -59,6 +59,13 @@ Auto-generated from source docstrings.
    :members:
 ```
 
+### press.transforms.lines
+
+```{eval-rst}
+.. automodule:: press.transforms.lines
+   :members:
+```
+
 ## press.dictionary
 
 ```{eval-rst}

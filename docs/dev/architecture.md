@@ -36,6 +36,7 @@
 │  case.py       encode.py            │
 │  json_fmt.py   dictionary.py        │
 │  encoding_repair.py  hold.py        │
+│  lines.py                           │
 └─────────────────────────────────────┘
 ```
 
@@ -50,6 +51,7 @@
 | `daemon.py` | pystray tray icon, pynput global hotkey listener, leader-key state machine, in-memory HOLD state, singleton mutex — all Windows daemon logic in one module |
 | `dictionary.py` | TSV file CRUD — `add_entry`, `remove_entry`, `list_entries` |
 | `transforms/` | Pure `str → str` functions, one module per domain; no I/O or side effects |
+| `transforms/lines.py` | Line-oriented operations: `trim_lines`, `dedupe_lines`, `sort_lines` |
 
 ## Key design decisions
 

@@ -165,6 +165,94 @@ press dict --file custom.tsv -c -C
 
 See {doc}`dictionary` for dictionary file format and management.
 
+## Line operations
+
+### `trim` (`tm`)
+
+Strip trailing whitespace from each line. Handles all Unicode whitespace
+characters (`\t`, `\r`, U+3000, U+00A0, etc.) via `str.rstrip()`.
+
+```bash
+printf "hello   \nworld\t" | press trim
+# → hello
+# → world
+```
+
+Options:
+
+| Flag | Description |
+|---|---|
+| `--both` / `-b` | Strip leading **and** trailing whitespace (`str.strip()`) |
+
+```bash
+printf "  hello  \n  world  " | press trim --both
+# → hello
+# → world
+```
+
+### `dedupe` (`dq`)
+
+Remove duplicate lines, preserving the first occurrence and original order.
+Comparison uses NFC Unicode normalisation so canonically equivalent forms
+(e.g. precomposed vs decomposed accents) are treated as identical.
+
+```bash
+printf "apple\nbanana\napple\ncherry" | press dedupe
+# → apple
+# → banana
+# → cherry
+```
+
+Options:
+
+| Flag | Description |
+|---|---|
+| `--ignore-case` / `-i` | Case-insensitive comparison (original case preserved) |
+| `--adjacent` / `-a` | Remove only adjacent duplicates (GNU `uniq` default behaviour) |
+
+```bash
+printf "Hello\nhello\nHELLO" | press dedupe --ignore-case
+# → Hello
+
+printf "a\na\nb\na" | press dedupe --adjacent
+# → a
+# → b
+# → a
+```
+
+### `sort` (`st`)
+
+Sort lines using locale-aware collation (`locale.strcoll`), matching
+GNU `sort` default behaviour. Trailing newline is preserved.
+
+```bash
+printf "banana\napple\ncherry" | press sort
+# → apple
+# → banana
+# → cherry
+```
+
+Options:
+
+| Flag | Description |
+|---|---|
+| `--reverse` / `-r` | Reverse sort order |
+| `--numeric` / `-n` | Numeric sort; non-numeric lines are placed last |
+| `--ignore-case` / `-i` | Case-insensitive sort |
+
+```bash
+printf "10\n2\n1\n20" | press sort --numeric
+# → 1
+# → 2
+# → 10
+# → 20
+
+printf "cherry\nApple\nbanana" | press sort --ignore-case
+# → Apple
+# → banana
+# → cherry
+```
+
 ## Character encoding
 
 ### `fix-encoding`

@@ -62,6 +62,30 @@ class TestNoCommand:
 
 
 # ---------------------------------------------------------------------------
+# Input routing
+# ---------------------------------------------------------------------------
+
+
+class TestInputRouting:
+    def test_stdin_pipe_used_when_not_tty(self) -> None:
+        # subprocess stdin is always a pipe (non-TTY), so piped text is used
+        result = _run("upper", input_text="hello")
+        assert result.returncode == 0
+        assert result.stdout.strip() == "HELLO"
+
+    def test_dash_sentinel_forces_stdin(self) -> None:
+        # "-" as positional arg forces stdin even when clip-in is not set
+        result = _run("upper", "-", input_text="hello")
+        assert result.returncode == 0
+        assert result.stdout.strip() == "HELLO"
+
+    def test_positional_arg_takes_priority_over_pipe(self) -> None:
+        result = _run("upper", "hello", input_text="ignored")
+        assert result.returncode == 0
+        assert result.stdout.strip() == "HELLO"
+
+
+# ---------------------------------------------------------------------------
 # halfwidth / hw
 # ---------------------------------------------------------------------------
 
@@ -267,6 +291,107 @@ class TestHtmlDecode:
         result = _run("hd", input_text="&amp;")
         assert result.returncode == 0
         assert result.stdout.strip() == "&"
+
+
+# ---------------------------------------------------------------------------
+# trim
+# ---------------------------------------------------------------------------
+
+
+class TestTrim:
+    def test_trailing_spaces(self) -> None:
+        result = _run("trim", input_text="hello   \nworld   ")
+        assert result.returncode == 0
+        assert result.stdout == "hello\nworld"
+
+    def test_alias_tm(self) -> None:
+        result = _run("tm", input_text="hello   ")
+        assert result.returncode == 0
+        assert result.stdout.strip() == "hello"
+
+    def test_both_flag(self) -> None:
+        result = _run("trim", "--both", input_text="  hello  ")
+        assert result.returncode == 0
+        assert result.stdout.strip() == "hello"
+
+    def test_empty_input(self) -> None:
+        result = _run("trim", input_text="")
+        assert result.returncode == 0
+
+
+# ---------------------------------------------------------------------------
+# dedupe
+# ---------------------------------------------------------------------------
+
+
+class TestDedupe:
+    def test_basic(self) -> None:
+        result = _run("dedupe", input_text="a\nb\na\nc")
+        assert result.returncode == 0
+        assert result.stdout.strip() == "a\nb\nc"
+
+    def test_alias_dq(self) -> None:
+        result = _run("dq", input_text="a\na\nb")
+        assert result.returncode == 0
+        assert result.stdout.strip() == "a\nb"
+
+    def test_ignore_case(self) -> None:
+        result = _run("dedupe", "--ignore-case", input_text="Hello\nhello\nWorld")
+        assert result.returncode == 0
+        assert result.stdout.strip() == "Hello\nWorld"
+
+    def test_adjacent(self) -> None:
+        result = _run("dedupe", "--adjacent", input_text="a\na\nb\na")
+        assert result.returncode == 0
+        assert result.stdout.strip() == "a\nb\na"
+
+    def test_empty_input(self) -> None:
+        result = _run("dedupe", input_text="")
+        assert result.returncode == 0
+
+
+# ---------------------------------------------------------------------------
+# sort
+# ---------------------------------------------------------------------------
+
+
+class TestSort:
+    def test_basic(self) -> None:
+        result = _run("sort", input_text="banana\napple\ncherry")
+        assert result.returncode == 0
+        lines = result.stdout.strip().split("\n")
+        assert lines[0].lower() == "apple"
+
+    def test_alias_st(self) -> None:
+        result = _run("st", input_text="b\na")
+        assert result.returncode == 0
+        assert result.stdout.strip() == "a\nb"
+
+    def test_reverse(self) -> None:
+        result = _run("sort", "--reverse", input_text="a\nb\nc")
+        assert result.returncode == 0
+        assert result.stdout.strip() == "c\nb\na"
+
+    def test_numeric(self) -> None:
+        result = _run("sort", "--numeric", input_text="10\n2\n1")
+        assert result.returncode == 0
+        assert result.stdout.strip() == "1\n2\n10"
+
+    def test_numeric_non_numeric_at_end(self) -> None:
+        result = _run("sort", "--numeric", input_text="2\napple\n1")
+        assert result.returncode == 0
+        lines = result.stdout.strip().split("\n")
+        assert lines[-1] == "apple"
+
+    def test_ignore_case(self) -> None:
+        result = _run("sort", "--ignore-case", input_text="banana\nApple")
+        assert result.returncode == 0
+        lines = result.stdout.strip().split("\n")
+        assert lines[0].lower() == "apple"
+
+    def test_empty_input(self) -> None:
+        result = _run("sort", input_text="")
+        assert result.returncode == 0
 
 
 # ---------------------------------------------------------------------------

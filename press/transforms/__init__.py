@@ -27,6 +27,7 @@ if TYPE_CHECKING:  # pragma: no cover
     )
     from press.transforms.json_fmt import json_compress, json_format
     from press.transforms.lineending import to_cr, to_crlf, to_lf
+    from press.transforms.lines import dedupe_lines, sort_lines, trim_lines
     from press.transforms.separator import hyphen_to_underscore, underscore_to_hyphen
     from press.transforms.sql import to_sql_in
     from press.transforms.whitespace import normalize_whitespace
@@ -37,6 +38,7 @@ __all__ = [
     "base64_encode",
     "decode_html_entities",
     "decode_unicode_escape",
+    "dedupe_lines",
     "dict_forward",
     "dict_reverse",
     "encode_unicode_escape",
@@ -46,6 +48,7 @@ __all__ = [
     "json_format",
     "load_tsv",
     "normalize_whitespace",
+    "sort_lines",
     "to_camel_case",
     "to_capitalize",
     "to_cr",
@@ -61,6 +64,7 @@ __all__ = [
     "to_swapcase",
     "to_title",
     "to_upper",
+    "trim_lines",
     "underscore_to_hyphen",
     "url_decode",
     "url_encode",
@@ -71,6 +75,7 @@ _LAZY: dict[str, tuple[str, str]] = {
     "base64_encode": ("press.transforms.encode", "base64_encode"),
     "decode_html_entities": ("press.transforms.escape", "decode_html_entities"),
     "decode_unicode_escape": ("press.transforms.escape", "decode_unicode_escape"),
+    "dedupe_lines": ("press.transforms.lines", "dedupe_lines"),
     "dict_forward": ("press.transforms.dictionary", "dict_forward"),
     "dict_reverse": ("press.transforms.dictionary", "dict_reverse"),
     "encode_unicode_escape": ("press.transforms.escape", "encode_unicode_escape"),
@@ -80,6 +85,7 @@ _LAZY: dict[str, tuple[str, str]] = {
     "json_compress": ("press.transforms.json_fmt", "json_compress"),
     "json_format": ("press.transforms.json_fmt", "json_format"),
     "normalize_whitespace": ("press.transforms.whitespace", "normalize_whitespace"),
+    "sort_lines": ("press.transforms.lines", "sort_lines"),
     "to_camel_case": ("press.transforms.case", "to_camel_case"),
     "to_capitalize": ("press.transforms.case", "to_capitalize"),
     "to_cr": ("press.transforms.lineending", "to_cr"),
@@ -95,6 +101,7 @@ _LAZY: dict[str, tuple[str, str]] = {
     "to_swapcase": ("press.transforms.case", "to_swapcase"),
     "to_title": ("press.transforms.case", "to_title"),
     "to_upper": ("press.transforms.case", "to_upper"),
+    "trim_lines": ("press.transforms.lines", "trim_lines"),
     "underscore_to_hyphen": ("press.transforms.separator", "underscore_to_hyphen"),
     "url_decode": ("press.transforms.encode", "url_decode"),
     "url_encode": ("press.transforms.encode", "url_encode"),
