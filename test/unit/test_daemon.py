@@ -1,7 +1,8 @@
 """Unit tests for press.daemon.
 
-All tests run on every platform (mocks replace pynput / pystray / psutil).
-Only TestAcquireMutex requires Windows and is marked @pytest.mark.windows_only.
+Daemon tests require pynput / pystray / pywin32 which are Windows-only optional
+dependencies.  All tests in this module are automatically skipped on non-Windows
+platforms via the windows_only marker and conftest.py.
 """
 
 from __future__ import annotations
@@ -12,6 +13,8 @@ from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+pytestmark = pytest.mark.windows_only
 
 if TYPE_CHECKING:
     from pathlib import Path
