@@ -395,6 +395,54 @@ class TestSort:
 
 
 # ---------------------------------------------------------------------------
+# Unicode normalization (nfc / nfd / nfkc / nfkd)
+# ---------------------------------------------------------------------------
+
+# が in NFD: U+304B (か) + U+3099 (combining dakuten)
+_GA_NFD = "が"
+# が in NFC: U+304C (precomposed)
+_GA_NFC = "が"
+
+
+class TestUnicodeNorm:
+    def test_nfc_stdin_to_stdout(self) -> None:
+        result = _run("nfc", input_text=_GA_NFD)
+        assert result.returncode == 0
+        assert result.stdout.strip() == _GA_NFC
+
+    def test_nfc_already_nfc_unchanged(self) -> None:
+        result = _run("nfc", input_text=_GA_NFC)
+        assert result.returncode == 0
+        assert result.stdout.strip() == _GA_NFC
+
+    def test_nfd_stdin_to_stdout(self) -> None:
+        result = _run("nfd", input_text=_GA_NFC)
+        assert result.returncode == 0
+        assert result.stdout.strip() == _GA_NFD
+
+    def test_nfkc_fullwidth_to_ascii(self) -> None:
+        # full-width ABC -> ASCII ABC
+        result = _run("nfkc", input_text="ＡＢＣ")
+        assert result.returncode == 0
+        assert result.stdout.strip() == "ABC"
+
+    def test_nfkd_fullwidth_to_ascii(self) -> None:
+        # full-width ABC -> ASCII ABC
+        result = _run("nfkd", input_text="ＡＢＣ")
+        assert result.returncode == 0
+        assert result.stdout.strip() == "ABC"
+
+    def test_nfc_empty_input(self) -> None:
+        result = _run("nfc", input_text="")
+        assert result.returncode == 0
+
+    def test_nfkc_ligature(self) -> None:
+        result = _run("nfkc", input_text="ﬁ")  # ﬁ
+        assert result.returncode == 0
+        assert result.stdout.strip() == "fi"
+
+
+# ---------------------------------------------------------------------------
 # daemon (stub)
 # ---------------------------------------------------------------------------
 

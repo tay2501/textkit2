@@ -30,6 +30,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from press.transforms.lines import dedupe_lines, sort_lines, trim_lines
     from press.transforms.separator import hyphen_to_underscore, underscore_to_hyphen
     from press.transforms.sql import to_sql_in
+    from press.transforms.unicode_norm import to_nfc, to_nfd, to_nfkc, to_nfkd
     from press.transforms.whitespace import normalize_whitespace
     from press.transforms.width import to_fullwidth, to_halfwidth
 
@@ -58,6 +59,10 @@ __all__ = [
     "to_kebab_case",
     "to_lf",
     "to_lower",
+    "to_nfc",
+    "to_nfd",
+    "to_nfkc",
+    "to_nfkd",
     "to_pascal_case",
     "to_snake_case",
     "to_sql_in",
@@ -95,6 +100,10 @@ _LAZY: dict[str, tuple[str, str]] = {
     "to_kebab_case": ("press.transforms.case", "to_kebab_case"),
     "to_lf": ("press.transforms.lineending", "to_lf"),
     "to_lower": ("press.transforms.case", "to_lower"),
+    "to_nfc": ("press.transforms.unicode_norm", "to_nfc"),
+    "to_nfd": ("press.transforms.unicode_norm", "to_nfd"),
+    "to_nfkc": ("press.transforms.unicode_norm", "to_nfkc"),
+    "to_nfkd": ("press.transforms.unicode_norm", "to_nfkd"),
     "to_pascal_case": ("press.transforms.case", "to_pascal_case"),
     "to_snake_case": ("press.transforms.case", "to_snake_case"),
     "to_sql_in": ("press.transforms.sql", "to_sql_in"),

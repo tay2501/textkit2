@@ -63,6 +63,11 @@ SIMPLE_COMMANDS: tuple[SimpleCommand, ...] = (
     SimpleCommand("base64-decode",  "press.transforms.encode",     "base64_decode",         ("bd",),   "Decode Base64 to text"),
     SimpleCommand("url-encode",     "press.transforms.encode",     "url_encode",            ("ue2",),  "Percent-encode URL text"),
     SimpleCommand("url-decode",     "press.transforms.encode",     "url_decode",            ("ud2",),  "Decode percent-encoded URL text"),
+    # --- unicode normalization ---
+    SimpleCommand("nfc",            "press.transforms.unicode_norm", "to_nfc",              (),        "Normalize to NFC (canonical composition) — Mac→Windows fix"),
+    SimpleCommand("nfd",            "press.transforms.unicode_norm", "to_nfd",              (),        "Normalize to NFD (canonical decomposition)"),
+    SimpleCommand("nfkc",           "press.transforms.unicode_norm", "to_nfkc",             (),        "Normalize to NFKC (compatibility composition)"),
+    SimpleCommand("nfkd",           "press.transforms.unicode_norm", "to_nfkd",             (),        "Normalize to NFKD (compatibility decomposition)"),
     # --- json ---
     SimpleCommand("json-compress",  "press.transforms.json_fmt",   "json_compress",         ("jc",),   "Compress JSON to single line"),
 )

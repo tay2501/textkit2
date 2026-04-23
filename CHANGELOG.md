@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Unicode normalization** (`press/transforms/unicode_norm.py`): four new commands
+  - `nfc` — Normalize to NFC (canonical composition); fixes macOS NFD filenames on Windows/pCloud
+  - `nfd` — Normalize to NFD (canonical decomposition)
+  - `nfkc` — Normalize to NFKC (compatibility composition); collapses full-width, ligatures, etc.
+  - `nfkd` — Normalize to NFKD (compatibility decomposition)
 - **Refactoring** (Python 3.13 best practices)
   - `mypy`: `strict_equality = true` — catches non-overlapping equality comparisons
   - `ruff`: per-file ignore `RUF067` for `transforms/__init__.py` (PEP 562 lazy-loading is intentional)
