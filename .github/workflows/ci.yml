@@ -13,10 +13,11 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest]
         python-version: ["3.13"]
 
     steps:
@@ -37,23 +38,20 @@ jobs:
       run: uv python install ${{ matrix.python-version }}
 
     - name: Install dependencies
-      run: |
-        uv sync --all-extras --dev --frozen
+      run: uv sync --all-extras --dev --frozen
 
-    - name: Lint with ruff
+    - name: Lint with ruff (Ubuntu only)
+      if: matrix.os == 'ubuntu-latest'
       run: |
         uv run ruff check --output-format=github .
         uv run ruff format --check .
-      continue-on-error: false
 
-    - name: Type check with mypy
-      run: |
-        uv run mypy press/
-      continue-on-error: false
+    - name: Type check with mypy (Ubuntu only)
+      if: matrix.os == 'ubuntu-latest'
+      run: uv run mypy press/
 
     - name: Test with pytest
-      run: |
-        uv run pytest --cov=. --cov-report=xml --cov-report=term-missing --cov-report=html
+      run: uv run pytest --cov=. --cov-report=xml --cov-report=term-missing --cov-report=html
       env:
         PYTHONPATH: .
 
@@ -61,7 +59,7 @@ jobs:
       uses: actions/upload-artifact@v7
       if: always()
       with:
-        name: coverage-reports-${{ matrix.python-version }}
+        name: coverage-reports-${{ matrix.os }}-${{ matrix.python-version }}
         path: |
           coverage.xml
           htmlcov/
