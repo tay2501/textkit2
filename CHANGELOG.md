@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Refactoring** (Python 3.13 best practices)
+  - `mypy`: `strict_equality = true` — catches non-overlapping equality comparisons
+  - `ruff`: per-file ignore `RUF067` for `transforms/__init__.py` (PEP 562 lazy-loading is intentional)
+  - `sort_lines`: docstring now documents ISO 14651 vs UCA collation caveat
+  - `_run_transform`: renamed `_cmd` → `cmd` (was misleadingly prefixed; variable is actively used)
+  - `_add_io_args`: updated `input` help text to reflect TTY clipboard / pipe stdin / `-` sentinel behaviour
 - **Line operations** (`press/transforms/lines.py`): three new parametric commands
   - `trim` / `tm` — strip trailing (and optionally leading) whitespace from each line (`--both`)
   - `dedupe` / `dq` — remove duplicate lines, insertion-order preserved (`--ignore-case`, `--adjacent`)

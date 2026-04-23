@@ -81,6 +81,9 @@ def sort_lines(
     locale.setlocale(LC_COLLATE, '') is called at function entry to match
     GNU sort default behaviour. --numeric float-parses lines; non-numeric
     lines sort last. --reverse inverts the final order.
+
+    Collation follows ISO 14651 (OS locale), not the full Unicode Collation
+    Algorithm (UCA). Results may differ from ICU-based tools on some locales.
     """
     locale.setlocale(locale.LC_COLLATE, "")
     lines, trailing = _normalise(text)
