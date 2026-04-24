@@ -91,11 +91,14 @@ select = [
     "G",
     "PERF",
     "FURB",
+    "ARG",
+    "PIE",
+    "C4",
 ]
 ignore = ["TRY003", "ERA001"]
 
 [tool.ruff.lint.per-file-ignores]
-"test/**/*.py" = ["S101", "RUF001"]  # full-width chars are intentional test data
+"test/**/*.py" = ["S101", "RUF001", "ARG"]  # pytest fixtures and mock helpers often have unused args
 "press/transforms/*.py" = ["RUF002"]  # EN DASH in Unicode range notation (e.g. U+0000–U+007F)
 "press/transforms/__init__.py" = ["RUF067"]  # PEP 562 __getattr__ lazy-loading registry is intentional
 

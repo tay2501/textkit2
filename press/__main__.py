@@ -1,6 +1,7 @@
 """Command-line entry point for press."""
 
 import argparse
+import locale
 import sys
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
@@ -91,8 +92,12 @@ def _run_transform(
 # ---------------------------------------------------------------------------
 
 
-def _add_io_args(parser: argparse.ArgumentParser) -> None:
-    """Attach common I/O options to a subcommand parser."""
+def _add_io_args(parser: argparse.ArgumentParser, *, positional: bool = True) -> None:
+    """Attach common I/O options to a subcommand parser.
+
+    Pass ``positional=False`` for commands that do not accept inline text input
+    (e.g. ``dict``, which always reads from clipboard or a pipeline).
+    """
     parser.add_argument("-c", "--clip-in", action="store_true", help="Read input from clipboard")
     parser.add_argument(
         "-C",
@@ -107,12 +112,13 @@ def _add_io_args(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="On transform error, output original text and exit 0",
     )
-    parser.add_argument(
-        "input",
-        nargs="?",
-        default=None,
-        help="Input text; omit to read clipboard (TTY) or stdin (pipe); '-' forces stdin",
-    )
+    if positional:
+        parser.add_argument(
+            "input",
+            nargs="?",
+            default=None,
+            help="Input text; omit to read clipboard (TTY) or stdin (pipe); '-' forces stdin",
+        )
 
 
 def _register_simple_command(sub: _SubParsers, cmd: "SimpleCommand") -> None:
@@ -251,24 +257,6 @@ def _register_json_format_command(sub: _SubParsers) -> None:
     p.set_defaults(func=_jf)
 
 
-def _add_dict_io_args(parser: argparse.ArgumentParser) -> None:
-    """Attach I/O options for the dict transform subcommand (no positional input)."""
-    parser.add_argument("-c", "--clip-in", action="store_true", help="Read input from clipboard")
-    parser.add_argument(
-        "-C",
-        "--clip-out",
-        action="store_true",
-        help="Write output to clipboard (also prints to stdout)",
-    )
-    parser.add_argument("-v", "--verbose", action="store_true", help="Show before/after on stderr")
-    parser.add_argument("-q", "--quiet", action="store_true", help="Suppress all stderr output")
-    parser.add_argument(
-        "--fallback",
-        action="store_true",
-        help="On transform error, output original text and exit 0",
-    )
-
-
 def _register_dict_commands(sub: _SubParsers) -> None:
     """Register the ``dict`` command group and its management subcommands."""
     dict_p = sub.add_parser("dict", help="Dictionary-based text replacement (F-08, F-09)")
@@ -284,7 +272,7 @@ def _register_dict_commands(sub: _SubParsers) -> None:
         default=None,
         help="TSV dictionary file (default: platform config path)",
     )
-    _add_dict_io_args(dict_p)
+    _add_io_args(dict_p, positional=False)
 
     dict_sub = dict_p.add_subparsers(dest="dict_action", metavar="ACTION")
 
@@ -498,6 +486,8 @@ def main() -> None:
     # Ensure UTF-8 I/O; disable newline translation on output (preserves CR/CRLF transforms)
     if hasattr(sys.stdin, "reconfigure"):
         sys.stdin.reconfigure(encoding="utf-8")
+    # Set locale once at startup so sort_lines / locale.strxfrm use the user's environment locale.
+    locale.setlocale(locale.LC_COLLATE, "")
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", newline="")
     if hasattr(sys.stderr, "reconfigure"):

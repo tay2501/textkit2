@@ -38,6 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `_register_simple_command()` factory + loop over `SIMPLE_COMMANDS` (−218 lines)
 - `daemon.py`: `CommandDispatcher._transform()` match block collapsed from 32 lines to
   18 lines via `SIMPLE_COMMAND_INDEX` lookup; only parametric/special commands remain explicit
+- `_add_io_args()`: unified with former `_add_dict_io_args()` via `positional: bool = True`
+  parameter — eliminates duplicate argument definitions (DRY fix)
+- `sort_lines()`: `locale.setlocale(LC_COLLATE, "")` moved to `main()` startup (pure function
+  design principle); collation key changed from `cmp_to_key(strcoll)` to `strxfrm` (O(n) key
+  generation vs O(n log n) comparisons — faster on large inputs)
+- ruff: added `ARG`, `PIE`, `C4` rule categories for unused-argument, idiomatic-expression, and
+  comprehension checks; `ARG` suppressed for test files (pytest fixtures are intentionally unused)
 
 ### Dependencies
 - `charset-normalizer` 3.4.6 → 3.4.7

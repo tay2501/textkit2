@@ -517,7 +517,7 @@ else:
     def _win_get_text() -> str:
         raise OSError("Clipboard access is only supported on Windows")
 
-    def _win_set_text(text: str) -> None:
+    def _win_set_text(_text: str) -> None:
         raise OSError("Clipboard access is only supported on Windows")
 
     def _win_clear() -> None:

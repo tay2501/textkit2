@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import locale
 import unicodedata
-from functools import cmp_to_key
 
 
 def _normalise(text: str) -> tuple[list[str], bool]:
@@ -76,16 +75,19 @@ def sort_lines(
     numeric: bool = False,
     ignore_case: bool = False,
 ) -> str:
-    """Sort lines using locale-aware collation (locale.strcoll).
+    """Sort lines using locale-aware collation (locale.strxfrm).
 
-    locale.setlocale(LC_COLLATE, '') is called at function entry to match
-    GNU sort default behaviour. --numeric float-parses lines; non-numeric
-    lines sort last. --reverse inverts the final order.
+    Requires locale.setlocale(LC_COLLATE, '') to have been called before
+    invocation (main() does this at startup). Uses strxfrm for O(n) key
+    generation, which is faster than cmp_to_key(strcoll) on large inputs.
+
+    --numeric  float-parses lines; non-numeric lines sort last.
+    --reverse  inverts the final order.
+    --ignore-case  casefolds the collation key before strxfrm.
 
     Collation follows ISO 14651 (OS locale), not the full Unicode Collation
     Algorithm (UCA). Results may differ from ICU-based tools on some locales.
     """
-    locale.setlocale(locale.LC_COLLATE, "")
     lines, trailing = _normalise(text)
 
     if numeric:
@@ -99,12 +101,10 @@ def sort_lines(
         sorted_lines = sorted(lines, key=_num_key, reverse=reverse)
     else:
 
-        def _locale_key(line: str) -> str:
-            return line.casefold() if ignore_case else line
+        def _strxfrm_key(line: str) -> str:
+            k = line.casefold() if ignore_case else line
+            return locale.strxfrm(k)
 
-        def _collate(a: str, b: str) -> int:
-            return locale.strcoll(_locale_key(a), _locale_key(b))
-
-        sorted_lines = sorted(lines, key=cmp_to_key(_collate), reverse=reverse)
+        sorted_lines = sorted(lines, key=_strxfrm_key, reverse=reverse)
 
     return _join(sorted_lines, trailing)
