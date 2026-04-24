@@ -9,18 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.3.0] - 2026-04-25
+
 ### Added
 - **Unicode normalization** (`press/transforms/unicode_norm.py`): four new commands
   - `nfc` — Normalize to NFC (canonical composition); fixes macOS NFD filenames on Windows/pCloud
   - `nfd` — Normalize to NFD (canonical decomposition)
   - `nfkc` — Normalize to NFKC (compatibility composition); collapses full-width, ligatures, etc.
   - `nfkd` — Normalize to NFKD (compatibility decomposition)
-- **Refactoring** (Python 3.13 best practices)
-  - `mypy`: `strict_equality = true` — catches non-overlapping equality comparisons
-  - `ruff`: per-file ignore `RUF067` for `transforms/__init__.py` (PEP 562 lazy-loading is intentional)
-  - `sort_lines`: docstring now documents ISO 14651 vs UCA collation caveat
-  - `_run_transform`: renamed `_cmd` → `cmd` (was misleadingly prefixed; variable is actively used)
-  - `_add_io_args`: updated `input` help text to reflect TTY clipboard / pipe stdin / `-` sentinel behaviour
 - **Line operations** (`press/transforms/lines.py`): three new parametric commands
   - `trim` / `tm` — strip trailing (and optionally leading) whitespace from each line (`--both`)
   - `dedupe` / `dq` — remove duplicate lines, insertion-order preserved (`--ignore-case`, `--adjacent`)
@@ -30,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "copy → transform → paste" workflow
 - **`-` stdin sentinel**: `press <cmd> -` forces stdin input when running interactively,
   following the Unix convention used by `cat`, `sort`, `grep`
+- **Daemon hotkey bindings** for new commands: `k`=trim, `o`=dedupe, `p`=sort added to
+  `_DEFAULT_BINDINGS`; `trim`/`dedupe`/`sort` registered in `CommandDispatcher._transform()`
 
 ### Changed
 - `press/commands.py` added as the central command registry: `SimpleCommand` dataclass +
@@ -43,8 +43,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `sort_lines()`: `locale.setlocale(LC_COLLATE, "")` moved to `main()` startup (pure function
   design principle); collation key changed from `cmp_to_key(strcoll)` to `strxfrm` (O(n) key
   generation vs O(n log n) comparisons — faster on large inputs)
-- ruff: added `ARG`, `PIE`, `C4` rule categories for unused-argument, idiomatic-expression, and
-  comprehension checks; `ARG` suppressed for test files (pytest fixtures are intentionally unused)
+
+### Refactored
+- `mypy`: `strict_equality = true` — catches non-overlapping equality comparisons
+- `ruff`: added `ARG`, `PIE`, `C4` rule categories; per-file ignore `RUF067` for
+  `transforms/__init__.py` (PEP 562 lazy-loading is intentional); `ARG` suppressed for
+  test files (pytest fixtures are intentionally unused)
+- `_run_transform`: renamed `_cmd` → `cmd` (was misleadingly prefixed; variable is actively used)
 
 ### Dependencies
 - `charset-normalizer` 3.4.6 → 3.4.7
@@ -119,6 +124,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Git-style UX: `press` with no subcommand prints help and exits 0
 - Windows 11 clipboard I/O via Win32 ctypes (no third-party clipboard library)
 
-[Unreleased]: https://github.com/tay2501/textkit2/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/tay2501/textkit2/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/tay2501/textkit2/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/tay2501/textkit2/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/tay2501/textkit2/releases/tag/v0.1.0

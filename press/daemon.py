@@ -207,6 +207,18 @@ class CommandDispatcher:
 
                 cfg = self._config.sql_in
                 return to_sql_in(text, quote_char=cfg.quote_char, wrap=cfg.wrap)
+            case "trim" | "tm":
+                from press.transforms.lines import trim_lines
+
+                return trim_lines(text)
+            case "dedupe" | "dq":
+                from press.transforms.lines import dedupe_lines
+
+                return dedupe_lines(text)
+            case "sort" | "st":
+                from press.transforms.lines import sort_lines
+
+                return sort_lines(text)
             case "dict":
                 return self._run_dict(text, reverse=False)
             case "dict_reverse":

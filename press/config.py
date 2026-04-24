@@ -41,6 +41,9 @@ _DEFAULT_BINDINGS: dict[str, str] = {
     "shift+e": "unicode-encode",
     "h": "hold",
     "z": "clear",
+    "k": "trim",
+    "o": "dedupe",
+    "p": "sort",
 }
 
 

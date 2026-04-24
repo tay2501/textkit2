@@ -1,6 +1,6 @@
 [project]
 name = "press"
-version = "0.2.0"
+version = "0.3.0"
 description = "Clipboard text transformation tool for Windows 11"
 readme = "README.md"
 license = { text = "MIT" }
