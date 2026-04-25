@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **`url-encode` alias**: `ue2` → `urle` (more semantic; avoids confusion with `unicode-encode` alias `ue`) ⚠️ **breaking**
+- **`url-decode` alias**: `ud2` → `urld` (more semantic; avoids confusion with `unicode-decode` alias `ud`) ⚠️ **breaking**
+- **`locale.setlocale`**: now wrapped in `contextlib.suppress(locale.Error)` — falls back to codepoint order on broken Windows locale settings
+- **`unicode_norm` transforms**: skip normalization when input is already in the target form (`unicodedata.is_normalized()`)
+- **mypy config**: added `local_partial_types = true` (mypy 2.0 forward compatibility) and `explicit-override` error code
+- **`_WorkerThread.run()`**: annotated with `@typing.override`
+- **dev dependency**: removed unused `freezegun`
+
 ---
 
 ## [0.3.0] - 2026-04-25

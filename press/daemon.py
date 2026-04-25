@@ -13,7 +13,7 @@ import queue
 import sys
 import threading
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -447,6 +447,7 @@ class _WorkerThread(threading.Thread):
         self._dispatcher = dispatcher
         self._hm = hotkey_manager
 
+    @override
     def run(self) -> None:
         while True:
             item = self._queue.get()

@@ -19,7 +19,7 @@ def to_nfc(text: str) -> str:
     Returns:
         NFC-normalized text.
     """
-    return unicodedata.normalize("NFC", text)
+    return text if unicodedata.is_normalized("NFC", text) else unicodedata.normalize("NFC", text)
 
 
 def to_nfd(text: str) -> str:
@@ -34,7 +34,7 @@ def to_nfd(text: str) -> str:
     Returns:
         NFD-normalized text.
     """
-    return unicodedata.normalize("NFD", text)
+    return text if unicodedata.is_normalized("NFD", text) else unicodedata.normalize("NFD", text)
 
 
 def to_nfkc(text: str) -> str:
@@ -49,7 +49,7 @@ def to_nfkc(text: str) -> str:
     Returns:
         NFKC-normalized text.
     """
-    return unicodedata.normalize("NFKC", text)
+    return text if unicodedata.is_normalized("NFKC", text) else unicodedata.normalize("NFKC", text)
 
 
 def to_nfkd(text: str) -> str:
@@ -63,4 +63,4 @@ def to_nfkd(text: str) -> str:
     Returns:
         NFKD-normalized text.
     """
-    return unicodedata.normalize("NFKD", text)
+    return text if unicodedata.is_normalized("NFKD", text) else unicodedata.normalize("NFKD", text)

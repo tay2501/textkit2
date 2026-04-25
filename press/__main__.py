@@ -1,6 +1,7 @@
 """Command-line entry point for press."""
 
 import argparse
+import contextlib
 import locale
 import sys
 from collections.abc import Callable
@@ -487,7 +488,10 @@ def main() -> None:
     if hasattr(sys.stdin, "reconfigure"):
         sys.stdin.reconfigure(encoding="utf-8")
     # Set locale once at startup so sort_lines / locale.strxfrm use the user's environment locale.
-    locale.setlocale(locale.LC_COLLATE, "")
+    # Falls back silently to codepoint order if the user's locale is unavailable (e.g. broken
+    # Windows "Region for non-Unicode programs" setting).
+    with contextlib.suppress(locale.Error):
+        locale.setlocale(locale.LC_COLLATE, "")
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", newline="")
     if hasattr(sys.stderr, "reconfigure"):
