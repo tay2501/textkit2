@@ -107,7 +107,6 @@ strict             = true
 warn_unreachable   = true
 enable_error_code  = ["truthy-bool", "redundant-expr", "possibly-undefined", "explicit-override"]
 strict_equality    = true
-local_partial_types = true
 
 [[tool.mypy.overrides]]
 module = ["pystray.*", "pynput.*", "win32.*", "pywintypes", "jaconv.*", "PIL.*", "psutil.*"]
