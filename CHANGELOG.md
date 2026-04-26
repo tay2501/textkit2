@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`[hotkeys.bindings]` merge**: partial bindings in `config.toml` now merge with defaults instead of replacing them entirely; users can override a single key without re-specifying all defaults
+
 ### Changed
 - **`url-encode` alias**: `ue2` → `urle` (more semantic; avoids confusion with `unicode-encode` alias `ue`) ⚠️ **breaking**
 - **`url-decode` alias**: `ud2` → `urld` (more semantic; avoids confusion with `unicode-decode` alias `ud`) ⚠️ **breaking**

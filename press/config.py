@@ -122,9 +122,7 @@ def _parse_hotkeys(data: dict[str, Any]) -> HotkeysConfig:
     default = HotkeysConfig()
     prefix: str = data.get("prefix", default.prefix)
     raw_bindings = data.get("bindings")
-    bindings: dict[str, str] = (
-        dict(raw_bindings) if raw_bindings is not None else dict(_DEFAULT_BINDINGS)
-    )
+    bindings = dict(_DEFAULT_BINDINGS) | (dict(raw_bindings) if raw_bindings is not None else {})
     return HotkeysConfig(prefix=prefix, bindings=bindings)
 
 

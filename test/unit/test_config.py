@@ -69,7 +69,10 @@ class TestFullConfig:
         config = load_config(cfg_file)
 
         assert config.hotkeys.prefix == "ctrl+alt+f9"
-        assert config.hotkeys.bindings == {"w": "halfwidth", "f": "fullwidth"}
+        # partial bindings merge with defaults — only overridden keys differ
+        assert config.hotkeys.bindings["w"] == "halfwidth"
+        assert config.hotkeys.bindings["f"] == "fullwidth"
+        assert "n" in config.hotkeys.bindings  # default key preserved
         assert config.sql_in.quote_char == '"'
         assert config.sql_in.wrap is True
         assert config.dictionary.files == ("%APPDATA%/press/dict/custom.tsv",)
@@ -161,3 +164,47 @@ class TestHotkeyPrefix:
         # bindings not specified in TOML — default must be preserved
         assert "w" in config.hotkeys.bindings
         assert config.hotkeys.bindings["w"] == "halfwidth"
+
+
+class TestBindingsMerge:
+    """Partial bindings in TOML are merged with defaults, not fully replaced."""
+
+    def test_partial_bindings_merge_with_defaults(self, tmp_path: Path) -> None:
+        toml_content = textwrap.dedent("""\
+            [hotkeys.bindings]
+            j = "sort"
+        """)
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(toml_content, encoding="utf-8")
+
+        config = load_config(cfg_file)
+
+        assert config.hotkeys.bindings["j"] == "sort"
+        assert config.hotkeys.bindings["w"] == "halfwidth"  # default preserved
+        assert config.hotkeys.bindings["f"] == "fullwidth"  # default preserved
+        assert len(config.hotkeys.bindings) > 1
+
+    def test_partial_bindings_override_default_key(self, tmp_path: Path) -> None:
+        toml_content = textwrap.dedent("""\
+            [hotkeys.bindings]
+            w = "nfc"
+        """)
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(toml_content, encoding="utf-8")
+
+        config = load_config(cfg_file)
+
+        assert config.hotkeys.bindings["w"] == "nfc"  # overridden
+        assert config.hotkeys.bindings["f"] == "fullwidth"  # unchanged default
+
+    def test_empty_bindings_table_keeps_defaults(self, tmp_path: Path) -> None:
+        toml_content = textwrap.dedent("""\
+            [hotkeys.bindings]
+        """)
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(toml_content, encoding="utf-8")
+
+        config = load_config(cfg_file)
+
+        assert config.hotkeys.bindings["w"] == "halfwidth"
+        assert config.hotkeys.bindings["f"] == "fullwidth"
