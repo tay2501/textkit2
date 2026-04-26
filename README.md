@@ -73,11 +73,21 @@ echo '{"b":2,"a":1}' | press json-format   # pretty-print (2-space indent)
 cat big.json         | press json-compress  # single line
 
 # Unicode escape ↔ text
-echo '\u30c6\u30b9\u30c8' | press unicode-decode  # → テスト
-echo "テスト"              | press unicode-encode  # → \u30c6\u30b9\u30c8
+echo 'テスト' | press unicode-decode  # → テスト
+echo "テスト"              | press unicode-encode  # → テスト
 
 # HTML entities
 echo '&lt;div&gt;' | press html-decode      # → <div>
+
+# Unicode normalization (macOS NFD → Windows NFC, etc.)
+echo "café" | press nfc     # → NFC (canonical composition)
+echo "café" | press nfkc    # → NFKC (compatibility composition)
+
+# Line operations
+printf "banana\napple\ncherry" | press sort         # → apple / banana / cherry
+printf "hello   \nworld   "   | press trim          # → strip trailing whitespace
+printf "a\nb\na\nc"           | press dedupe        # → a / b / c
+printf "10\n2\n1\n20"         | press sort --numeric  # → 1 / 2 / 10 / 20
 
 # Dictionary lookup
 press dict add FOOBER01 TABLE_HOGEHOGE --file ~/my.tsv
@@ -96,6 +106,8 @@ cat file.txt        | press lf               # all line endings → LF
 press halfwidth  -c -C   # transform clipboard in-place
 press sql-in     -c -C
 press normalize  -c -C
+press sort       -c -C
+press dedupe --ignore-case -c -C
 ```
 
 ---
@@ -117,6 +129,14 @@ press normalize  -c -C
 | `crlf` | | Unify all line endings to `\r\n` |
 | `lf` | | Unify all line endings to `\n` |
 | `cr` | | Unify all line endings to `\r` |
+
+### Line Operations
+
+| Command | Alias | Options | Description |
+|---|---|---|---|
+| `trim` | `tm` | `--both` | Strip trailing whitespace from each line (`--both` strips leading too) |
+| `dedupe` | `dq` | `--ignore-case`, `--adjacent` | Remove duplicate lines, preserving first-occurrence order |
+| `sort` | `st` | `--reverse`, `--numeric`, `--ignore-case` | Sort lines (locale-aware; `--numeric` for natural number order) |
 
 ### Separators
 
@@ -145,8 +165,8 @@ press normalize  -c -C
 |---|---|---|
 | `base64-encode` | `be` | Encode text to Base64 |
 | `base64-decode` | `bd` | Decode Base64 to text |
-| `url-encode` | `ue2` | Percent-encode URL text |
-| `url-decode` | `ud2` | Decode percent-encoded URL text |
+| `url-encode` | `urle` | Percent-encode URL text |
+| `url-decode` | `urld` | Decode percent-encoded URL text |
 | `fix-encoding` | `fe` | Repair mojibake — re-detect and re-decode the original encoding (`--threshold N`) |
 
 ### Escape Sequences
@@ -157,12 +177,21 @@ press normalize  -c -C
 | `unicode-encode` | `ue` | Encode text to `\uXXXX` sequences |
 | `html-decode` | `hd` | Decode HTML entities (`&amp;` → `&`) |
 
+### Unicode Normalization
+
+| Command | Description |
+|---|---|
+| `nfc` | Canonical composition — precomposed form (Windows/web standard, fixes macOS NFD filenames) |
+| `nfd` | Canonical decomposition — base character + combining marks (macOS HFS+ form) |
+| `nfkc` | Compatibility composition — collapses full-width, ligatures, etc. |
+| `nfkd` | Compatibility decomposition |
+
 ### Clipboard Utilities
 
 | Command | Alias | Description |
 |---|---|---|
 | `clear` | `cl` | Clear the clipboard |
-| `hold` | | Hold clipboard contents — protect from overwrite *(Phase 4, not yet implemented)* |
+| `hold` | | Toggle clipboard hold — protect contents from overwrite (requires daemon) |
 
 ### Dictionary
 
@@ -202,6 +231,48 @@ USER-ID	USER_ID
 
 ---
 
+## Daemon & Global Hotkeys
+
+The `press daemon` runs a background process with a system tray icon and global hotkey support. Once started, any clipboard transform is available from any application via a key chord.
+
+```bash
+press daemon start    # start tray icon + hotkey listener
+press daemon stop     # stop the daemon
+press daemon status   # show running / not running
+```
+
+### Default key bindings
+
+Prefix: **Ctrl+Shift+F10**, then:
+
+| Key | Command | | Key | Command |
+|---|---|---|---|---|
+| `w` | halfwidth | | `e` | unicode-decode |
+| `f` | fullwidth | | `Shift+E` | unicode-encode |
+| `n` | normalize | | `s` | sql-in |
+| `c` | crlf | | `d` | dict |
+| `l` | lf | | `Shift+D` | dict (reverse) |
+| `r` | cr | | `h` | hold (toggle) |
+| `u` | hyphen | | `z` | clear clipboard |
+| `Shift+U` | underscore | | `k` | trim |
+| | | | `o` | dedupe |
+| | | | `p` | sort |
+
+### Custom bindings
+
+Create `%APPDATA%\press\config.toml` and add a `[hotkeys.bindings]` section. User-defined entries are **merged with** the defaults — you only need to specify the keys you want to change:
+
+```toml
+[hotkeys]
+prefix = "ctrl+shift+f10"   # optional — change the leader key
+
+[hotkeys.bindings]
+j = "sort"          # add new binding
+w = "nfc"           # override existing binding
+```
+
+---
+
 ## Design Philosophy
 
 press follows a **hybrid CLI design** modeled after [uv](https://docs.astral.sh/uv/) and [ruff](https://docs.astral.sh/ruff/):
@@ -223,23 +294,13 @@ Error messages follow the format `press <subcommand>: error: <message>` so they 
 
 ---
 
-## Roadmap (Phase 2)
-
-The following features are planned but not yet implemented:
-
-- **Daemon mode** — background process with system tray icon
-- **Global hotkeys** — `Ctrl+Shift+F10` → key chord transforms clipboard in any app
-- **Clipboard HOLD** — protect clipboard from overwrite (`hold` command, requires daemon)
-
----
-
 ## Documentation
 
 | | |
 |---|---|
 | **User Guide** | [docs/user/](docs/user/index.md) — transforms, hotkeys, dictionary, config |
 | **Developer Guide** | [docs/dev/](docs/dev/index.md) — architecture, contributing, API reference |
-| **Specification** | [SPEC.md](SPEC.md) — full requirements and design decisions |
+| **Changelog** | [CHANGELOG.md](CHANGELOG.md) |
 
 Build the docs locally:
 
