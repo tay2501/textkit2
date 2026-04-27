@@ -35,6 +35,7 @@ SIMPLE_COMMANDS: tuple[SimpleCommand, ...] = (
     # --- width ---
     SimpleCommand("halfwidth",      "press.transforms.width",      "to_halfwidth",          ("hw",),   "Convert full-width characters to half-width"),
     SimpleCommand("fullwidth",      "press.transforms.width",      "to_fullwidth",          ("fw",),   "Convert half-width characters to full-width"),
+    SimpleCommand("enlarge-kana",   "press.transforms.width",      "to_enlarge_smallkana",  ("ek",),   "Expand small kana to normal size (ぁ→あ, ァ→ア)"),
     # --- whitespace ---
     SimpleCommand("normalize",      "press.transforms.whitespace", "normalize_whitespace",  ("norm",), "Normalize whitespace and blank lines"),
     # --- line endings ---

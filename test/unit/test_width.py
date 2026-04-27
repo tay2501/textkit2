@@ -1,6 +1,6 @@
 """Tests for full-width / half-width conversion (F-01, F-02)."""
 
-from press.transforms.width import to_fullwidth, to_halfwidth
+from press.transforms.width import to_enlarge_smallkana, to_fullwidth, to_halfwidth
 
 
 class TestToHalfwidth:
@@ -51,3 +51,34 @@ class TestToFullwidth:
 
     def test_empty(self) -> None:
         assert to_fullwidth("") == ""
+
+
+class TestToEnlargeSmalKana:
+    def test_small_hiragana_enlarged(self) -> None:
+        assert to_enlarge_smallkana("ぁぃぅぇぉ") == "あいうえお"
+
+    def test_small_hiragana_tsu_ya_yu_yo(self) -> None:
+        assert to_enlarge_smallkana("っゃゅょ") == "つやゆよ"
+
+    def test_small_katakana_enlarged(self) -> None:
+        assert to_enlarge_smallkana("ァィゥェォ") == "アイウエオ"
+
+    def test_small_katakana_tsu_ya_yu_yo(self) -> None:
+        assert to_enlarge_smallkana("ッャュョ") == "ツヤユヨ"
+
+    def test_normal_kana_unchanged(self) -> None:
+        assert to_enlarge_smallkana("あいうえお") == "あいうえお"
+
+    def test_mixed_small_and_normal(self) -> None:
+        result = to_enlarge_smallkana("ぁあぃい")
+        assert result == "ああいい"
+
+    def test_ascii_unchanged(self) -> None:
+        assert to_enlarge_smallkana("ABC") == "ABC"
+
+    def test_empty(self) -> None:
+        assert to_enlarge_smallkana("") == ""
+
+    def test_multiline_preserved(self) -> None:
+        result = to_enlarge_smallkana("ぁぃ\nぅぇ")
+        assert result == "あい\nうえ"

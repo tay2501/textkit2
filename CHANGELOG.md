@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`enlarge-kana` / `ek`**: new command to expand small-form kana to normal size (ぁ→あ, ァ→ア) using `jaconv.enlarge_smallkana`
+
 ### Fixed
 - **`[hotkeys.bindings]` merge**: partial bindings in `config.toml` now merge with defaults instead of replacing them entirely; users can override a single key without re-specifying all defaults
 
@@ -17,9 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`url-decode` alias**: `ud2` → `urld` (more semantic; avoids confusion with `unicode-decode` alias `ud`) ⚠️ **breaking**
 - **`locale.setlocale`**: now wrapped in `contextlib.suppress(locale.Error)` — falls back to codepoint order on broken Windows locale settings
 - **`unicode_norm` transforms**: skip normalization when input is already in the target form (`unicodedata.is_normalized()`)
-- **mypy config**: added `local_partial_types = true` (mypy 2.0 forward compatibility) and `explicit-override` error code
+- **mypy config**: added `explicit-override` error code; removed `local_partial_types` (caused false positives on Ubuntu CI)
 - **`_WorkerThread.run()`**: annotated with `@typing.override`
-- **dev dependency**: removed unused `freezegun`
+- **dev dependency**: removed unused `freezegun`; tightened lower bounds for `psutil`, `pyinstaller`, `pytest-benchmark`, `pip-audit`
 
 ---
 

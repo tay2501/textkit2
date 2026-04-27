@@ -32,7 +32,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from press.transforms.sql import to_sql_in
     from press.transforms.unicode_norm import to_nfc, to_nfd, to_nfkc, to_nfkd
     from press.transforms.whitespace import normalize_whitespace
-    from press.transforms.width import to_fullwidth, to_halfwidth
+    from press.transforms.width import to_enlarge_smallkana, to_fullwidth, to_halfwidth
 
 __all__ = [
     "base64_decode",
@@ -54,6 +54,7 @@ __all__ = [
     "to_capitalize",
     "to_cr",
     "to_crlf",
+    "to_enlarge_smallkana",
     "to_fullwidth",
     "to_halfwidth",
     "to_kebab_case",
@@ -95,6 +96,7 @@ _LAZY: dict[str, tuple[str, str]] = {
     "to_capitalize": ("press.transforms.case", "to_capitalize"),
     "to_cr": ("press.transforms.lineending", "to_cr"),
     "to_crlf": ("press.transforms.lineending", "to_crlf"),
+    "to_enlarge_smallkana": ("press.transforms.width", "to_enlarge_smallkana"),
     "to_fullwidth": ("press.transforms.width", "to_fullwidth"),
     "to_halfwidth": ("press.transforms.width", "to_halfwidth"),
     "to_kebab_case": ("press.transforms.case", "to_kebab_case"),

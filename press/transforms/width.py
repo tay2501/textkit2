@@ -30,3 +30,18 @@ def to_fullwidth(text: str) -> str:
         Text with half-width characters converted to full-width equivalents.
     """
     return jaconv.h2z(text, ascii=True, digit=True, kana=True)
+
+
+def to_enlarge_smallkana(text: str) -> str:
+    """Convert small-form kana to normal-size kana (hiragana and katakana).
+
+    Applies to both hiragana (ぁぃぅぇぉっゃゅょ → あいうえおつやゆよ) and
+    katakana (ァィゥェォッャュョ → アイウエオツヤユヨ).
+
+    Args:
+        text: Input text containing small-form kana characters.
+
+    Returns:
+        Text with small kana expanded to normal size.
+    """
+    return jaconv.enlarge_smallkana(text)
