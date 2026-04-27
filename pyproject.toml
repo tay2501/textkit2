@@ -54,13 +54,13 @@ docs = [
 ]
 dev = [
     "pytest>=9.0.3",
-    "pytest-mock>=3.14",
+    "pytest-mock>=3.15.1",
     "pytest-benchmark>=5.2.3",
     "pytest-cov>=7.1.0",
-    "hypothesis>=6.0",
+    "hypothesis>=6.152.3",
     "pip-audit>=2.10",
-    "ruff>=0.15.11",
-    "mypy>=1.20.1",
+    "ruff>=0.15.12",
+    "mypy>=1.20.2",
 ]
 
 [build-system]
