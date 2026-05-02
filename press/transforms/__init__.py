@@ -34,48 +34,6 @@ if TYPE_CHECKING:  # pragma: no cover
     from press.transforms.whitespace import normalize_whitespace
     from press.transforms.width import to_enlarge_smallkana, to_fullwidth, to_halfwidth
 
-__all__ = [
-    "base64_decode",
-    "base64_encode",
-    "decode_html_entities",
-    "decode_unicode_escape",
-    "dedupe_lines",
-    "dict_forward",
-    "dict_reverse",
-    "encode_unicode_escape",
-    "fix_encoding",
-    "hyphen_to_underscore",
-    "json_compress",
-    "json_format",
-    "load_tsv",
-    "normalize_whitespace",
-    "sort_lines",
-    "to_camel_case",
-    "to_capitalize",
-    "to_cr",
-    "to_crlf",
-    "to_enlarge_smallkana",
-    "to_fullwidth",
-    "to_halfwidth",
-    "to_kebab_case",
-    "to_lf",
-    "to_lower",
-    "to_nfc",
-    "to_nfd",
-    "to_nfkc",
-    "to_nfkd",
-    "to_pascal_case",
-    "to_snake_case",
-    "to_sql_in",
-    "to_swapcase",
-    "to_title",
-    "to_upper",
-    "trim_lines",
-    "underscore_to_hyphen",
-    "url_decode",
-    "url_encode",
-]
-
 _LAZY: dict[str, tuple[str, str]] = {
     "base64_decode": ("press.transforms.encode", "base64_decode"),
     "base64_encode": ("press.transforms.encode", "base64_encode"),
@@ -117,6 +75,8 @@ _LAZY: dict[str, tuple[str, str]] = {
     "url_decode": ("press.transforms.encode", "url_decode"),
     "url_encode": ("press.transforms.encode", "url_encode"),
 }
+
+__all__ = sorted(_LAZY)
 
 
 def __getattr__(name: str) -> Any:

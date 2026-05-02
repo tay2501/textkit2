@@ -74,5 +74,7 @@ SIMPLE_COMMANDS: tuple[SimpleCommand, ...] = (
 )
 # fmt: on
 
-# O(1) lookup by command name — used by daemon.CommandDispatcher._transform()
-SIMPLE_COMMAND_INDEX: dict[str, SimpleCommand] = {cmd.name: cmd for cmd in SIMPLE_COMMANDS}
+# O(1) lookup by command name or alias — used by daemon.CommandDispatcher._transform()
+SIMPLE_COMMAND_INDEX: dict[str, SimpleCommand] = {
+    name: cmd for cmd in SIMPLE_COMMANDS for name in (cmd.name, *cmd.aliases)
+}

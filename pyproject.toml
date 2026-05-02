@@ -99,7 +99,7 @@ ignore = ["TRY003", "ERA001"]
 [tool.ruff.lint.per-file-ignores]
 "test/**/*.py" = ["S101", "RUF001", "ARG"]  # pytest fixtures and mock helpers often have unused args
 "press/transforms/*.py" = ["RUF002"]  # EN DASH in Unicode range notation (e.g. U+0000–U+007F)
-"press/transforms/__init__.py" = ["RUF067"]  # PEP 562 __getattr__ lazy-loading registry is intentional
+"press/transforms/__init__.py" = ["RUF067", "F401"]  # PEP 562 __getattr__; TYPE_CHECKING imports re-exported via __all__ = sorted(_LAZY)
 
 [tool.mypy]
 python_version     = "3.13"

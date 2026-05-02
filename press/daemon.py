@@ -231,11 +231,8 @@ class CommandDispatcher:
         from press.transforms.dictionary import dict_forward, dict_reverse, load_tsv
 
         cfg = self._config.dictionary
-        path = (
-            Path(cfg.files[0].replace("%APPDATA%", os.environ.get("APPDATA", "")))
-            if cfg.files
-            else default_dict_path()
-        )
+        paths = cfg.resolved_paths()
+        path = paths[0] if paths else default_dict_path()
         table = load_tsv(path)
         return dict_reverse(text, table=table) if reverse else dict_forward(text, table=table)
 

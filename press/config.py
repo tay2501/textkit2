@@ -76,6 +76,11 @@ class DictionaryConfig:
     bidirectional: bool = True
     case_sensitive: bool = True
 
+    def resolved_paths(self) -> tuple[Path, ...]:
+        """Return ``files`` with ``%APPDATA%`` expanded to an absolute path."""
+        appdata = os.environ.get("APPDATA", str(Path.home()))
+        return tuple(Path(f.replace("%APPDATA%", appdata)) for f in self.files)
+
 
 @dataclass(frozen=True, slots=True)
 class UiConfig:
