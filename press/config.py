@@ -73,8 +73,6 @@ class DictionaryConfig:
     """Dictionary lookup configuration."""
 
     files: tuple[str, ...] = ("%APPDATA%/press/dict/default.tsv",)
-    bidirectional: bool = True
-    case_sensitive: bool = True
 
     def resolved_paths(self) -> tuple[Path, ...]:
         """Return ``files`` with ``%APPDATA%`` expanded to an absolute path."""
@@ -159,11 +157,7 @@ def _parse_dictionary(data: dict[str, Any]) -> DictionaryConfig:
     default = DictionaryConfig()
     raw_files = data.get("files")
     files: tuple[str, ...] = tuple(raw_files) if raw_files is not None else default.files
-    return DictionaryConfig(
-        files=files,
-        bidirectional=data.get("bidirectional", default.bidirectional),
-        case_sensitive=data.get("case_sensitive", default.case_sensitive),
-    )
+    return DictionaryConfig(files=files)
 
 
 def _parse_hold(data: dict[str, Any]) -> HoldConfig:

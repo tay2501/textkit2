@@ -6,6 +6,8 @@ from pathlib import Path
 
 from press.transforms.dictionary import load_tsv
 
+__all__ = ["add_entry", "default_dict_path", "list_entries", "remove_entry"]
+
 
 def default_dict_path() -> Path:
     """Return the default dictionary file path.

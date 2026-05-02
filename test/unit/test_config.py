@@ -32,8 +32,6 @@ class TestDefaultConfigWhenFileNotFound:
         assert config.hotkeys.prefix == "ctrl+shift+f10"
         assert config.sql_in.quote_char == "'"
         assert config.sql_in.wrap is False
-        assert config.dictionary.bidirectional is True
-        assert config.dictionary.case_sensitive is True
         assert config.ui.startup_notification is True
         assert config.ui.hold_icon is True
 
@@ -56,8 +54,6 @@ class TestFullConfig:
 
             [dictionary]
             files = ["%APPDATA%/press/dict/custom.tsv"]
-            bidirectional = false
-            case_sensitive = false
 
             [ui]
             startup_notification = false
@@ -76,8 +72,6 @@ class TestFullConfig:
         assert config.sql_in.quote_char == '"'
         assert config.sql_in.wrap is True
         assert config.dictionary.files == ("%APPDATA%/press/dict/custom.tsv",)
-        assert config.dictionary.bidirectional is False
-        assert config.dictionary.case_sensitive is False
         assert config.ui.startup_notification is False
         assert config.ui.hold_icon is False
 
@@ -102,7 +96,6 @@ class TestPartialConfigSqlInOnly:
 
         # Sections not in file remain at defaults
         assert config.hotkeys.prefix == "ctrl+shift+f10"
-        assert config.dictionary.bidirectional is True
         assert config.ui.startup_notification is True
 
 
