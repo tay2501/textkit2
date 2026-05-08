@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`[hotkeys.bindings]` merge**: partial bindings in `config.toml` now merge with defaults instead of replacing them entirely; users can override a single key without re-specifying all defaults
 
 ### Changed
+- **Dev dependencies**: bumped lower bounds — `ruff>=0.15.12`, `mypy>=2.0.0`, `pytest-mock>=3.15.1`; all 475 tests pass under mypy 2.0 strict mode with no new errors
 - **`url-encode` alias**: `ue2` → `urle` (more semantic; avoids confusion with `unicode-encode` alias `ue`) ⚠️ **breaking**
 - **`url-decode` alias**: `ud2` → `urld` (more semantic; avoids confusion with `unicode-decode` alias `ud`) ⚠️ **breaking**
 - **`locale.setlocale`**: now wrapped in `contextlib.suppress(locale.Error)` — falls back to codepoint order on broken Windows locale settings
