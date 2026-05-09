@@ -159,6 +159,40 @@ class TestHotkeyPrefix:
         assert config.hotkeys.bindings["w"] == "halfwidth"
 
 
+class TestDictionaryConfigResolvedPaths:
+    """DictionaryConfig.resolved_paths() expands %APPDATA% correctly."""
+
+    def test_resolved_paths_with_appdata(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("APPDATA", "C:/fake/AppData/Roaming")
+        cfg = DictionaryConfig(files=("%APPDATA%/press/dict/default.tsv",))
+        paths = cfg.resolved_paths()
+        assert paths == (Path("C:/fake/AppData/Roaming/press/dict/default.tsv"),)
+
+    def test_resolved_paths_fallback_to_home_when_appdata_missing(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        monkeypatch.delenv("APPDATA", raising=False)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        cfg = DictionaryConfig(files=("%APPDATA%/press/dict/default.tsv",))
+        paths = cfg.resolved_paths()
+        assert len(paths) == 1
+        assert paths[0].name == "default.tsv"
+
+
+class TestLoadConfigDefaultPath:
+    """load_config(path=None) resolves path from APPDATA and returns defaults when missing."""
+
+    def test_default_path_uses_appdata_returns_defaults(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        fake_appdata = tmp_path / "AppData" / "Roaming"
+        fake_appdata.mkdir(parents=True)
+        monkeypatch.setenv("APPDATA", str(fake_appdata))
+        config = load_config(path=None)
+        assert isinstance(config, PressConfig)
+        assert config.hotkeys.prefix == "ctrl+shift+f10"
+
+
 class TestBindingsMerge:
     """Partial bindings in TOML are merged with defaults, not fully replaced."""
 

@@ -60,6 +60,12 @@ class TestLoadTsv:
         result = load_tsv(tsv)
         assert result == {"猫": "cat", "犬": "dog"}
 
+    def test_line_without_tab_is_skipped(self, tmp_path: Path) -> None:
+        tsv = tmp_path / "dict.tsv"
+        tsv.write_text("no_tab_here\nhello\tworld\n", encoding="utf-8")
+        result = load_tsv(tsv)
+        assert result == {"hello": "world"}
+
 
 class TestDictForward:
     def test_single_line_match(self) -> None:
@@ -96,6 +102,10 @@ class TestDictForward:
 
     def test_empty_text_returns_empty(self) -> None:
         assert dict_forward("", {}) == ""
+
+    def test_crlf_line_endings_preserved(self) -> None:
+        table = {"hello": "world"}
+        assert dict_forward("hello\r\nfoo\r\n", table) == "world\r\nfoo\r\n"
 
 
 class TestDictReverse:

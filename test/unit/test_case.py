@@ -46,6 +46,9 @@ class TestToSnakeCase:
     def test_pascal_case(self) -> None:
         assert to_snake_case("PascalCase") == "pascal_case"
 
+    def test_separator_only_line_preserved(self) -> None:
+        assert to_snake_case("___") == "___"
+
     def test_https_server(self) -> None:
         assert to_snake_case("HTTPSServer") == "https_server"
 
