@@ -52,6 +52,7 @@
 | `dictionary.py` | TSV file CRUD — `add_entry`, `remove_entry`, `list_entries` |
 | `transforms/` | Pure `str → str` functions, one module per domain; no I/O or side effects |
 | `transforms/lines.py` | Line-oriented operations: `trim_lines`, `dedupe_lines`, `sort_lines` |
+| `transforms/unicode_norm.py` | Unicode normalization: `to_nfc`, `to_nfd`, `to_nfkc`, `to_nfkd`, `check_norm` |
 
 ## Key design decisions
 
@@ -140,6 +141,7 @@ press/
     ├── lineending.py    CRLF / LF / CR conversion
     ├── separator.py     underscore ↔ hyphen
     ├── sql.py           SQL IN clause generator
+    ├── unicode_norm.py  NFC/NFD/NFKC/NFKD normalization + check_norm
     ├── whitespace.py    whitespace normalisation
     └── width.py         full-width ↔ half-width (jaconv)
 

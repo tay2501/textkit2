@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unicodedata
 
-from press.transforms.unicode_norm import to_nfc, to_nfd, to_nfkc, to_nfkd
+from press.transforms.unicode_norm import check_norm, to_nfc, to_nfd, to_nfkc, to_nfkd
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -141,3 +141,91 @@ class TestToNfkd:
     def test_preserves_newlines(self) -> None:
         result = to_nfkd("A\nB\n")
         assert result == "A\nB\n"
+
+
+# ---------------------------------------------------------------------------
+# TestCheckNorm
+# ---------------------------------------------------------------------------
+
+
+class TestCheckNorm:
+    # --- output structure ---
+
+    def test_returns_four_lines(self) -> None:
+        """Output must have exactly four non-empty lines, one per form."""
+        result = check_norm("hello")
+        lines = result.rstrip("\n").splitlines()
+        assert len(lines) == 4
+
+    def test_each_line_names_a_form(self) -> None:
+        """Each line must start with the form name."""
+        result = check_norm("hello")
+        lines = result.rstrip("\n").splitlines()
+        assert lines[0].startswith("NFC ")
+        assert lines[1].startswith("NFD ")
+        assert lines[2].startswith("NFKC")
+        assert lines[3].startswith("NFKD")
+
+    def test_ends_with_newline(self) -> None:
+        assert check_norm("hello").endswith("\n")
+
+    # --- ASCII is in all four forms ---
+
+    def test_ascii_all_yes(self) -> None:
+        result = check_norm("hello world")
+        assert result.count("yes") == 4
+        assert "no" not in result
+
+    def test_empty_string_all_yes(self) -> None:
+        result = check_norm("")
+        assert result.count("yes") == 4
+
+    # --- NFC input ---
+
+    def test_nfc_text_nfc_yes_nfd_no(self) -> None:
+        # が (U+304C) is NFC-precomposed; not NFD-canonical
+        ga_nfc = "が"
+        result = check_norm(ga_nfc)
+        lines = {ln.split()[0]: ln.split()[1] for ln in result.rstrip("\n").splitlines()}
+        assert lines["NFC"] == "yes"
+        assert lines["NFD"] == "no"
+        assert lines["NFKC"] == "yes"
+        assert lines["NFKD"] == "no"
+
+    # --- NFD input ---
+
+    def test_nfd_text_nfd_yes_nfc_no(self) -> None:
+        # か (U+304B) + combining dakuten (U+3099) = NFD form of が
+        ga_nfd = "が"
+        result = check_norm(ga_nfd)
+        lines = {ln.split()[0]: ln.split()[1] for ln in result.rstrip("\n").splitlines()}
+        assert lines["NFD"] == "yes"
+        assert lines["NFC"] == "no"
+
+    # --- compatibility characters (NFKC/NFKD) ---
+
+    def test_fullwidth_not_in_nfkc(self) -> None:
+        # U+FF21 FULLWIDTH LATIN CAPITAL LETTER A is a compatibility character — not NFKC-normalised
+        result = check_norm("Ａ")
+        lines = {ln.split()[0]: ln.split()[1] for ln in result.rstrip("\n").splitlines()}
+        assert lines["NFKC"] == "no"
+        assert lines["NFKD"] == "no"
+
+    def test_ligature_fi_not_in_nfkc(self) -> None:
+        # ﬁ (U+FB01) is a compatibility ligature
+        result = check_norm("ﬁ")
+        lines = {ln.split()[0]: ln.split()[1] for ln in result.rstrip("\n").splitlines()}
+        assert lines["NFKC"] == "no"
+        assert lines["NFKD"] == "no"
+
+    # --- round-trip consistency with is_normalized ---
+
+    def test_consistent_with_unicodedata_is_normalized(self) -> None:
+        """check_norm must agree with unicodedata.is_normalized for every form."""
+        samples = ["hello", "が", "が", "Ａ", "ﬁ", ""]
+        for text in samples:
+            result = check_norm(text)
+            lines = {ln.split()[0]: ln.split()[1] for ln in result.rstrip("\n").splitlines()}
+            for form in ("NFC", "NFD", "NFKC", "NFKD"):
+                expected = "yes" if unicodedata.is_normalized(form, text) else "no"
+                assert lines[form] == expected, f"{form!r} mismatch for {text!r}"

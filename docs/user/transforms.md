@@ -253,6 +253,58 @@ printf "cherry\nApple\nbanana" | press sort --ignore-case
 # → cherry
 ```
 
+## Unicode normalization
+
+### `nfc` / `nfd` / `nfkc` / `nfkd`
+
+Normalize text to the specified Unicode form.
+
+| Command | Form | Use case |
+|---------|------|----------|
+| `nfc` | Canonical composition | macOS NFD filenames → Windows-compatible text |
+| `nfd` | Canonical decomposition | Decompose precomposed characters |
+| `nfkc` | Compatibility composition | Full-width Latin, ligatures → ASCII equivalents |
+| `nfkd` | Compatibility decomposition | Compatibility + decomposition |
+
+```bash
+# Fix macOS copy-paste artefacts (NFD → NFC)
+press nfc -c -C
+
+# Fold full-width letters and ligatures to ASCII
+echo "ＡＢＣＤ ﬁ" | press nfkc
+# → ABCD fi
+```
+
+### `check-norm` (`cn`)
+
+Report which Unicode normalization forms the text already satisfies.
+Useful for diagnosing copy-paste encoding issues before deciding which
+normalization command to apply.
+
+```bash
+echo "が" | press check-norm
+# NFC   yes
+# NFD   no
+# NFKC  yes
+# NFKD  no
+
+# Pipe-friendly: read from clipboard, inspect only (no rewrite)
+press check-norm -c
+```
+
+Each line shows one form followed by `yes` (text already satisfies that form)
+or `no` (normalization would change the text).
+
+ASCII-only text always satisfies all four forms:
+
+```bash
+echo "hello" | press check-norm
+# NFC   yes
+# NFD   yes
+# NFKC  yes
+# NFKD  yes
+```
+
 ## Character encoding
 
 ### `fix-encoding`

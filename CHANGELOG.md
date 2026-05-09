@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`check-norm` / `cn`**: new command to inspect which Unicode normalization forms (NFC/NFD/NFKC/NFKD) the clipboard text already satisfies; prints a four-line table (`NFC   yes`, `NFD   no`, …) — useful for diagnosing copy-paste encoding issues before choosing a normalization command
 - **`enlarge-kana` / `ek`**: new command to expand small-form kana to normal size (ぁ→あ, ァ→ア) using `jaconv.enlarge_smallkana`
 
 ### Fixed

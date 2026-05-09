@@ -4,7 +4,28 @@ from __future__ import annotations
 
 import unicodedata
 
-__all__ = ["to_nfc", "to_nfd", "to_nfkc", "to_nfkd"]
+__all__ = ["check_norm", "to_nfc", "to_nfd", "to_nfkc", "to_nfkd"]
+
+
+def check_norm(text: str) -> str:
+    """Report which Unicode normalization forms the text already satisfies.
+
+    Checks all four forms (NFC, NFD, NFKC, NFKD) using
+    ``unicodedata.is_normalized()`` and returns a human-readable table.
+
+    Args:
+        text: Input text to inspect.
+
+    Returns:
+        A four-line string with columns aligned at position 6, each line
+        formatted as ``"<FORM>  yes"`` or ``"<FORM>  no"``.
+    """
+    n = unicodedata.is_normalized
+    nfc = "yes" if n("NFC", text) else "no"
+    nfd = "yes" if n("NFD", text) else "no"
+    nfkc = "yes" if n("NFKC", text) else "no"
+    nfkd = "yes" if n("NFKD", text) else "no"
+    return f"NFC   {nfc}\nNFD   {nfd}\nNFKC  {nfkc}\nNFKD  {nfkd}\n"
 
 
 def to_nfc(text: str) -> str:

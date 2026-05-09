@@ -69,6 +69,7 @@ SIMPLE_COMMANDS: tuple[SimpleCommand, ...] = (
     SimpleCommand("nfd",            "press.transforms.unicode_norm", "to_nfd",              (),        "Normalize to NFD (canonical decomposition)"),
     SimpleCommand("nfkc",           "press.transforms.unicode_norm", "to_nfkc",             (),        "Normalize to NFKC (compatibility composition)"),
     SimpleCommand("nfkd",           "press.transforms.unicode_norm", "to_nfkd",             (),        "Normalize to NFKD (compatibility decomposition)"),
+    SimpleCommand("check-norm",     "press.transforms.unicode_norm", "check_norm",          ("cn",),   "Report which Unicode normalization forms (NFC/NFD/NFKC/NFKD) the text satisfies"),
     # --- json ---
     SimpleCommand("json-compress",  "press.transforms.json_fmt",   "json_compress",         ("jc",),   "Compress JSON to single line"),
 )
