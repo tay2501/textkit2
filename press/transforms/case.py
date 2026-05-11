@@ -17,6 +17,10 @@ from __future__ import annotations
 import re
 import string
 
+_RE_UPPER_SEQ = re.compile(r"([A-Z]+)([A-Z][a-z])")
+_RE_LOWER_UPPER = re.compile(r"([a-z\d])([A-Z])")
+_RE_SPLIT = re.compile(r"[-_\s]+")
+
 
 def _split_words(text: str) -> list[str]:
     """Split text into a list of lowercase word tokens.
@@ -31,11 +35,11 @@ def _split_words(text: str) -> list[str]:
         A list of lowercase word strings.
     """
     # Step 1: Handle sequences like "HTTPSServer" → "HTTPS_Server"
-    s = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", text)
+    s = _RE_UPPER_SEQ.sub(r"\1_\2", text)
     # Step 2: Handle boundaries like "helloWorld" → "hello_World"
-    s = re.sub(r"([a-z\d])([A-Z])", r"\1_\2", s)
+    s = _RE_LOWER_UPPER.sub(r"\1_\2", s)
     # Step 3: Split on hyphens, underscores, and whitespace; discard empty tokens
-    return [w.lower() for w in re.split(r"[-_\s]+", s) if w]
+    return [w.lower() for w in _RE_SPLIT.split(s) if w]
 
 
 def _convert_line(text: str, joiner: str, capitalize_first: bool, capitalize_rest: bool) -> str:
