@@ -30,11 +30,12 @@ if TYPE_CHECKING:  # pragma: no cover
     from press.transforms.lines import dedupe_lines, sort_lines, trim_lines
     from press.transforms.separator import hyphen_to_underscore, underscore_to_hyphen
     from press.transforms.sql import to_sql_in
-    from press.transforms.unicode_norm import to_nfc, to_nfd, to_nfkc, to_nfkd
+    from press.transforms.unicode_norm import check_norm, to_nfc, to_nfd, to_nfkc, to_nfkd
     from press.transforms.whitespace import normalize_whitespace
     from press.transforms.width import to_enlarge_smallkana, to_fullwidth, to_halfwidth
 
 _LAZY: dict[str, tuple[str, str]] = {
+    "check_norm": ("press.transforms.unicode_norm", "check_norm"),
     "base64_decode": ("press.transforms.encode", "base64_decode"),
     "base64_encode": ("press.transforms.encode", "base64_encode"),
     "decode_html_entities": ("press.transforms.escape", "decode_html_entities"),

@@ -10,6 +10,7 @@ Supported conversions:
 from __future__ import annotations
 
 import base64
+import binascii
 import urllib.parse
 
 
@@ -44,7 +45,7 @@ def base64_decode(text: str) -> str:
     """
     try:
         decoded_bytes = base64.b64decode(text, validate=True)
-    except Exception as exc:
+    except binascii.Error as exc:
         raise ValueError(f"Invalid Base64 input: {exc}") from exc
     try:
         return decoded_bytes.decode("utf-8")
