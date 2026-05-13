@@ -50,9 +50,9 @@ class TestFixEncodingErrors:
             with pytest.raises(ValueError, match=r"low confidence"):
                 fix_encoding("test", confidence_threshold=0.8)
 
-    def test_non_latin1_raises_unicode_encode_error(self) -> None:
-        """Text with code points above U+00FF cannot be re-encoded as latin-1."""
-        with pytest.raises(UnicodeEncodeError):
+    def test_non_latin1_raises_value_error(self) -> None:
+        """Correctly decoded text (non-latin-1) raises ValueError with a clear message."""
+        with pytest.raises(ValueError, match=r"not mojibake"):
             fix_encoding("テスト")  # already correctly decoded, not latin-1 encodable
 
     def test_no_encoding_detected_raises_value_error(self) -> None:

@@ -28,12 +28,16 @@ def fix_encoding(text: str, *, confidence_threshold: float = 0.7) -> str:
         Correctly decoded string.
 
     Raises:
-        ValueError: If encoding cannot be detected or confidence is below
-            *confidence_threshold*.
-        UnicodeEncodeError: If *text* cannot be encoded as ``latin-1``
-            (i.e. it is already a correctly-decoded non-Latin-1 string).
+        ValueError: If encoding cannot be detected, confidence is below
+            *confidence_threshold*, or *text* contains characters outside
+            the latin-1 range (i.e. it is already correctly decoded, not mojibake).
     """
-    raw_bytes = text.encode("latin-1")
+    try:
+        raw_bytes = text.encode("latin-1")
+    except UnicodeEncodeError as exc:
+        raise ValueError(
+            "fix-encoding: input is not mojibake (contains non-latin-1 characters)"
+        ) from exc
     results = from_bytes(raw_bytes)
     best = results.best()
 
