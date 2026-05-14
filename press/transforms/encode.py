@@ -15,34 +15,13 @@ import urllib.parse
 
 
 def base64_encode(text: str) -> str:
-    """Encode text to a Base64 string.
-
-    The text is first encoded as UTF-8 bytes, then converted to a Base64
-    string.  The result contains no trailing newline.
-
-    Args:
-        text: Input text to encode.
-
-    Returns:
-        Base64-encoded string without a trailing newline.
-    """
+    """Encode text to Base64 (UTF-8 bytes → ASCII Base64 string, no trailing newline)."""
     encoded_bytes = base64.b64encode(text.encode("utf-8"))
     return encoded_bytes.decode("ascii")
 
 
 def base64_decode(text: str) -> str:
-    """Decode a Base64 string back to text.
-
-    Args:
-        text: Base64-encoded string.
-
-    Returns:
-        Decoded UTF-8 text.
-
-    Raises:
-        ValueError: If the input is not valid Base64 or the decoded bytes
-            cannot be interpreted as UTF-8.
-    """
+    """Decode Base64 string to UTF-8 text."""
     try:
         decoded_bytes = base64.b64decode(text, validate=True)
     except binascii.Error as exc:
@@ -54,29 +33,10 @@ def base64_decode(text: str) -> str:
 
 
 def url_encode(text: str) -> str:
-    """Percent-encode all characters in text using UTF-8.
-
-    All characters including ``/`` and ``@`` are encoded (``safe=''``).
-
-    Args:
-        text: Input text to encode.
-
-    Returns:
-        Percent-encoded string.
-    """
+    """Percent-encode text using UTF-8 (safe='', all chars including / and @ are encoded)."""
     return urllib.parse.quote(text, safe="")
 
 
 def url_decode(text: str) -> str:
-    """Decode a percent-encoded URL string.
-
-    ``+`` is NOT treated as a space; use ``urllib.parse.unquote_plus`` if
-    that behaviour is desired.
-
-    Args:
-        text: Percent-encoded string.
-
-    Returns:
-        Decoded string.
-    """
+    """Decode a percent-encoded URL string (+ is NOT treated as space)."""
     return urllib.parse.unquote(text)

@@ -94,116 +94,41 @@ def _transform_lines(
 
 
 def to_snake_case(text: str) -> str:
-    """Convert each line to snake_case.
-
-    Handles camelCase, PascalCase, kebab-case, and consecutive uppercase
-    sequences (e.g. HTTPResponse → http_response).
-
-    Args:
-        text: Input text; each line is converted independently.
-
-    Returns:
-        Text with each line converted to snake_case.
-    """
+    """Convert each line to snake_case (handles camelCase, PascalCase, kebab-case)."""
     return _transform_lines(text, joiner="_", capitalize_first=False, capitalize_rest=False)
 
 
 def to_camel_case(text: str) -> str:
-    """Convert each line to camelCase.
-
-    Args:
-        text: Input text; each line is converted independently.
-
-    Returns:
-        Text with each line converted to camelCase.
-    """
+    """Convert each line to camelCase."""
     return _transform_lines(text, joiner="", capitalize_first=False, capitalize_rest=True)
 
 
 def to_pascal_case(text: str) -> str:
-    """Convert each line to PascalCase.
-
-    Args:
-        text: Input text; each line is converted independently.
-
-    Returns:
-        Text with each line converted to PascalCase.
-    """
+    """Convert each line to PascalCase."""
     return _transform_lines(text, joiner="", capitalize_first=True, capitalize_rest=True)
 
 
 def to_kebab_case(text: str) -> str:
-    """Convert each line to kebab-case.
-
-    Args:
-        text: Input text; each line is converted independently.
-
-    Returns:
-        Text with each line converted to kebab-case.
-    """
+    """Convert each line to kebab-case."""
     return _transform_lines(text, joiner="-", capitalize_first=False, capitalize_rest=False)
 
 
 def to_upper(text: str) -> str:
-    """Convert all characters to UPPERCASE.
-
-    Args:
-        text: Input text.
-
-    Returns:
-        Text with all characters converted to uppercase.
-    """
     return text.upper()
 
 
 def to_lower(text: str) -> str:
-    """Convert all characters to lowercase.
-
-    Args:
-        text: Input text.
-
-    Returns:
-        Text with all characters converted to lowercase.
-    """
     return text.lower()
 
 
 def to_title(text: str) -> str:
-    """Convert each line to Title Case.
-
-    Uses string.capwords() instead of str.title() to correctly handle
-    apostrophes (e.g. "they're" → "They're", not "They'Re").
-    Each line is converted independently.
-
-    Args:
-        text: Input text; each line is converted independently.
-
-    Returns:
-        Text with each line converted to Title Case.
-    """
+    """Convert each line to Title Case using capwords() (handles apostrophes correctly)."""
     return "\n".join(string.capwords(line) if line else "" for line in text.split("\n"))
 
 
 def to_capitalize(text: str) -> str:
-    """Capitalize the first letter of each line, lowercase the rest.
-
-    Args:
-        text: Input text; each line is converted independently.
-
-    Returns:
-        Text with the first character of each line uppercased and the
-        remaining characters lowercased.
-    """
     return "\n".join(line.capitalize() if line else "" for line in text.split("\n"))
 
 
 def to_swapcase(text: str) -> str:
-    """Swap upper and lower case characters.
-
-    Args:
-        text: Input text.
-
-    Returns:
-        Text with uppercase characters converted to lowercase and vice versa.
-    """
     return text.swapcase()

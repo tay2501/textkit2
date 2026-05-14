@@ -150,6 +150,7 @@ Thumbs.db
 *.bak
 *.orig
 *.tmp
+*.tmp.*
 
 # Database files
 *.db

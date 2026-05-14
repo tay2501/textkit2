@@ -114,14 +114,6 @@ class PressConfig:
 
 
 def _parse_hotkeys(data: dict[str, Any]) -> HotkeysConfig:
-    """Build :class:`HotkeysConfig` from the ``[hotkeys]`` TOML table.
-
-    Args:
-        data: Mapping parsed from the ``[hotkeys]`` section.
-
-    Returns:
-        A :class:`HotkeysConfig` with per-field defaults applied.
-    """
     default = HotkeysConfig()
     prefix: str = data.get("prefix", default.prefix)
     raw_bindings = data.get("bindings")
@@ -130,14 +122,6 @@ def _parse_hotkeys(data: dict[str, Any]) -> HotkeysConfig:
 
 
 def _parse_sql_in(data: dict[str, Any]) -> SqlInConfig:
-    """Build :class:`SqlInConfig` from the ``[sql_in]`` TOML table.
-
-    Args:
-        data: Mapping parsed from the ``[sql_in]`` section.
-
-    Returns:
-        A :class:`SqlInConfig` with per-field defaults applied.
-    """
     default = SqlInConfig()
     return SqlInConfig(
         quote_char=data.get("quote_char", default.quote_char),
@@ -146,14 +130,6 @@ def _parse_sql_in(data: dict[str, Any]) -> SqlInConfig:
 
 
 def _parse_dictionary(data: dict[str, Any]) -> DictionaryConfig:
-    """Build :class:`DictionaryConfig` from the ``[dictionary]`` TOML table.
-
-    Args:
-        data: Mapping parsed from the ``[dictionary]`` section.
-
-    Returns:
-        A :class:`DictionaryConfig` with per-field defaults applied.
-    """
     default = DictionaryConfig()
     raw_files = data.get("files")
     files: tuple[str, ...] = tuple(raw_files) if raw_files is not None else default.files
@@ -161,14 +137,6 @@ def _parse_dictionary(data: dict[str, Any]) -> DictionaryConfig:
 
 
 def _parse_hold(data: dict[str, Any]) -> HoldConfig:
-    """Build :class:`HoldConfig` from the ``[hold]`` TOML table.
-
-    Args:
-        data: Mapping parsed from the ``[hold]`` section.
-
-    Returns:
-        A :class:`HoldConfig` with per-field defaults applied.
-    """
     default = HoldConfig()
     return HoldConfig(
         monitor_clipboard=data.get("monitor_clipboard", default.monitor_clipboard),
@@ -177,14 +145,6 @@ def _parse_hold(data: dict[str, Any]) -> HoldConfig:
 
 
 def _parse_ui(data: dict[str, Any]) -> UiConfig:
-    """Build :class:`UiConfig` from the ``[ui]`` TOML table.
-
-    Args:
-        data: Mapping parsed from the ``[ui]`` section.
-
-    Returns:
-        A :class:`UiConfig` with per-field defaults applied.
-    """
     default = UiConfig()
     raw_level = data.get("notify_level", default.notify_level)
     notify_level = raw_level if raw_level in ("off", "success", "error", "all") else "off"
@@ -201,20 +161,7 @@ def _parse_ui(data: dict[str, Any]) -> UiConfig:
 
 
 def load_config(path: Path | None = None) -> PressConfig:
-    """Load press configuration from a TOML file.
-
-    Args:
-        path: Explicit path to the TOML file.  When ``None``, defaults to
-            ``%APPDATA%\\press\\config.toml`` (falling back to the user home
-            directory on non-Windows systems).
-
-    Returns:
-        A fully-populated :class:`PressConfig`.  Missing files yield an
-        all-default instance; partial files apply defaults to unlisted fields.
-
-    Raises:
-        ValueError: If the file exists but contains invalid TOML.
-    """
+    """Load press configuration from a TOML file; missing file returns all defaults."""
     if path is None:
         appdata = os.environ.get("APPDATA", str(Path.home()))
         path = Path(appdata) / "press" / "config.toml"
