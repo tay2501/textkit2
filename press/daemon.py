@@ -8,10 +8,13 @@ functions/methods so that CLI-only usage works without the ``daemon`` extra.
 from __future__ import annotations
 
 import ctypes
+import logging
 import os
 import queue
+import re
 import sys
 import threading
+from datetime import UTC
 from pathlib import Path
 from typing import TYPE_CHECKING, override
 
@@ -25,7 +28,7 @@ if TYPE_CHECKING:
     from press.clipboard import ClipboardGuard
     from press.config import HotkeysConfig, PressConfig
 
-__all__ = ["daemon_status", "run_daemon", "stop_daemon"]
+__all__ = ["daemon_logs", "daemon_status", "run_daemon", "stop_daemon"]
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -36,6 +39,25 @@ _LEADER_TIMEOUT = 2.0  # seconds to wait for a binding key after prefix
 _ICON_SIZE = 64  # tray icon size in pixels
 
 _PID_PATH: Path = Path(os.environ.get("APPDATA", str(Path.home()))) / "press" / "press.pid"
+_LOG_PATH: Path = Path(os.environ.get("APPDATA", str(Path.home()))) / "press" / "daemon.log"
+_STATUS_PATH: Path = Path(os.environ.get("APPDATA", str(Path.home()))) / "press" / "status.json"
+_LOG_MAX_BYTES = 5 * 1024 * 1024  # 5 MB per SPEC §15
+_LOG_BACKUP_COUNT = 3
+
+# Module-level logger — handlers are added by _setup_logging() at daemon start.
+_log = logging.getLogger("press.daemon")
+
+# Log line format written by _setup_logging's Formatter:
+#   2026-05-15T09:30:00 INFO     message text here
+_LOG_LINE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\s+(\w+)\s+(.*)$")
+_LEVEL_MIN: dict[str, int] = {
+    "debug": 10,
+    "info": 20,
+    "warning": 30,
+    "error": 40,
+    "critical": 50,
+    "all": 0,
+}
 
 # Token set for _to_pynput_hotkey: these need angle-bracket wrapping
 _MODIFIER_TOKENS = frozenset({"ctrl", "shift", "alt", "cmd", "win", "meta"})
@@ -97,6 +119,57 @@ def _normalize_key(key: object) -> str | None:
     if isinstance(key, kb.Key):
         return str(key.name)  # e.g. "shift", "ctrl", "f10"
     return None
+
+
+# ---------------------------------------------------------------------------
+# Logging helpers
+# ---------------------------------------------------------------------------
+
+
+def _setup_logging() -> None:
+    """Configure rotating file logging for the daemon (idempotent)."""
+    import logging.handlers
+
+    if _log.handlers:
+        return
+    _log.setLevel(logging.DEBUG)
+    _LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    handler = logging.handlers.RotatingFileHandler(
+        _LOG_PATH,
+        maxBytes=_LOG_MAX_BYTES,
+        backupCount=_LOG_BACKUP_COUNT,
+        encoding="utf-8",
+    )
+    handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s %(levelname)-8s %(message)s",
+            datefmt="%Y-%m-%dT%H:%M:%S",
+        )
+    )
+    _log.addHandler(handler)
+
+
+# ---------------------------------------------------------------------------
+# Status file helpers
+# ---------------------------------------------------------------------------
+
+
+def _write_status_file(data: dict[str, object]) -> None:
+    """Persist daemon state to *_STATUS_PATH* as JSON."""
+    import json
+
+    _STATUS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _STATUS_PATH.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+
+
+def _read_status_file() -> dict[str, object] | None:
+    """Load the status file, returning ``None`` on missing or parse error."""
+    import json
+
+    try:
+        return dict(json.loads(_STATUS_PATH.read_text(encoding="utf-8")))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -469,6 +542,79 @@ class _WorkerThread(threading.Thread):
 # ---------------------------------------------------------------------------
 
 
+def daemon_logs(
+    lines: int | None = 50,
+    *,
+    follow: bool = False,
+    level: str = "all",
+    as_json: bool = False,
+) -> int:
+    """Print entries from the daemon log file.
+
+    Args:
+        lines: Number of tail lines to show, or ``None`` to show all.
+        follow: If ``True``, stream new entries until Ctrl+C.
+        level: Minimum level to display (``debug``/``info``/``warning``/``error``/``all``).
+        as_json: Emit one JSON object per line (NDJSON) instead of plain text.
+
+    Returns:
+        0 on success, 1 if the log file does not exist.
+    """
+    import json as _json
+    import time
+
+    if not _LOG_PATH.exists():
+        print(f"press daemon: log file not found: {_LOG_PATH}", file=sys.stderr)
+        print("press daemon: start the daemon first to create a log file", file=sys.stderr)
+        return 1
+
+    min_level = _LEVEL_MIN.get(level.lower(), 0)
+
+    def _parse(raw: str) -> tuple[str, str, str] | None:
+        m = _LOG_LINE_RE.match(raw.rstrip("\n\r"))
+        if not m:
+            return None
+        return m.group(1), m.group(2), m.group(3)
+
+    def _passes(lvl: str) -> bool:
+        return _LEVEL_MIN.get(lvl.lower(), 0) >= min_level
+
+    def _emit(ts: str, lvl: str, msg: str) -> None:
+        if as_json:
+            print(_json.dumps({"ts": ts, "level": lvl, "msg": msg}))
+        else:
+            print(f"{ts} {lvl:<8} {msg}")
+
+    with _LOG_PATH.open(encoding="utf-8", errors="replace") as fh:
+        all_lines = fh.readlines()
+
+    tail = all_lines[-lines:] if lines is not None else all_lines
+    for raw in tail:
+        parsed = _parse(raw)
+        if parsed and _passes(parsed[1]):
+            _emit(*parsed)
+
+    if not follow:
+        return 0
+
+    print(f"Following {_LOG_PATH} — press Ctrl+C to stop", file=sys.stderr)
+    try:
+        with _LOG_PATH.open(encoding="utf-8", errors="replace") as fh:
+            fh.seek(0, 2)  # jump to end
+            while True:
+                raw = fh.readline()
+                if raw:
+                    parsed = _parse(raw)
+                    if parsed and _passes(parsed[1]):
+                        _emit(*parsed)
+                        sys.stdout.flush()
+                else:
+                    time.sleep(0.1)
+    except KeyboardInterrupt:
+        pass
+    return 0
+
+
 def run_daemon(config_path: Path | None = None) -> None:
     """Start the press daemon (blocking until quit from the tray menu).
 
@@ -488,6 +634,8 @@ def run_daemon(config_path: Path | None = None) -> None:
 
     from press.config import load_config
 
+    _setup_logging()
+
     config = load_config(config_path)
 
     mutex_handle = _acquire_mutex()
@@ -498,8 +646,28 @@ def run_daemon(config_path: Path | None = None) -> None:
         )
         sys.exit(1)
 
+    from datetime import datetime
+
     _PID_PATH.parent.mkdir(parents=True, exist_ok=True)
     _PID_PATH.write_text(str(os.getpid()), encoding="utf-8")
+
+    import contextlib
+    from importlib.metadata import version as _pkg_version
+
+    _ver = "unknown"
+    with contextlib.suppress(Exception):
+        _ver = _pkg_version("press")
+
+    _write_status_file(
+        {
+            "pid": os.getpid(),
+            "started_at": datetime.now(UTC).astimezone().isoformat(timespec="seconds"),
+            "version": _ver,
+            "restart_count": 0,
+            "state": "running",
+        }
+    )
+    _log.info("daemon started pid=%d version=%s", os.getpid(), _ver)
 
     work_queue: queue.Queue[tuple[str, ...]] = queue.Queue()
     dispatcher = CommandDispatcher(config)
@@ -537,6 +705,8 @@ def run_daemon(config_path: Path | None = None) -> None:
     finally:
         hm.stop()
         _PID_PATH.unlink(missing_ok=True)
+        _STATUS_PATH.unlink(missing_ok=True)
+        _log.info("daemon stopped")
         _release_mutex(mutex_handle)
 
 
@@ -577,8 +747,11 @@ def stop_daemon() -> int:
     return 0
 
 
-def daemon_status() -> int:
+def daemon_status(*, as_json: bool = False) -> int:
     """Print the daemon's running status and return an exit code.
+
+    Args:
+        as_json: When ``True``, print a JSON object to stdout instead of plain text.
 
     Returns:
         0 if the daemon is running, 1 if not.
@@ -590,24 +763,52 @@ def daemon_status() -> int:
         with contextlib.suppress(ValueError):
             pid = int(_PID_PATH.read_text(encoding="utf-8").strip())
 
+    running = False
+
     # On Windows: probe the mutex — most reliable indicator
     if sys.platform == "win32":
         probe = _acquire_mutex()
         if probe is None:
-            # Mutex is held → daemon is running
-            print(f"press daemon: running (pid={pid or '?'})")
-            return 0
-        # We acquired it → not running; release immediately
-        _release_mutex(probe)
-
-    # Fallback (non-Windows or mutex released): check PID liveness
-    if pid is not None:
+            running = True
+        else:
+            _release_mutex(probe)
+    elif pid is not None:
         import psutil
 
         if psutil.pid_exists(pid):
-            print(f"press daemon: running (pid={pid})")
-            return 0
-        _PID_PATH.unlink(missing_ok=True)
+            running = True
+        else:
+            _PID_PATH.unlink(missing_ok=True)
 
-    print("press daemon: not running")
-    return 1
+    if not as_json:
+        if running:
+            print(f"press daemon: running (pid={pid or '?'})")
+        else:
+            print("press daemon: not running")
+        return 0 if running else 1
+
+    # JSON output — merge live process data with persisted status file
+    import json as _json
+
+    status = _read_status_file() or {}
+    uptime_seconds: int | None = None
+    if running and "started_at" in status:
+        from datetime import datetime
+
+        with contextlib.suppress(ValueError, TypeError):
+            started = datetime.fromisoformat(str(status["started_at"]))
+            uptime_seconds = int((datetime.now(UTC) - started.astimezone(UTC)).total_seconds())
+
+    result: dict[str, object] = {
+        "running": running,
+        "state": "running" if running else str(status.get("state", "stopped")),
+        "pid": pid,
+        "started_at": status.get("started_at"),
+        "uptime_seconds": uptime_seconds,
+        "version": status.get("version"),
+        "restart_count": int(str(status.get("restart_count", 0))),
+        "log_path": str(_LOG_PATH),
+        "pid_file": str(_PID_PATH),
+    }
+    print(_json.dumps(result, indent=2, ensure_ascii=False))
+    return 0 if running else 1

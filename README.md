@@ -191,7 +191,7 @@ press dedupe --ignore-case -c -C
 | Command | Alias | Description |
 |---|---|---|
 | `clear` | `cl` | Clear the clipboard |
-| `hold` | | Toggle clipboard hold — protect contents from overwrite (requires daemon) |
+| `hold` | | Save clipboard text; call again to restore it (see [Clipboard Hold](#clipboard-hold) for real-time protection) |
 
 ### Dictionary
 
@@ -228,6 +228,35 @@ USER-ID	USER_ID
 | `-v` / `--verbose` | Show before/after on stderr |
 | `-q` / `--quiet` | Suppress all stderr output |
 | `--fallback` | Return original text on failure (exit 0) |
+
+---
+
+## Clipboard Hold
+
+`press hold` protects clipboard contents from being overwritten. It works in two modes:
+
+### CLI mode (file-based, no daemon required)
+
+```bash
+press hold          # saves current clipboard text to disk → prints "press hold: held"
+# ... do other copy-paste work ...
+press hold          # restores the saved text to the clipboard → prints "press hold: released"
+```
+
+First call saves; second call restores. Survives process restarts because the text is written to `%APPDATA%\press\hold.txt`.
+
+### Daemon mode (real-time dual-layer protection)
+
+When the daemon is running, the hotkey **Ctrl+Shift+F10 → `h`** engages `ClipboardGuard` — a two-layer defence that makes the clipboard effectively read-only until you release it:
+
+| Layer | Mechanism | Reaction time |
+|---|---|---|
+| **Layer 1** | Hidden Win32 window monitors `WM_CLIPBOARDUPDATE`. Any application that writes to the clipboard triggers an immediate restore. | < 1 ms |
+| **Layer 2** | `WH_KEYBOARD_LL` hook intercepts **Ctrl+V / Shift+Insert** *before* the OS dispatches the keystroke, so the protected text is in place before the receiving application reads the clipboard. | 0 ms gap |
+
+The tray icon turns **red** while protection is active. Press the hotkey again (`Ctrl+Shift+F10 → h`) to release.
+
+> **Note:** Windows does not allow a full exclusive clipboard lock (holding `OpenClipboard` open). Layer 1 restores within < 1 ms of any external write; Layer 2 covers the paste path with zero gap. Together they provide near-absolute protection for normal desktop workflows.
 
 ---
 
