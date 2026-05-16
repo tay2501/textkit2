@@ -522,3 +522,18 @@ else:
 
     def _win_clear() -> None:
         raise OSError("Clipboard access is only supported on Windows")
+
+    class ClipboardGuard:
+        """Stub for non-Windows platforms — raises OSError on all methods."""
+
+        is_active: bool = False
+        protected_text: str | None = None
+
+        def __init__(self, _config: object | None = None) -> None:
+            raise OSError("ClipboardGuard is only available on Windows")
+
+        def engage(self, _text: str) -> None:
+            raise OSError("ClipboardGuard is only available on Windows")
+
+        def release(self) -> None:
+            raise OSError("ClipboardGuard is only available on Windows")
