@@ -7,19 +7,25 @@ Missing files yield defaults; partial files merge with defaults.
 
 import os
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
 __all__ = [
+    "CURRENT_SCHEMA_VERSION",
     "DictionaryConfig",
     "HoldConfig",
     "HotkeysConfig",
     "PressConfig",
     "SqlInConfig",
     "UiConfig",
+    "config_reset",
+    "config_validate",
+    "default_config_path",
     "load_config",
 ]
+
+CURRENT_SCHEMA_VERSION: int = 1
 
 # ---------------------------------------------------------------------------
 # Default bindings table
@@ -106,6 +112,7 @@ class PressConfig:
     dictionary: DictionaryConfig = field(default_factory=DictionaryConfig)
     ui: UiConfig = field(default_factory=UiConfig)
     hold: HoldConfig = field(default_factory=HoldConfig)
+    schema_version: int = CURRENT_SCHEMA_VERSION
 
 
 # ---------------------------------------------------------------------------
@@ -160,11 +167,16 @@ def _parse_ui(data: dict[str, Any]) -> UiConfig:
 # ---------------------------------------------------------------------------
 
 
+def default_config_path() -> Path:
+    """Return the platform default config path (``%APPDATA%\\press\\config.toml``)."""
+    appdata = os.environ.get("APPDATA", str(Path.home()))
+    return Path(appdata) / "press" / "config.toml"
+
+
 def load_config(path: Path | None = None) -> PressConfig:
     """Load press configuration from a TOML file; missing file returns all defaults."""
     if path is None:
-        appdata = os.environ.get("APPDATA", str(Path.home()))
-        path = Path(appdata) / "press" / "config.toml"
+        path = default_config_path()
 
     try:
         with path.open("rb") as fh:
@@ -174,10 +186,128 @@ def load_config(path: Path | None = None) -> PressConfig:
     except tomllib.TOMLDecodeError as exc:
         raise ValueError(f"Invalid TOML in {path}: {exc}") from exc
 
+    schema_version = int(raw.get("schema_version", CURRENT_SCHEMA_VERSION))
     hotkeys = _parse_hotkeys(raw.get("hotkeys", {}))
     sql_in = _parse_sql_in(raw.get("sql_in", {}))
     dictionary = _parse_dictionary(raw.get("dictionary", {}))
     ui = _parse_ui(raw.get("ui", {}))
     hold = _parse_hold(raw.get("hold", {}))
 
-    return PressConfig(hotkeys=hotkeys, sql_in=sql_in, dictionary=dictionary, ui=ui, hold=hold)
+    return PressConfig(
+        hotkeys=hotkeys,
+        sql_in=sql_in,
+        dictionary=dictionary,
+        ui=ui,
+        hold=hold,
+        schema_version=schema_version,
+    )
+
+
+def config_validate(path: Path) -> tuple[bool, str]:
+    """Validate a config file without starting the daemon.
+
+    Returns:
+        ``(True, message)`` on success; ``(False, error)`` on failure.
+        A missing file is *not* an error — defaults will be used.
+    """
+    if not path.exists():
+        return True, f"no config file at {path!r} — defaults will be used"
+    try:
+        with path.open("rb") as fh:
+            raw: dict[str, Any] = tomllib.load(fh)
+    except tomllib.TOMLDecodeError as exc:
+        return False, f"TOML parse error: {exc}"
+    schema = int(raw.get("schema_version", CURRENT_SCHEMA_VERSION))
+    if schema > CURRENT_SCHEMA_VERSION:
+        return False, (
+            f"schema_version {schema} is newer than this press version supports "
+            f"(current: {CURRENT_SCHEMA_VERSION}) — upgrade press or reset the config"
+        )
+    try:
+        load_config(path)
+    except ValueError as exc:
+        return False, str(exc)
+    return True, f"{path!r}: valid (schema_version={schema})"
+
+
+def _toml_key(key: str) -> str:
+    """Return *key* as a bare or double-quoted TOML key as needed."""
+    if all(c.isalnum() or c in "-_" for c in key):
+        return key
+    return f'"{key}"'
+
+
+def _config_to_toml(config: PressConfig) -> str:
+    """Serialize *config* to a TOML-formatted string."""
+    lines: list[str] = [
+        f"schema_version = {config.schema_version}",
+        "",
+        "[hotkeys]",
+        f'prefix = "{config.hotkeys.prefix}"',
+        "",
+        "[hotkeys.bindings]",
+    ]
+    for k, cmd in config.hotkeys.bindings.items():
+        lines.append(f'{_toml_key(k)} = "{cmd}"')
+    lines += [
+        "",
+        "[sql_in]",
+        f'quote_char = "{config.sql_in.quote_char}"',
+        f"wrap = {str(config.sql_in.wrap).lower()}",
+        "",
+        "[dictionary]",
+        "files = [" + ", ".join(f'"{f}"' for f in config.dictionary.files) + "]",
+        "",
+        "[ui]",
+        f"startup_notification = {str(config.ui.startup_notification).lower()}",
+        f"hold_icon = {str(config.ui.hold_icon).lower()}",
+        f'notify_level = "{config.ui.notify_level}"',
+        "",
+        "[hold]",
+        f"monitor_clipboard = {str(config.hold.monitor_clipboard).lower()}",
+        f"intercept_paste_keys = {str(config.hold.intercept_paste_keys).lower()}",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def config_reset(path: Path, *, key: str | None = None) -> bool:
+    """Reset config to defaults, creating a ``.toml.bak`` backup first.
+
+    Args:
+        path: Path to ``config.toml``.
+        key: Section name to reset (``hotkeys``, ``sql_in``, ``dictionary``,
+            ``ui``, ``hold``).  ``None`` resets the entire file.
+
+    Returns:
+        ``True`` if a backup was created, ``False`` if no previous file existed.
+    """
+    backed_up = False
+    if path.exists():
+        path.with_suffix(".toml.bak").write_bytes(path.read_bytes())
+        backed_up = True
+
+    if key is None:
+        config = PressConfig()
+    else:
+        try:
+            existing = load_config(path)
+        except (FileNotFoundError, ValueError):
+            existing = PressConfig()
+        match key:
+            case "hotkeys":
+                config = replace(existing, hotkeys=HotkeysConfig())
+            case "sql_in":
+                config = replace(existing, sql_in=SqlInConfig())
+            case "dictionary":
+                config = replace(existing, dictionary=DictionaryConfig())
+            case "ui":
+                config = replace(existing, ui=UiConfig())
+            case "hold":
+                config = replace(existing, hold=HoldConfig())
+            case _:
+                config = existing
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(_config_to_toml(config), encoding="utf-8")
+    return backed_up

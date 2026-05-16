@@ -6,11 +6,17 @@ from pathlib import Path
 import pytest
 
 from press.config import (
+    CURRENT_SCHEMA_VERSION,
     DictionaryConfig,
+    HoldConfig,
     HotkeysConfig,
     PressConfig,
     SqlInConfig,
     UiConfig,
+    _config_to_toml,
+    config_reset,
+    config_validate,
+    default_config_path,
     load_config,
 )
 
@@ -235,3 +241,221 @@ class TestBindingsMerge:
 
         assert config.hotkeys.bindings["w"] == "halfwidth"
         assert config.hotkeys.bindings["f"] == "fullwidth"
+
+
+# ---------------------------------------------------------------------------
+# schema_version
+# ---------------------------------------------------------------------------
+
+
+class TestSchemaVersion:
+    """schema_version is loaded from TOML and stored in PressConfig."""
+
+    def test_default_schema_version(self, tmp_path: Path) -> None:
+        cfg = load_config(tmp_path / "missing.toml")
+        assert cfg.schema_version == CURRENT_SCHEMA_VERSION
+
+    def test_schema_version_loaded_from_toml(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("schema_version = 1\n", encoding="utf-8")
+        cfg = load_config(cfg_file)
+        assert cfg.schema_version == 1
+
+    def test_schema_version_missing_uses_default(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("[sql_in]\nwrap = true\n", encoding="utf-8")
+        cfg = load_config(cfg_file)
+        assert cfg.schema_version == CURRENT_SCHEMA_VERSION
+
+
+# ---------------------------------------------------------------------------
+# default_config_path
+# ---------------------------------------------------------------------------
+
+
+class TestDefaultConfigPath:
+    def test_uses_appdata_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("APPDATA", "C:/fake/AppData")
+        p = default_config_path()
+        assert p == Path("C:/fake/AppData/press/config.toml")
+
+    def test_falls_back_to_home_when_appdata_missing(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        monkeypatch.delenv("APPDATA", raising=False)
+        monkeypatch.setenv("HOME", str(tmp_path))
+        p = default_config_path()
+        assert p.name == "config.toml"
+        assert "press" in p.parts
+
+
+# ---------------------------------------------------------------------------
+# config_validate
+# ---------------------------------------------------------------------------
+
+
+class TestConfigValidate:
+    def test_missing_file_is_ok(self, tmp_path: Path) -> None:
+        ok, msg = config_validate(tmp_path / "missing.toml")
+        assert ok is True
+        assert "defaults" in msg
+
+    def test_valid_file_passes(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("[sql_in]\nwrap = true\n", encoding="utf-8")
+        ok, msg = config_validate(cfg_file)
+        assert ok is True
+        assert "valid" in msg
+
+    def test_invalid_toml_fails(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("not valid ][", encoding="utf-8")
+        ok, msg = config_validate(cfg_file)
+        assert ok is False
+        assert "parse error" in msg.lower()
+
+    def test_future_schema_version_fails(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(f"schema_version = {CURRENT_SCHEMA_VERSION + 99}\n", encoding="utf-8")
+        ok, msg = config_validate(cfg_file)
+        assert ok is False
+        assert "schema_version" in msg
+
+
+# ---------------------------------------------------------------------------
+# _config_to_toml
+# ---------------------------------------------------------------------------
+
+
+class TestConfigToToml:
+    def test_roundtrip_defaults(self, tmp_path: Path) -> None:
+        original = PressConfig()
+        toml_str = _config_to_toml(original)
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(toml_str, encoding="utf-8")
+        reloaded = load_config(cfg_file)
+
+        assert reloaded.hotkeys.prefix == original.hotkeys.prefix
+        assert reloaded.hotkeys.bindings == original.hotkeys.bindings
+        assert reloaded.sql_in == original.sql_in
+        assert reloaded.ui == original.ui
+        assert reloaded.hold == original.hold
+
+    def test_schema_version_in_output(self) -> None:
+        toml_str = _config_to_toml(PressConfig())
+        assert f"schema_version = {CURRENT_SCHEMA_VERSION}" in toml_str
+
+    def test_quoted_key_for_shift_modifier(self) -> None:
+        toml_str = _config_to_toml(PressConfig())
+        assert '"shift+u"' in toml_str
+
+
+# ---------------------------------------------------------------------------
+# config_reset
+# ---------------------------------------------------------------------------
+
+
+class TestConfigReset:
+    def test_full_reset_creates_file_when_missing(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "press" / "config.toml"
+        backed_up = config_reset(cfg_file)
+        assert backed_up is False
+        assert cfg_file.exists()
+
+    def test_full_reset_creates_backup_when_file_exists(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("[sql_in]\nwrap = true\n", encoding="utf-8")
+        backed_up = config_reset(cfg_file)
+        assert backed_up is True
+        assert cfg_file.with_suffix(".toml.bak").exists()
+
+    def test_full_reset_writes_defaults(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("[sql_in]\nwrap = true\n", encoding="utf-8")
+        config_reset(cfg_file)
+        reloaded = load_config(cfg_file)
+        assert reloaded.sql_in.wrap is False  # back to default
+
+    def test_partial_reset_key_hotkeys(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(
+            '[hotkeys]\nprefix = "ctrl+alt+f9"\n[sql_in]\nwrap = true\n',
+            encoding="utf-8",
+        )
+        config_reset(cfg_file, key="hotkeys")
+        reloaded = load_config(cfg_file)
+        assert reloaded.hotkeys.prefix == "ctrl+shift+f10"  # reset
+        assert reloaded.sql_in.wrap is True  # other section untouched
+
+    def test_partial_reset_key_sql_in(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("[sql_in]\nwrap = true\nquote_char = '\"'\n", encoding="utf-8")
+        config_reset(cfg_file, key="sql_in")
+        reloaded = load_config(cfg_file)
+        assert reloaded.sql_in.wrap is False
+        assert reloaded.sql_in.quote_char == "'"
+
+    def test_partial_reset_key_ui(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("[ui]\nstartup_notification = false\n", encoding="utf-8")
+        config_reset(cfg_file, key="ui")
+        reloaded = load_config(cfg_file)
+        assert reloaded.ui.startup_notification is True
+
+    def test_partial_reset_key_hold(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("[hold]\nmonitor_clipboard = false\n", encoding="utf-8")
+        config_reset(cfg_file, key="hold")
+        reloaded = load_config(cfg_file)
+        assert reloaded.hold.monitor_clipboard is True
+
+    def test_partial_reset_key_dictionary(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(
+            '[dictionary]\nfiles = ["%APPDATA%/press/dict/custom.tsv"]\n', encoding="utf-8"
+        )
+        config_reset(cfg_file, key="dictionary")
+        reloaded = load_config(cfg_file)
+        assert reloaded.dictionary == DictionaryConfig()
+
+    def test_reset_when_existing_file_is_invalid(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("not valid ][", encoding="utf-8")
+        config_reset(cfg_file, key="ui")
+        assert cfg_file.exists()
+        reloaded = load_config(cfg_file)
+        assert reloaded.ui == UiConfig()
+
+    def test_hold_config_imported(self) -> None:
+        assert HoldConfig().monitor_clipboard is True
+
+    def test_unknown_key_leaves_config_unchanged(self, tmp_path: Path) -> None:
+        """Passing an unrecognised key (bypassing argparse) leaves the config intact."""
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("[sql_in]\nwrap = true\n", encoding="utf-8")
+        # Directly invoke with an invalid key to exercise the `case _` branch
+        config_reset(cfg_file, key="__invalid__")  # type: ignore[arg-type]
+        reloaded = load_config(cfg_file)
+        assert reloaded.sql_in.wrap is True  # unchanged
+
+
+class TestConfigValidateEdgeCases:
+    def test_valid_toml_with_internal_value_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """config_validate returns (False, …) when load_config raises ValueError."""
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("schema_version = 1\n", encoding="utf-8")
+
+        import press.config as cfg_mod
+
+        original_load = cfg_mod.load_config
+
+        def _raise(_path: Path | None = None) -> PressConfig:
+            raise ValueError("simulated validation error")
+
+        monkeypatch.setattr(cfg_mod, "load_config", _raise)
+        ok, msg = config_validate(cfg_file)
+        assert ok is False
+        assert "simulated validation error" in msg
+        monkeypatch.setattr(cfg_mod, "load_config", original_load)
