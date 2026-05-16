@@ -31,9 +31,12 @@ Brief description of the changes.
 - [ ] `press/transforms/` - Text transformation modules
 - [ ] `press/clipboard.py` - Clipboard integration
 - [ ] `press/__main__.py` - CLI entry point
+- [ ] `press/config.py` - Configuration loader and management
 - [ ] `press/daemon.py` - Daemon / hotkey dispatch
 - [ ] `test/` - Tests
 - [ ] `docs/` - Documentation
+- [ ] `CHANGELOG.md` - Changelog entry added
+- [ ] `ROADMAP.md` - Roadmap updated
 - [ ] CI/GitHub workflows
 - [ ] Other: _______________
 

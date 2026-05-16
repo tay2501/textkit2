@@ -49,6 +49,8 @@ body:
       options:
         - CLI Interface (press commands)
         - Clipboard integration
+        - Configuration (press config validate/reset)
+        - Daemon & hotkeys (press daemon)
         - Text transforms (whitespace, lineending, etc.)
         - Case conversion (upper/lower/title/etc.)
         - Width conversion (zen/han)
