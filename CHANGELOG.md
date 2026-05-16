@@ -10,21 +10,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **`check-norm` / `cn`**: new command to inspect which Unicode normalization forms (NFC/NFD/NFKC/NFKD) the clipboard text already satisfies; prints a four-line table (`NFC   yes`, `NFD   no`, …) — useful for diagnosing copy-paste encoding issues before choosing a normalization command
-- **`enlarge-kana` / `ek`**: new command to expand small-form kana to normal size (ぁ→あ, ァ→ア) using `jaconv.enlarge_smallkana`
+- **`press config validate`**: parse `config.toml` and report TOML errors or future schema versions without starting the daemon; missing file is not an error
+- **`press config reset [--key SECTION]`**: overwrite config with built-in defaults; creates a `.toml.bak` backup; `--key` limits reset to one section (`hotkeys`, `sql_in`, `dictionary`, `ui`, `hold`)
+- **`schema_version`**: new field in `PressConfig` and generated config files (current: `1`); `config validate` rejects files with a schema version newer than the installed press
+
+---
+
+## [0.4.0] - 2026-05-16
+
+### Added
+- **`press daemon logs [-f] [-n N] [--level] [--json]`**: tail daemon log file; `--follow` streams new entries; `--json` outputs NDJSON
+- **`press daemon status --json`**: machine-readable health check (snake_case keys, RFC 3339 timestamps, uptime in seconds)
+- **Daemon logging infrastructure**: `RotatingFileHandler` (5 MB × 3 backups) writing to `%APPDATA%\press\daemon.log`; `status.json` written at daemon start
+- **`check-norm` / `cn`**: inspect which Unicode normalization forms (NFC/NFD/NFKC/NFKD) the text already satisfies
+- **`enlarge-kana` / `ek`**: expand small-form kana to normal size (ぁ→あ, ァ→ア) via `jaconv.enlarge_smallkana`
+- **`ClipboardGuard` non-Windows stub**: allows mypy to type-check `daemon.py` on Linux
 
 ### Fixed
-- **`[hotkeys.bindings]` merge**: partial bindings in `config.toml` now merge with defaults instead of replacing them entirely; users can override a single key without re-specifying all defaults
+- **`[hotkeys.bindings]` merge**: partial bindings in `config.toml` now merge with defaults
+- **`daemon_logs._passes()`**: removed redundant `lvl.upper().lower()` → `lvl.lower()`
 
 ### Changed
-- **Dev dependencies**: bumped lower bounds — `ruff>=0.15.12`, `mypy>=2.0.0`, `pytest-mock>=3.15.1`; all 475 tests pass under mypy 2.0 strict mode with no new errors
-- **`url-encode` alias**: `ue2` → `urle` (more semantic; avoids confusion with `unicode-encode` alias `ue`) ⚠️ **breaking**
-- **`url-decode` alias**: `ud2` → `urld` (more semantic; avoids confusion with `unicode-decode` alias `ud`) ⚠️ **breaking**
-- **`locale.setlocale`**: now wrapped in `contextlib.suppress(locale.Error)` — falls back to codepoint order on broken Windows locale settings
-- **`unicode_norm` transforms**: skip normalization when input is already in the target form (`unicodedata.is_normalized()`)
-- **mypy config**: added `explicit-override` error code; removed `local_partial_types` (caused false positives on Ubuntu CI)
-- **`_WorkerThread.run()`**: annotated with `@typing.override`
-- **dev dependency**: removed unused `freezegun`; tightened lower bounds for `psutil`, `pyinstaller`, `pytest-benchmark`, `pip-audit`
+- **`press daemon` restructured to nested subparsers** (docker/gh style): `press daemon start|stop|status|restart|logs`
+- **`press hold`**: improved `--help` text explaining CLI vs daemon dual modes
+- **Dev dependencies**: bumped lower bounds — `ruff>=0.15.12`, `mypy>=2.0.0`, `pytest-mock>=3.15.1`
+- **`url-encode` alias**: `ue2` → `urle` ⚠️ **breaking**
+- **`url-decode` alias**: `ud2` → `urld` ⚠️ **breaking**
 
 ---
 

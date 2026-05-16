@@ -1,6 +1,6 @@
 # press — Roadmap
 
-**Current version:** v0.4.0-dev (2026-05-16)
+**Current version:** v0.5.0-dev (2026-05-16)
 **Status:** Beta (`Development Status :: 4 - Beta`)
 
 ---
@@ -15,30 +15,17 @@
 | Phase 4 | Clipboard HOLD — dual-layer real-time protection | v0.2.0 |
 | Phase 5 | Mojibake repair (`fix-encoding`), TOML config, lazy loading | v0.2.0 |
 | Misc | Unicode normalization (NFC/NFD/NFKC/NFKD + `check-norm`), `enlarge-kana`, line ops | v0.3.0 |
-
----
-
-## v0.4.0 — Daemon UX completion
-
-Finish the daemon features described in SPEC.md §15 that are not yet implemented.
-
-- [x] `press daemon logs [-f] [-n N] [--level] [--json]` — tail daemon log file (NDJSON, RFC 3339 timestamps)
-- [x] `press daemon status --json` — machine-readable health output for scripts/CI (snake_case keys, RFC 3339)
-- [x] Daemon logging infrastructure: rotating file handler (5 MB × 3), status.json written at start
-- [x] `daemon` subcommand restructured to nested subparsers (docker/gh style)
-- [x] `check-norm` (`cn`) and `enlarge-kana` (`ek`) commands officially available in CLI and daemon dispatch
-- [ ] Crash recovery: auto-restart up to 5 times / 60 s, exponential backoff + jitter, terminal failed state
-- [ ] `press daemon reset-failed` — clear failed state and allow restart
+| v0.4.0 | Daemon logs, JSON status, rotating log, nested subparsers, ClipboardGuard stub | v0.4.0 |
 
 ---
 
 ## v0.5.0 — Config management CLI
 
-Add the `press config` subcommand family described in SPEC.md §8.
+Add the `press config` subcommand family.
 
-- [ ] `press config validate` — parse `config.toml` and report errors without starting the daemon
-- [ ] `press config reset [--key <key>]` — overwrite with defaults (creates backup)
-- [ ] `schema_version` field + forward-compatible migration path for future breaking config changes
+- [x] `press config validate` — parse `config.toml` and report errors without starting the daemon
+- [x] `press config reset [--key SECTION]` — overwrite with defaults (creates `.toml.bak` backup); `--key` limits to one section
+- [x] `schema_version` field in `PressConfig` + forward-compatible detection (validate fails for unknown future versions)
 
 ---
 
