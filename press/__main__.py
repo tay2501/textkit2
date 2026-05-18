@@ -4,14 +4,12 @@ import argparse
 import contextlib
 import locale
 import sys
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
+
+from press._cli_helpers import _add_io_args, _run_transform, _SubParsers
 
 if TYPE_CHECKING:
     from press.commands import SimpleCommand
-
-# Convenience alias for the subparsers action type
-type _SubParsers = argparse._SubParsersAction[argparse.ArgumentParser]
 
 
 def _version() -> str:
@@ -24,102 +22,8 @@ def _version() -> str:
 
 
 # ---------------------------------------------------------------------------
-# I/O helpers
+# Simple command registration
 # ---------------------------------------------------------------------------
-
-
-def _read_input(args: argparse.Namespace) -> str:
-    """Read input: clipboard (TTY default), positional arg, stdin pipe, or '-' sentinel."""
-    if getattr(args, "clip_in", False):
-        from press.clipboard import get_clipboard_text
-
-        return get_clipboard_text()
-    inp = getattr(args, "input", None)
-    if inp is not None and inp != "-":
-        return str(inp)
-    # "-" forces stdin; non-TTY (pipe/redirect) also uses stdin
-    if inp == "-" or not sys.stdin.isatty():
-        return sys.stdin.read()
-    # TTY with no input → clipboard is the default
-    from press.clipboard import get_clipboard_text
-
-    return get_clipboard_text()
-
-
-def _write_output(text: str, args: argparse.Namespace) -> None:
-    """Write output to stdout and optionally to clipboard."""
-    sys.stdout.write(text)
-    sys.stdout.flush()
-    if getattr(args, "clip_out", False):
-        from press.clipboard import set_clipboard_text
-
-        set_clipboard_text(text)
-
-
-def _run_transform(
-    fn: Callable[..., str],
-    args: argparse.Namespace,
-    **kwargs: Any,
-) -> int:
-    """Read → transform → write.  Returns an exit code (0 = success, 1 = error)."""
-    cmd = getattr(args, "command", "press")
-    try:
-        text = _read_input(args)
-    except Exception as exc:
-        if not getattr(args, "quiet", False):
-            print(f"press {cmd}: error: failed to read input: {exc}", file=sys.stderr)
-        return 1
-
-    try:
-        result = fn(text, **kwargs)
-    except Exception as exc:
-        if getattr(args, "fallback", False):
-            _write_output(text, args)
-            return 0
-        if not getattr(args, "quiet", False):
-            print(f"press {cmd}: error: {exc}", file=sys.stderr)
-        return 1
-
-    if getattr(args, "verbose", False) and not getattr(args, "quiet", False):
-        print(f"before: {text!r}", file=sys.stderr)
-        print(f"after:  {result!r}", file=sys.stderr)
-
-    _write_output(result, args)
-    return 0
-
-
-# ---------------------------------------------------------------------------
-# Argument parser construction
-# ---------------------------------------------------------------------------
-
-
-def _add_io_args(parser: argparse.ArgumentParser, *, positional: bool = True) -> None:
-    """Attach common I/O options to a subcommand parser.
-
-    Pass ``positional=False`` for commands that do not accept inline text input
-    (e.g. ``dict``, which always reads from clipboard or a pipeline).
-    """
-    parser.add_argument("-c", "--clip-in", action="store_true", help="Read input from clipboard")
-    parser.add_argument(
-        "-C",
-        "--clip-out",
-        action="store_true",
-        help="Write output to clipboard (also prints to stdout)",
-    )
-    parser.add_argument("-v", "--verbose", action="store_true", help="Show before/after on stderr")
-    parser.add_argument("-q", "--quiet", action="store_true", help="Suppress all stderr output")
-    parser.add_argument(
-        "--fallback",
-        action="store_true",
-        help="On transform error, output original text and exit 0",
-    )
-    if positional:
-        parser.add_argument(
-            "input",
-            nargs="?",
-            default=None,
-            help="Input text; omit to read clipboard (TTY) or stdin (pipe); '-' forces stdin",
-        )
 
 
 def _register_simple_command(sub: _SubParsers, cmd: "SimpleCommand") -> None:
@@ -139,6 +43,11 @@ def _register_simple_command(sub: _SubParsers, cmd: "SimpleCommand") -> None:
         return _run_transform(fn, a)
 
     p.set_defaults(func=_handler)
+
+
+# ---------------------------------------------------------------------------
+# Parametric command registration
+# ---------------------------------------------------------------------------
 
 
 def _register_trim_command(sub: _SubParsers) -> None:
@@ -258,121 +167,6 @@ def _register_json_format_command(sub: _SubParsers) -> None:
     p.set_defaults(func=_jf)
 
 
-def _register_dict_commands(sub: _SubParsers) -> None:
-    """Register the ``dict`` command group and its management subcommands."""
-    dict_p = sub.add_parser("dict", help="Dictionary-based text replacement (F-08, F-09)")
-    dict_p.add_argument(
-        "-r",
-        "--reverse",
-        action="store_true",
-        help="Apply reverse lookup (value→key instead of key→value)",
-    )
-    dict_p.add_argument(
-        "--file",
-        metavar="PATH",
-        default=None,
-        help="TSV dictionary file (default: platform config path)",
-    )
-    _add_io_args(dict_p, positional=False)
-
-    dict_sub = dict_p.add_subparsers(dest="dict_action", metavar="ACTION")
-
-    # --- dict list ---
-    list_p = dict_sub.add_parser("list", help="List all dictionary entries")
-    list_p.add_argument(
-        "--file",
-        metavar="PATH",
-        default=None,
-        help="TSV dictionary file (default: platform config path)",
-    )
-
-    # --- dict add ---
-    add_p = dict_sub.add_parser("add", help="Add an entry to the dictionary")
-    add_p.add_argument("key", help="Entry key")
-    add_p.add_argument("value", help="Entry value")
-    add_p.add_argument(
-        "--file",
-        metavar="PATH",
-        default=None,
-        help="TSV dictionary file (default: platform config path)",
-    )
-
-    # --- dict remove ---
-    rm_p = dict_sub.add_parser("remove", aliases=["rm"], help="Remove an entry from the dictionary")
-    rm_p.add_argument("key", help="Key to remove")
-    rm_p.add_argument(
-        "--file",
-        metavar="PATH",
-        default=None,
-        help="TSV dictionary file (default: platform config path)",
-    )
-
-    def _dict_handler(a: argparse.Namespace) -> int:
-        from pathlib import Path
-
-        from press.dictionary import add_entry, default_dict_path, list_entries, remove_entry
-        from press.transforms.dictionary import dict_forward, dict_reverse, load_tsv
-
-        # Resolve the --file argument from whichever parser captured it
-        raw_file: str | None = getattr(a, "file", None)
-        dict_path = Path(raw_file) if raw_file else default_dict_path()
-
-        action: str | None = getattr(a, "dict_action", None)
-
-        match action:
-            case "list":
-                try:
-                    entries = list_entries(dict_path)
-                except FileNotFoundError:
-                    print(
-                        f"press dict: error: dict file not found: {dict_path}",
-                        file=sys.stderr,
-                    )
-                    return 2
-                for key, value in entries:
-                    sys.stdout.write(f"{key}\t{value}\n")
-                return 0
-
-            case "add":
-                add_entry(a.key, a.value, dict_path)
-                return 0
-
-            case "remove" | "rm":
-                try:
-                    found = remove_entry(a.key, dict_path)
-                except FileNotFoundError:
-                    print(
-                        f"press dict: error: dict file not found: {dict_path}",
-                        file=sys.stderr,
-                    )
-                    return 2
-                if not found:
-                    print(
-                        f"press dict remove: error: key not found: {a.key}",
-                        file=sys.stderr,
-                    )
-                    return 1
-                return 0
-
-            case _:
-                # No subcommand — run as a transform
-                try:
-                    table = load_tsv(dict_path)
-                except FileNotFoundError:
-                    print(
-                        f"press dict: error: dict file not found: {dict_path}",
-                        file=sys.stderr,
-                    )
-                    return 2
-                fn = dict_reverse if getattr(a, "reverse", False) else dict_forward
-                return _run_transform(fn, a, table=table)
-
-    dict_p.set_defaults(func=_dict_handler)
-    list_p.set_defaults(func=_dict_handler)
-    add_p.set_defaults(func=_dict_handler)
-    rm_p.set_defaults(func=_dict_handler)
-
-
 def _register_clipboard_util_commands(sub: _SubParsers) -> None:
     p = sub.add_parser("clear", aliases=["cl"], help="Clear the clipboard")
     p.add_argument("-q", "--quiet", action="store_true", help="Suppress all stderr output")
@@ -432,145 +226,16 @@ def _register_clipboard_util_commands(sub: _SubParsers) -> None:
     p.set_defaults(func=_hold)
 
 
-def _lines_type(val: str) -> int | None:
-    """Argparse type for --lines: accept a positive integer or the string 'all'."""
-    if val.lower() == "all":
-        return None
-    try:
-        n = int(val)
-    except ValueError:
-        raise argparse.ArgumentTypeError(f"invalid value for --lines: {val!r}") from None
-    if n < 1:
-        raise argparse.ArgumentTypeError("--lines must be a positive integer or 'all'")
-    return n
-
-
-def _register_config_commands(sub: _SubParsers) -> None:
-    """Register the ``config`` subcommand family."""
-    config_p = sub.add_parser("config", help="Manage press configuration")
-    config_sub = config_p.add_subparsers(dest="config_action", metavar="ACTION")
-    config_p.set_defaults(func=_handle_config)
-
-    _file_arg: dict[str, object] = {
-        "metavar": "PATH",
-        "default": None,
-        "help": "Config file (default: platform path)",
-    }
-
-    val_p = config_sub.add_parser("validate", help="Parse config.toml and report errors")
-    val_p.add_argument("--file", **_file_arg)  # type: ignore[arg-type]
-
-    rst_p = config_sub.add_parser(
-        "reset",
-        help="Reset config to defaults and create a .toml.bak backup",
-    )
-    rst_p.add_argument(
-        "--key",
-        choices=["hotkeys", "sql_in", "dictionary", "ui", "hold"],
-        default=None,
-        metavar="SECTION",
-        help="Section to reset; omit to reset the entire file",
-    )
-    rst_p.add_argument("--file", **_file_arg)  # type: ignore[arg-type]
-
-
-def _handle_config(args: argparse.Namespace) -> int:
-    from pathlib import Path
-
-    from press.config import config_reset, config_validate, default_config_path
-
-    raw_file: str | None = getattr(args, "file", None)
-    cfg_path = Path(raw_file) if raw_file else default_config_path()
-
-    action: str | None = getattr(args, "config_action", None)
-    if action is None:
-        import subprocess
-
-        subprocess.run([sys.argv[0], "config", "--help"], check=False)
-        return 0
-
-    match action:
-        case "validate":
-            ok, msg = config_validate(cfg_path)
-            print(f"press config validate: {msg}", file=sys.stdout if ok else sys.stderr)
-            return 0 if ok else 1
-        case "reset":
-            key: str | None = getattr(args, "key", None)
-            try:
-                backed_up = config_reset(cfg_path, key=key)
-                if backed_up:
-                    print(
-                        f"press config reset: backup saved to {cfg_path.with_suffix('.toml.bak')}"
-                    )
-                section = f" [{key}]" if key else ""
-                print(f"press config reset: config{section} reset to defaults → {cfg_path}")
-                return 0
-            except Exception as exc:
-                print(f"press config reset: error: {exc}", file=sys.stderr)
-                return 1
-        case _:
-            return 1
-
-
-def _register_daemon_commands(sub: _SubParsers) -> None:
-    daemon_p = sub.add_parser("daemon", help="Manage press background daemon")
-    daemon_sub = daemon_p.add_subparsers(dest="daemon_action", metavar="ACTION")
-    daemon_p.set_defaults(func=_handle_daemon)
-
-    daemon_sub.add_parser("start", help="Start the tray icon + hotkey daemon")
-    daemon_sub.add_parser("stop", help="Stop the running daemon")
-    daemon_sub.add_parser("restart", help="Stop and restart the daemon")
-
-    p_status = daemon_sub.add_parser("status", help="Show running status")
-    p_status.add_argument(
-        "--json",
-        action="store_true",
-        dest="as_json",
-        help="Output as JSON",
-    )
-
-    p_logs = daemon_sub.add_parser(
-        "logs",
-        help="Show daemon log entries",
-        description=(
-            "Display entries from the daemon log file.\n\n"
-            "Default: last 50 lines, human-readable.\n"
-            "Use --follow to stream new entries (Ctrl+C to stop).\n"
-            "Use --json to output as NDJSON (one JSON object per line)."
-        ),
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    p_logs.add_argument(
-        "-f",
-        "--follow",
-        action="store_true",
-        help="Stream new entries until Ctrl+C",
-    )
-    p_logs.add_argument(
-        "-n",
-        "--lines",
-        type=_lines_type,
-        default=50,
-        metavar="N",
-        help="Lines to show (positive integer or 'all'; default: 50)",
-    )
-    p_logs.add_argument(
-        "--level",
-        choices=["debug", "info", "warning", "error", "all"],
-        default="all",
-        metavar="LEVEL",
-        help="Minimum log level: debug, info, warning, error, all (default: all)",
-    )
-    p_logs.add_argument(
-        "--json",
-        action="store_true",
-        dest="as_json",
-        help="Output as NDJSON (one JSON object per line)",
-    )
+# ---------------------------------------------------------------------------
+# Argument parser construction
+# ---------------------------------------------------------------------------
 
 
 def make_parser() -> argparse.ArgumentParser:
     """Build and return the top-level argument parser."""
+    from press._cli_config import _register_config_commands
+    from press._cli_daemon import _register_daemon_commands
+    from press._cli_dict import _register_dict_commands
     from press.commands import SIMPLE_COMMANDS
 
     parser = argparse.ArgumentParser(
@@ -599,47 +264,6 @@ def make_parser() -> argparse.ArgumentParser:
     _register_daemon_commands(sub)
 
     return parser
-
-
-def _handle_daemon(args: argparse.Namespace) -> int:
-    action = getattr(args, "daemon_action", None)
-    if action is None:
-        # `press daemon` with no subcommand — print daemon help
-        import subprocess
-
-        subprocess.run([sys.argv[0], "daemon", "--help"], check=False)
-        return 0
-    match action:
-        case "start":
-            from press.daemon import run_daemon
-
-            run_daemon()
-            return 0
-        case "stop":
-            from press.daemon import stop_daemon
-
-            return stop_daemon()
-        case "status":
-            from press.daemon import daemon_status
-
-            return daemon_status(as_json=getattr(args, "as_json", False))
-        case "restart":
-            from press.daemon import run_daemon, stop_daemon
-
-            stop_daemon()
-            run_daemon()
-            return 0
-        case "logs":
-            from press.daemon import daemon_logs
-
-            return daemon_logs(
-                lines=args.lines,
-                follow=args.follow,
-                level=args.level,
-                as_json=args.as_json,
-            )
-        case _:
-            return 1
 
 
 # ---------------------------------------------------------------------------

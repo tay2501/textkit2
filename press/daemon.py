@@ -309,6 +309,10 @@ class CommandDispatcher:
         table = load_tsv(path)
         return dict_reverse(text, table=table) if reverse else dict_forward(text, table=table)
 
+    def notify_error(self, command: str, message: str) -> None:
+        """Deliver an error notification; public entry point for external callers."""
+        self._notify_error(command, message)
+
     def _notify_success(self, command: str, _result: str) -> None:
         if self._config.ui.notify_level in ("success", "all"):
             self._notify("press", f"[{command}] done")
@@ -529,7 +533,7 @@ class _WorkerThread(threading.Thread):
                     self._hm.reset_leader()
                 case ("unknown_key", key):
                     self._hm.reset_leader()
-                    self._dispatcher._notify_error("hotkey", f"no binding for: {key!r}")
+                    self._dispatcher.notify_error("hotkey", f"no binding for: {key!r}")
                 case ("stop",):
                     break
                 case _:

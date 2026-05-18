@@ -79,3 +79,14 @@ SIMPLE_COMMANDS: tuple[SimpleCommand, ...] = (
 SIMPLE_COMMAND_INDEX: dict[str, SimpleCommand] = {
     name: cmd for cmd in SIMPLE_COMMANDS for name in (cmd.name, *cmd.aliases)
 }
+
+# ---------------------------------------------------------------------------
+# Design note: parametric commands in the daemon
+# ---------------------------------------------------------------------------
+# Commands not listed in SIMPLE_COMMANDS (trim, dedupe, sort, sql-in, dict, …)
+# need extra parameters.  The daemon dispatches these with *default* arguments
+# only (no CLI flags), which is intentional: hotkey bindings cannot carry
+# per-invocation parameters.  Config-driven overrides (sql-in quote_char/wrap,
+# dictionary files) live in PressConfig and are applied in
+# daemon.CommandDispatcher._transform().
+# When adding a new parametric command, update that match block as well.

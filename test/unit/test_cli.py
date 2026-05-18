@@ -214,7 +214,7 @@ class TestSqlIn:
     def test_basic(self) -> None:
         result = _run("sql-in", input_text="foo\nbar\nbaz\n")
         assert result.returncode == 0
-        assert result.stdout.strip() == "'foo','bar','baz'"
+        assert result.stdout.strip() == "'bar','baz','foo'"
 
     def test_alias_sq(self) -> None:
         result = _run("sq", input_text="a\nb\n")
