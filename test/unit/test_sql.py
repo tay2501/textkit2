@@ -34,3 +34,6 @@ class TestToSqlIn:
     def test_only_blank_lines_raises(self) -> None:
         with pytest.raises(ValueError, match="empty"):
             to_sql_in("\n\n\n")
+
+    def test_deduplicates_values(self) -> None:
+        assert to_sql_in("B\nA\nB\nA\nC") == "'A','B','C'"
