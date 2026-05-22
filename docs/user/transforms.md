@@ -76,6 +76,16 @@ echo "USER-ID" | press underscore
 # → USER_ID
 ```
 
+### `strip-commas` (`sc`)
+
+Remove comma characters from text. Removes both ASCII `,` (U+002C) and full-width `，` (U+FF0C).
+Useful for cleaning numbers copied from the web before pasting into Excel.
+
+```bash
+echo "1,234,567" | press strip-commas
+# → 1234567
+```
+
 ## SQL
 
 ### `sql-in` (`sq`)
