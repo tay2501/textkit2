@@ -46,6 +46,7 @@ SIMPLE_COMMANDS: tuple[SimpleCommand, ...] = (
     SimpleCommand("underscore",     "press.transforms.separator",  "hyphen_to_underscore",  ("us",),   "Convert hyphens to underscores"),
     SimpleCommand("hyphen",         "press.transforms.separator",  "underscore_to_hyphen",  ("hy",),   "Convert underscores to hyphens"),
     SimpleCommand("strip-commas",   "press.transforms.separator",  "strip_commas",          ("sc",),   "Remove commas from text (e.g. 1,234 → 1234)"),
+    SimpleCommand("digits-only",    "press.transforms.separator",  "digits_only",           ("dg",),   "Keep only digit characters, removing everything else (e.g. ¥1,234 → 1234)"),
     # --- escape ---
     SimpleCommand("unicode-decode", "press.transforms.escape",     "decode_unicode_escape", ("ud",),   r"Decode \uXXXX escape sequences to text"),
     SimpleCommand("unicode-encode", "press.transforms.escape",     "encode_unicode_escape", ("ue",),   r"Encode text to \uXXXX escape sequences"),

@@ -50,6 +50,11 @@ echo "USER-ID"     | press underscore        # → USER_ID
 # Strip commas (e.g. numbers copied from the web)
 echo "1,234,567"   | press strip-commas      # → 1234567
 
+# Keep digits only (currency symbols, separators, etc. removed)
+echo "¥1,234"      | press digits-only       # → 1234
+echo "€1.234"      | press digits-only       # → 1234  (comma/period both removed)
+echo "１２３円"     | press digits-only       # → １２３ (full-width preserved)
+
 # Case: identifier conversion
 echo "my_variable" | press camel            # → myVariable
 echo "myVariable"  | press snake            # → my_variable
@@ -148,6 +153,7 @@ press dedupe --ignore-case -c -C
 | `hyphen` | `hy` | Underscores → hyphens (`USER_ID` → `USER-ID`) |
 | `underscore` | `us` | Hyphens → underscores (`USER-ID` → `USER_ID`) |
 | `strip-commas` | `sc` | Remove commas (`1,234,567` → `1234567`; also strips full-width `，`) |
+| `digits-only` | `dg` | Keep only digit characters — removes currency symbols, punctuation, spaces (`¥1,234` → `1234`; `€1.234` → `1234`; `１２３円` → `１２３`) |
 
 ### Case Conversion
 

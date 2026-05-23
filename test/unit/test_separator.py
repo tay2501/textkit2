@@ -1,6 +1,40 @@
-"""Tests for underscore / hyphen separator conversion, and comma stripping (F-07)."""
+"""Tests for underscore / hyphen separator conversion, comma stripping, and digits-only (F-07)."""
 
-from press.transforms.separator import hyphen_to_underscore, strip_commas, underscore_to_hyphen
+from press.transforms.separator import (
+    digits_only,
+    hyphen_to_underscore,
+    strip_commas,
+    underscore_to_hyphen,
+)
+
+
+class TestDigitsOnly:
+    def test_yen_comma_thousands(self) -> None:
+        assert digits_only("¥1,234") == "1234"
+
+    def test_euro_period_thousands(self) -> None:
+        assert digits_only("€1.234") == "1234"
+
+    def test_dollar_with_decimal(self) -> None:
+        assert digits_only("$1,234.56") == "123456"
+
+    def test_fullwidth_digits_preserved(self) -> None:
+        assert digits_only("１２３円") == "１２３"
+
+    def test_mixed_width(self) -> None:
+        assert digits_only("¥1,２３４") == "1２３４"
+
+    def test_digits_only_input(self) -> None:
+        assert digits_only("1234") == "1234"
+
+    def test_empty(self) -> None:
+        assert digits_only("") == ""
+
+    def test_no_digits(self) -> None:
+        assert digits_only("abc") == ""
+
+    def test_multiline(self) -> None:
+        assert digits_only("¥1,000\n$2,000") == "10002000"
 
 
 class TestUnderscoreToHyphen:
