@@ -28,7 +28,12 @@ if TYPE_CHECKING:  # pragma: no cover
     from press.transforms.json_fmt import json_compress, json_format
     from press.transforms.lineending import to_cr, to_crlf, to_lf
     from press.transforms.lines import dedupe_lines, sort_lines, trim_lines
-    from press.transforms.separator import hyphen_to_underscore, underscore_to_hyphen
+    from press.transforms.separator import (
+        digits_only,
+        hyphen_to_underscore,
+        strip_commas,
+        underscore_to_hyphen,
+    )
     from press.transforms.sql import to_sql_in
     from press.transforms.unicode_norm import check_norm, to_nfc, to_nfd, to_nfkc, to_nfkd
     from press.transforms.whitespace import normalize_whitespace
@@ -46,6 +51,7 @@ _LAZY: dict[str, tuple[str, str]] = {
     "encode_unicode_escape": ("press.transforms.escape", "encode_unicode_escape"),
     "fix_encoding": ("press.transforms.encoding_repair", "fix_encoding"),
     "load_tsv": ("press.transforms.dictionary", "load_tsv"),
+    "digits_only": ("press.transforms.separator", "digits_only"),
     "hyphen_to_underscore": ("press.transforms.separator", "hyphen_to_underscore"),
     "json_compress": ("press.transforms.json_fmt", "json_compress"),
     "json_format": ("press.transforms.json_fmt", "json_format"),
@@ -72,6 +78,7 @@ _LAZY: dict[str, tuple[str, str]] = {
     "to_title": ("press.transforms.case", "to_title"),
     "to_upper": ("press.transforms.case", "to_upper"),
     "trim_lines": ("press.transforms.lines", "trim_lines"),
+    "strip_commas": ("press.transforms.separator", "strip_commas"),
     "underscore_to_hyphen": ("press.transforms.separator", "underscore_to_hyphen"),
     "url_decode": ("press.transforms.encode", "url_decode"),
     "url_encode": ("press.transforms.encode", "url_encode"),

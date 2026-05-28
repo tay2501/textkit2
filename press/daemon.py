@@ -250,8 +250,6 @@ class CommandDispatcher:
             result = self._transform(command, text)
             set_clipboard_text(result)
             self._notify_success(command, result)
-        except NotImplementedError as exc:
-            self._notify_error(command, str(exc))
         except Exception as exc:
             self._notify_error(command, str(exc))
 

@@ -21,7 +21,7 @@ def base64_encode(text: str) -> str:
 
 
 def base64_decode(text: str) -> str:
-    """Decode Base64 string to UTF-8 text."""
+    """Decode Base64 string to UTF-8 text; raises ValueError on invalid input."""
     try:
         decoded_bytes = base64.b64decode(text, validate=True)
     except binascii.Error as exc:
@@ -33,7 +33,7 @@ def base64_decode(text: str) -> str:
 
 
 def url_encode(text: str) -> str:
-    """Percent-encode text using UTF-8 (safe='', all chars including / and @ are encoded)."""
+    """Percent-encode text using UTF-8 (all chars including / and @ are encoded)."""
     return urllib.parse.quote(text, safe="")
 
 

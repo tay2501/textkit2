@@ -23,17 +23,7 @@ _RE_SPLIT = re.compile(r"[-_\s]+")
 
 
 def _split_words(text: str) -> list[str]:
-    """Split text into a list of lowercase word tokens.
-
-    Handles camelCase, PascalCase, kebab-case, snake_case, and combinations
-    such as HTTPSServer or HTTPResponse.
-
-    Args:
-        text: A single-word or compound-word string.
-
-    Returns:
-        A list of lowercase word strings.
-    """
+    """Split camelCase/PascalCase/kebab/snake text into lowercase word tokens."""
     # Step 1: Handle sequences like "HTTPSServer" → "HTTPS_Server"
     s = _RE_UPPER_SEQ.sub(r"\1_\2", text)
     # Step 2: Handle boundaries like "helloWorld" → "hello_World"
@@ -43,17 +33,7 @@ def _split_words(text: str) -> list[str]:
 
 
 def _convert_line(text: str, joiner: str, capitalize_first: bool, capitalize_rest: bool) -> str:
-    """Convert a single line using the given word-join strategy.
-
-    Args:
-        text:             A single line of text (no newline character).
-        joiner:           String inserted between words (e.g. "_", "-", "").
-        capitalize_first: Whether to capitalize the first word.
-        capitalize_rest:  Whether to capitalize words after the first.
-
-    Returns:
-        The converted line, or the original line if no words were found.
-    """
+    """Join words from a single line using the given strategy; returns original if no words."""
     words = _split_words(text)
     if not words:
         return text
@@ -72,19 +52,7 @@ def _transform_lines(
     capitalize_first: bool,
     capitalize_rest: bool,
 ) -> str:
-    """Apply a case conversion to each line of multi-line text.
-
-    Empty lines are preserved as-is.
-
-    Args:
-        text:             Multi-line input text.
-        joiner:           Separator string between words.
-        capitalize_first: Whether to capitalize the first word.
-        capitalize_rest:  Whether to capitalize subsequent words.
-
-    Returns:
-        Transformed text with the same number of lines as the input.
-    """
+    """Apply a case conversion to each line; empty lines are preserved."""
     lines = text.split("\n")
     converted = [
         _convert_line(line, joiner, capitalize_first, capitalize_rest) if line else ""

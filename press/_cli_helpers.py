@@ -47,10 +47,11 @@ def _run_transform(
 ) -> int:
     """Read → transform → write.  Returns an exit code (0 = success, 1 = error)."""
     cmd = getattr(args, "command", "press")
+    quiet = getattr(args, "quiet", False)
     try:
         text = _read_input(args)
     except Exception as exc:
-        if not getattr(args, "quiet", False):
+        if not quiet:
             print(f"press {cmd}: error: failed to read input: {exc}", file=sys.stderr)
         return 1
 
@@ -60,11 +61,11 @@ def _run_transform(
         if getattr(args, "fallback", False):
             _write_output(text, args)
             return 0
-        if not getattr(args, "quiet", False):
+        if not quiet:
             print(f"press {cmd}: error: {exc}", file=sys.stderr)
         return 1
 
-    if getattr(args, "verbose", False) and not getattr(args, "quiet", False):
+    if getattr(args, "verbose", False) and not quiet:
         print(f"before: {text!r}", file=sys.stderr)
         print(f"after:  {result!r}", file=sys.stderr)
 

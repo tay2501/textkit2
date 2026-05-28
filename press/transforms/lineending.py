@@ -12,36 +12,15 @@ def _normalize_to_lf(text: str) -> str:
 
 
 def to_crlf(text: str) -> str:
-    """Convert all line endings to CRLF (\\r\\n).
-
-    Args:
-        text: Input text with any combination of line endings.
-
-    Returns:
-        Text with all line endings replaced by CRLF.
-    """
+    r"""Convert all line endings to CRLF (\r\n)."""
     return _normalize_to_lf(text).replace("\n", "\r\n")
 
 
 def to_lf(text: str) -> str:
-    """Convert all line endings to LF (\\n).
-
-    Args:
-        text: Input text with any combination of line endings.
-
-    Returns:
-        Text with all line endings replaced by LF.
-    """
+    r"""Convert all line endings to LF (\n)."""
     return _normalize_to_lf(text)
 
 
 def to_cr(text: str) -> str:
-    """Convert all line endings to CR (\\r).
-
-    Args:
-        text: Input text with any combination of line endings.
-
-    Returns:
-        Text with all line endings replaced by CR.
-    """
+    r"""Convert all line endings to CR (\r)."""
     return _normalize_to_lf(text).replace("\n", "\r")
