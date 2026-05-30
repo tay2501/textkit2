@@ -4,7 +4,7 @@
 project = "press"
 author = "press contributors"
 copyright = "2026, press contributors"
-release = "0.1.0"
+release = "0.5.0"
 
 # -- General configuration -----------------------------------------------------
 extensions = [

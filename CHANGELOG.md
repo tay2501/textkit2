@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`press config reset [--key SECTION]`**: overwrite config with built-in defaults; creates a `.toml.bak` backup; `--key` limits reset to one section (`hotkeys`, `sql_in`, `dictionary`, `ui`, `hold`)
 - **`schema_version`**: new field in `PressConfig` and generated config files (current: `1`); `config validate` rejects files with a schema version newer than the installed press
 
+### Refactored
+- **`__main__.py` decomposed** into focused CLI modules: `_cli_helpers.py` (shared I/O), `_cli_dict.py` (dict commands), `_cli_config.py` (config commands), `_cli_daemon.py` (daemon commands) — `__main__.py` retains only parser construction and entry point
+- **`sql-in` deduplication**: input values are deduplicated and sorted before building the `IN` clause
+- **Bug fixes**: corrected `_LAZY` omissions in `transforms/__init__.py` (missing `strip_commas`, `digits_only`); removed duplicate `except` clause; trimmed redundant docstrings
+
 ---
 
 ## [0.4.0] - 2026-05-16

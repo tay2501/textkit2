@@ -30,7 +30,11 @@ Brief description of the changes.
 - [ ] `press/commands.py` - Command registry (add here for new simple transforms)
 - [ ] `press/transforms/` - Text transformation modules
 - [ ] `press/clipboard.py` - Clipboard integration
-- [ ] `press/__main__.py` - CLI entry point
+- [ ] `press/__main__.py` - CLI parser + entry point
+- [ ] `press/_cli_helpers.py` - Shared I/O helpers
+- [ ] `press/_cli_dict.py` - dict command group
+- [ ] `press/_cli_config.py` - config command group
+- [ ] `press/_cli_daemon.py` - daemon command group
 - [ ] `press/config.py` - Configuration loader and management
 - [ ] `press/daemon.py` - Daemon / hotkey dispatch
 - [ ] `test/` - Tests

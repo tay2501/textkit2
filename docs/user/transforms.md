@@ -33,6 +33,15 @@ echo "TABLE1" | press fullwidth
 # → ＴＡＢＬＥ１
 ```
 
+### `enlarge-kana` (`ek`)
+
+Expand small kana characters to their normal-size equivalents (ぁ→あ, ァ→ア, っ→つ, etc.).
+
+```bash
+echo "ぁぃぅぇぉっゃゅょ" | press enlarge-kana
+# → あいうえおつやゆよ
+```
+
 ## Whitespace
 
 ### `normalize` (`norm`)
@@ -86,6 +95,18 @@ echo "1,234,567" | press strip-commas
 # → 1234567
 ```
 
+### `digits-only` (`dg`)
+
+Keep only digit characters (`0`–`9`), removing everything else including currency symbols, commas, and spaces.
+
+```bash
+echo "¥1,234,567" | press digits-only
+# → 1234567
+
+echo "TEL: 03-1234-5678" | press digits-only
+# → 0312345678
+```
+
 ## SQL
 
 ### `sql-in` (`sq`)
@@ -103,6 +124,90 @@ Options:
 |---|---|---|
 | `--quote` | `'` | Quote character |
 | `--wrap` | off | Wrap result in parentheses: `('A','B')` |
+
+## Case conversion
+
+### `snake` (`sn`)
+
+Convert text to `snake_case`.
+
+```bash
+echo "MyVariable Name" | press snake
+# → my_variable_name
+```
+
+### `camel` (`cm`)
+
+Convert text to `camelCase`.
+
+```bash
+echo "my_variable_name" | press camel
+# → myVariableName
+```
+
+### `pascal` (`pc`)
+
+Convert text to `PascalCase`.
+
+```bash
+echo "my_variable_name" | press pascal
+# → MyVariableName
+```
+
+### `kebab` (`kb`)
+
+Convert text to `kebab-case`.
+
+```bash
+echo "MyVariableName" | press kebab
+# → my-variable-name
+```
+
+### `upper` (`up`)
+
+Convert all characters to UPPERCASE.
+
+```bash
+echo "Hello World" | press upper
+# → HELLO WORLD
+```
+
+### `lower` (`lo`)
+
+Convert all characters to lowercase.
+
+```bash
+echo "Hello World" | press lower
+# → hello world
+```
+
+### `title` (`tt`)
+
+Capitalize the first letter of each word (Title Case).
+
+```bash
+echo "hello world" | press title
+# → Hello World
+```
+
+### `capitalize` (`cap`)
+
+Capitalize the first letter of each line; lowercase the rest.
+
+```bash
+printf "hELLO\nwORLD" | press capitalize
+# → Hello
+# → World
+```
+
+### `swapcase` (`sw`)
+
+Swap upper and lower case characters.
+
+```bash
+echo "Hello World" | press swapcase
+# → hELLO wORLD
+```
 
 ## Unicode escape
 
@@ -138,6 +243,77 @@ Decode HTML entities.
 echo "&lt;div&gt;&amp;" | press html-decode
 # → <div>&
 ```
+
+## Base64 / URL encoding
+
+### `base64-encode` (`be`)
+
+Encode text to Base64.
+
+```bash
+echo "Hello, World!" | press base64-encode
+# → SGVsbG8sIFdvcmxkIQ==
+```
+
+### `base64-decode` (`bd`)
+
+Decode Base64 to text.
+
+```bash
+echo "SGVsbG8sIFdvcmxkIQ==" | press base64-decode
+# → Hello, World!
+```
+
+### `url-encode` (`urle`)
+
+Percent-encode text for use in URLs.
+
+```bash
+echo "hello world & more" | press url-encode
+# → hello%20world%20%26%20more
+```
+
+### `url-decode` (`urld`)
+
+Decode percent-encoded URL text.
+
+```bash
+echo "hello%20world%20%26%20more" | press url-decode
+# → hello world & more
+```
+
+## JSON
+
+### `json-compress` (`jc`)
+
+Compress pretty-printed JSON to a single line.
+
+```bash
+printf '{\n  "key": "value"\n}' | press json-compress
+# → {"key":"value"}
+```
+
+### `json-format` (`jf`)
+
+Pretty-print JSON with configurable indentation.
+
+```bash
+echo '{"key":"value","list":[1,2,3]}' | press json-format
+# → {
+# →   "key": "value",
+# →   "list": [
+# →     1,
+# →     2,
+# →     3
+# →   ]
+# → }
+```
+
+Options:
+
+| Flag | Default | Description |
+|---|---|---|
+| `--indent N` | `2` | Number of indentation spaces |
 
 ## Clipboard utilities
 
