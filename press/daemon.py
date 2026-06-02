@@ -290,6 +290,14 @@ class CommandDispatcher:
                 from press.transforms.lines import sort_lines
 
                 return sort_lines(text)
+            case "json-format" | "jf":
+                from press.transforms.json_fmt import json_format
+
+                return json_format(text)
+            case "fix-encoding" | "fe":
+                from press.transforms.encoding_repair import fix_encoding
+
+                return fix_encoding(text)
             case "dict":
                 return self._run_dict(text, reverse=False)
             case "dict_reverse":

@@ -3,41 +3,7 @@
 from __future__ import annotations
 
 import importlib
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:  # pragma: no cover
-    from press.transforms.case import (
-        to_camel_case,
-        to_capitalize,
-        to_kebab_case,
-        to_lower,
-        to_pascal_case,
-        to_snake_case,
-        to_swapcase,
-        to_title,
-        to_upper,
-    )
-    from press.transforms.dictionary import dict_forward, dict_reverse, load_tsv
-    from press.transforms.encode import base64_decode, base64_encode, url_decode, url_encode
-    from press.transforms.encoding_repair import fix_encoding
-    from press.transforms.escape import (
-        decode_html_entities,
-        decode_unicode_escape,
-        encode_unicode_escape,
-    )
-    from press.transforms.json_fmt import json_compress, json_format
-    from press.transforms.lineending import to_cr, to_crlf, to_lf
-    from press.transforms.lines import dedupe_lines, sort_lines, trim_lines
-    from press.transforms.separator import (
-        digits_only,
-        hyphen_to_underscore,
-        strip_commas,
-        underscore_to_hyphen,
-    )
-    from press.transforms.sql import to_sql_in
-    from press.transforms.unicode_norm import check_norm, to_nfc, to_nfd, to_nfkc, to_nfkd
-    from press.transforms.whitespace import normalize_whitespace
-    from press.transforms.width import to_enlarge_smallkana, to_fullwidth, to_halfwidth
+from typing import Any
 
 _LAZY: dict[str, tuple[str, str]] = {
     "check_norm": ("press.transforms.unicode_norm", "check_norm"),
