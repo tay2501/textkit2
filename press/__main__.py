@@ -167,6 +167,58 @@ def _register_json_format_command(sub: _SubParsers) -> None:
     p.set_defaults(func=_jf)
 
 
+def _register_genpass_command(sub: _SubParsers) -> None:
+    def _positive_int(value: str) -> int:
+        n = int(value)
+        if n < 1:
+            raise argparse.ArgumentTypeError(f"length must be >= 1, got {n}")
+        return n
+
+    p = sub.add_parser("genpass", aliases=["gp"], help="Generate a secure random password")
+    p.add_argument(
+        "-n",
+        "--length",
+        type=_positive_int,
+        default=20,
+        metavar="N",
+        help="Password length (default: 20)",
+    )
+    p.add_argument(
+        "-s",
+        "--symbols",
+        action="store_true",
+        help="Include ASCII punctuation characters",
+    )
+    p.add_argument("-C", "--clip-out", action="store_true", help="Write output to clipboard")
+    p.add_argument(
+        "-N",
+        "--no-clip",
+        action="store_true",
+        help="Do NOT write to clipboard even on a TTY (prevents accidental overwrite)",
+    )
+    p.add_argument("-q", "--quiet", action="store_true", help="Suppress all stderr output")
+
+    def _gp(a: argparse.Namespace) -> int:
+        from press.genpass import generate_password
+
+        password = generate_password(length=a.length, symbols=a.symbols)
+        sys.stdout.write(password)
+        sys.stdout.flush()
+        # On a TTY, auto-write to clipboard so the password is immediately pasteable.
+        # --no-clip (-N) suppresses this to avoid overwriting an existing clipboard value.
+        if (a.clip_out or sys.stdout.isatty()) and not a.no_clip:
+            try:
+                from press.clipboard import set_clipboard_text
+
+                set_clipboard_text(password)
+            except Exception as exc:
+                if not a.quiet:
+                    print(f"press genpass: warning: clipboard write failed: {exc}", file=sys.stderr)
+        return 0
+
+    p.set_defaults(func=_gp)
+
+
 def _register_clipboard_util_commands(sub: _SubParsers) -> None:
     p = sub.add_parser("clear", aliases=["cl"], help="Clear the clipboard")
     p.add_argument("-q", "--quiet", action="store_true", help="Suppress all stderr output")
@@ -256,6 +308,7 @@ def make_parser() -> argparse.ArgumentParser:
     _register_sql_commands(sub)
     _register_encoding_repair_commands(sub)
     _register_json_format_command(sub)
+    _register_genpass_command(sub)
 
     # Special-purpose commands
     _register_dict_commands(sub)

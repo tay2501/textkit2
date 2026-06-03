@@ -24,11 +24,48 @@ def _lines_type(val: str) -> int | None:
 
 
 def _register_daemon_commands(sub: _SubParsers) -> None:
-    daemon_p = sub.add_parser("daemon", help="Manage press background daemon")
+    daemon_p = sub.add_parser(
+        "daemon",
+        help="Manage press background daemon",
+        description=(
+            "Manage the press background daemon.\n\n"
+            "The daemon adds a system-tray icon and global hotkeys so any clipboard\n"
+            "transform is available from any application via Ctrl+Shift+F10 → <key>.\n\n"
+            "Key features:\n"
+            "  ClipboardGuard  Ctrl+Shift+F10 → h   Protect clipboard until pasted\n"
+            "                                        (tray icon turns red while active)\n"
+            "  hold toggle     same key              Save / restore clipboard contents\n"
+            "  transforms      see 'press --help'    All transforms available via hotkey\n\n"
+            "Typical workflow:\n"
+            "  press daemon start\n"
+            "  press genpass              # generate password → clipboard\n"
+            "  Ctrl+Shift+F10 → h        # engage ClipboardGuard\n"
+            "  <navigate to login field>\n"
+            "  Ctrl+V                     # paste — guard auto-releases"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     daemon_sub = daemon_p.add_subparsers(dest="daemon_action", metavar="ACTION")
     daemon_p.set_defaults(func=_handle_daemon)
 
-    daemon_sub.add_parser("start", help="Start the tray icon + hotkey daemon")
+    daemon_sub.add_parser(
+        "start",
+        help="Start the tray icon + hotkey daemon",
+        description=(
+            "Start the press background daemon.\n\n"
+            "Registers a system-tray icon and a global prefix hotkey (default:\n"
+            "Ctrl+Shift+F10). After the prefix, press a letter to run a transform\n"
+            "on the current clipboard contents.\n\n"
+            "ClipboardGuard  (Ctrl+Shift+F10 → h):\n"
+            "  Engages a dual-layer clipboard lock — any application that writes to\n"
+            "  the clipboard is blocked (Layer 1: WM_CLIPBOARDUPDATE < 1 ms restore)\n"
+            "  and Ctrl+V / Shift+Insert are intercepted before the OS dispatches\n"
+            "  them (Layer 2: 0 ms gap). The tray icon turns red while active.\n"
+            "  Press the hotkey again to release.\n\n"
+            "Use 'press daemon stop' to shut down."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     daemon_sub.add_parser("stop", help="Stop the running daemon")
     daemon_sub.add_parser("restart", help="Stop and restart the daemon")
 

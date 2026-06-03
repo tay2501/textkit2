@@ -97,6 +97,13 @@ printf "hello   \nworld   "   | press trim          # → strip trailing whitesp
 printf "a\nb\na\nc"           | press dedupe        # → a / b / c
 printf "10\n2\n1\n20"         | press sort --numeric  # → 1 / 2 / 10 / 20
 
+# Password generation (cryptographically secure — secrets.choice / os.urandom)
+press genpass              # 20-char alphanumeric → stdout + clipboard (TTY)
+press genpass -n 32        # 32-char
+press genpass -n 16 -s     # 16-char with symbols
+press genpass -N           # stdout only, clipboard unchanged
+press gp                   # alias
+
 # Dictionary lookup
 press dict add FOOBER01 TABLE_HOGEHOGE --file ~/my.tsv
 echo "FOOBER01" | press dict --file ~/my.tsv  # → TABLE_HOGEHOGE
@@ -128,6 +135,7 @@ press dedupe --ignore-case -c -C
 |---|---|---|
 | `halfwidth` | `hw` | Full-width → half-width (`ＴＡＢＬＥ１` → `TABLE1`) |
 | `fullwidth` | `fw` | Half-width → full-width (`TABLE1` → `ＴＡＢＬＥ１`) |
+| `enlarge-kana` | `ek` | Expand small kana to normal size (`ぁ` → `あ`, `ァ` → `ア`) |
 
 ### Whitespace & Line Endings
 
@@ -189,12 +197,38 @@ press dedupe --ignore-case -c -C
 
 ### Unicode Normalization
 
-| Command | Description |
+| Command | Alias | Description |
+|---|---|---|
+| `nfc` | | Canonical composition — precomposed form (Windows/web standard, fixes macOS NFD filenames) |
+| `nfd` | | Canonical decomposition — base character + combining marks (macOS HFS+ form) |
+| `nfkc` | | Compatibility composition — collapses full-width, ligatures, etc. |
+| `nfkd` | | Compatibility decomposition |
+| `check-norm` | `cn` | Report which normalization forms (NFC/NFD/NFKC/NFKD) the text already satisfies |
+
+### Password Generation
+
+```
+press genpass [-n N] [-s] [-N] [-C]
+```
+
+| Flag | Description |
 |---|---|
-| `nfc` | Canonical composition — precomposed form (Windows/web standard, fixes macOS NFD filenames) |
-| `nfd` | Canonical decomposition — base character + combining marks (macOS HFS+ form) |
-| `nfkc` | Compatibility composition — collapses full-width, ligatures, etc. |
-| `nfkd` | Compatibility decomposition |
+| `-n N` / `--length N` | Password length (default: **20**) |
+| `-s` / `--symbols` | Include ASCII punctuation (`!"#$%&'()*+,...`) |
+| `-N` / `--no-clip` | **Print to stdout only — do NOT write to clipboard** (prevents accidental overwrite) |
+| `-C` / `--clip-out` | Force clipboard write even in pipe mode |
+
+```bash
+press genpass              # 20-char alphanumeric → stdout + clipboard (TTY)
+press genpass -n 32        # 32-char alphanumeric
+press genpass -n 16 -s     # 16-char with symbols
+press genpass -N           # show in terminal only, clipboard unchanged
+press gp                   # alias
+```
+
+> **TTY auto-clipboard**: when running interactively, the password is written to the clipboard automatically so it is ready to paste immediately. Use `-N` if you only want to view the password without replacing the current clipboard contents.
+
+Uses `secrets.choice()` (backed by `os.urandom()`) — cryptographically secure.
 
 ### Clipboard Utilities
 
@@ -257,7 +291,21 @@ First call saves; second call restores. Survives process restarts because the te
 
 ### Daemon mode (real-time dual-layer protection)
 
-When the daemon is running, the hotkey **Ctrl+Shift+F10 → `h`** engages `ClipboardGuard` — a two-layer defence that makes the clipboard effectively read-only until you release it:
+When the daemon is running, the hotkey **Ctrl+Shift+F10 → `h`** engages **ClipboardGuard** — a two-layer defence that makes the clipboard effectively read-only until you release it:
+
+**Workflow — generate a password and protect it until pasted:**
+
+```
+1. press daemon start          # start the daemon (once)
+2. press genpass               # generate password → auto-written to clipboard
+3. Ctrl+Shift+F10 → h          # engage ClipboardGuard (tray icon turns red)
+   ↳ now any app that tries to overwrite the clipboard is blocked
+4. Navigate to the password field in any app
+5. Ctrl+V                      # paste the password
+   ↳ ClipboardGuard auto-releases after the paste (Layer 2)
+```
+
+> Use `Ctrl+Shift+F10 → h` again at any time to manually release protection.
 
 | Layer | Mechanism | Reaction time |
 |---|---|---|
