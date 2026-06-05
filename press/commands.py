@@ -82,6 +82,17 @@ SIMPLE_COMMAND_INDEX: dict[str, SimpleCommand] = {
     name: cmd for cmd in SIMPLE_COMMANDS for name in (cmd.name, *cmd.aliases)
 }
 
+# Alias → canonical name for parametric commands.
+# Daemon dispatch resolves these before the match block in CommandDispatcher._transform().
+PARAMETRIC_ALIASES: dict[str, str] = {
+    "tm": "trim",
+    "dq": "dedupe",
+    "st": "sort",
+    "sq": "sql-in",
+    "fe": "fix-encoding",
+    "jf": "json-format",
+}
+
 # ---------------------------------------------------------------------------
 # Design note: parametric commands in the daemon
 # ---------------------------------------------------------------------------

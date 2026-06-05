@@ -5,51 +5,28 @@ from __future__ import annotations
 import importlib
 from typing import Any
 
-_LAZY: dict[str, tuple[str, str]] = {
-    "check_norm": ("press.transforms.unicode_norm", "check_norm"),
-    "base64_decode": ("press.transforms.encode", "base64_decode"),
-    "base64_encode": ("press.transforms.encode", "base64_encode"),
-    "decode_html_entities": ("press.transforms.escape", "decode_html_entities"),
-    "decode_unicode_escape": ("press.transforms.escape", "decode_unicode_escape"),
+# Parametric / utility functions NOT covered by SIMPLE_COMMANDS.
+# SIMPLE_COMMANDS entries are auto-populated by _build_lazy() below.
+_EXTRA: dict[str, tuple[str, str]] = {
     "dedupe_lines": ("press.transforms.lines", "dedupe_lines"),
     "dict_forward": ("press.transforms.dictionary", "dict_forward"),
     "dict_reverse": ("press.transforms.dictionary", "dict_reverse"),
-    "encode_unicode_escape": ("press.transforms.escape", "encode_unicode_escape"),
     "fix_encoding": ("press.transforms.encoding_repair", "fix_encoding"),
-    "load_tsv": ("press.transforms.dictionary", "load_tsv"),
-    "digits_only": ("press.transforms.separator", "digits_only"),
-    "hyphen_to_underscore": ("press.transforms.separator", "hyphen_to_underscore"),
-    "json_compress": ("press.transforms.json_fmt", "json_compress"),
     "json_format": ("press.transforms.json_fmt", "json_format"),
-    "normalize_whitespace": ("press.transforms.whitespace", "normalize_whitespace"),
+    "load_tsv": ("press.transforms.dictionary", "load_tsv"),
     "sort_lines": ("press.transforms.lines", "sort_lines"),
-    "to_camel_case": ("press.transforms.case", "to_camel_case"),
-    "to_capitalize": ("press.transforms.case", "to_capitalize"),
-    "to_cr": ("press.transforms.lineending", "to_cr"),
-    "to_crlf": ("press.transforms.lineending", "to_crlf"),
-    "to_enlarge_smallkana": ("press.transforms.width", "to_enlarge_smallkana"),
-    "to_fullwidth": ("press.transforms.width", "to_fullwidth"),
-    "to_halfwidth": ("press.transforms.width", "to_halfwidth"),
-    "to_kebab_case": ("press.transforms.case", "to_kebab_case"),
-    "to_lf": ("press.transforms.lineending", "to_lf"),
-    "to_lower": ("press.transforms.case", "to_lower"),
-    "to_nfc": ("press.transforms.unicode_norm", "to_nfc"),
-    "to_nfd": ("press.transforms.unicode_norm", "to_nfd"),
-    "to_nfkc": ("press.transforms.unicode_norm", "to_nfkc"),
-    "to_nfkd": ("press.transforms.unicode_norm", "to_nfkd"),
-    "to_pascal_case": ("press.transforms.case", "to_pascal_case"),
-    "to_snake_case": ("press.transforms.case", "to_snake_case"),
     "to_sql_in": ("press.transforms.sql", "to_sql_in"),
-    "to_swapcase": ("press.transforms.case", "to_swapcase"),
-    "to_title": ("press.transforms.case", "to_title"),
-    "to_upper": ("press.transforms.case", "to_upper"),
     "trim_lines": ("press.transforms.lines", "trim_lines"),
-    "strip_commas": ("press.transforms.separator", "strip_commas"),
-    "underscore_to_hyphen": ("press.transforms.separator", "underscore_to_hyphen"),
-    "url_decode": ("press.transforms.encode", "url_decode"),
-    "url_encode": ("press.transforms.encode", "url_encode"),
 }
 
+
+def _build_lazy() -> dict[str, tuple[str, str]]:
+    from press.commands import SIMPLE_COMMANDS  # lightweight: dataclasses only
+
+    return {cmd.fn: (cmd.module, cmd.fn) for cmd in SIMPLE_COMMANDS} | _EXTRA
+
+
+_LAZY = _build_lazy()
 __all__ = sorted(_LAZY)
 
 

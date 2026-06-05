@@ -21,7 +21,8 @@ Clipboard text transformer for Windows 11.
 # Clone and install as a tool
 git clone https://github.com/tay2501/textkit2.git
 cd textkit2
-uv tool install .
+uv tool install .                      # CLI transforms only
+uv tool install --extra daemon .       # + daemon / global hotkeys / ClipboardGuard
 ```
 
 `press` and `px` are both available as command aliases.
@@ -29,7 +30,8 @@ uv tool install .
 For development:
 
 ```bash
-uv sync
+uv sync                    # CLI transforms only
+uv sync --extra daemon     # + daemon / global hotkeys / ClipboardGuard (pystray, pynput)
 uv run press --help
 ```
 
@@ -113,6 +115,28 @@ echo "TABLE_HOGEHOGE" | press dict -r --file ~/my.tsv  # → FOOBER01 (reverse)
 echo "  USER_ID  "  | press normalize        # → USER_ID
 cat file.txt        | press crlf             # all line endings → CRLF
 cat file.txt        | press lf               # all line endings → LF
+```
+
+### Daemon & global hotkeys
+
+```bash
+uv sync --extra daemon     # install pystray + pynput (first time only)
+press daemon start         # start tray icon + hotkey listener
+
+# --- transform from any app via Ctrl+Shift+F10 → key ---
+# Copy "ＴＡＢＬＥ＿ＮＡＭＥ", then:
+#   Ctrl+Shift+F10 → w   →  paste gives "TABLE_NAME"   (halfwidth)
+#   Ctrl+Shift+F10 → n   →  paste gives normalized text (normalize)
+#   Ctrl+Shift+F10 → p   →  paste gives sorted lines    (sort)
+
+# --- password + ClipboardGuard ---
+press genpass                    # generate password → clipboard
+#   Ctrl+Shift+F10 → h           # ClipboardGuard ON  (tray turns red)
+#   <navigate to password field in any app>
+#   Ctrl+V                       # paste — guard auto-releases
+
+press daemon stop          # stop the daemon
+press daemon status        # show running / not running
 ```
 
 ### Clipboard in-place (`-c` read, `-C` write)

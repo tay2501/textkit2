@@ -260,7 +260,10 @@ class CommandDispatcher:
         import importlib
         from typing import cast
 
-        from press.commands import SIMPLE_COMMAND_INDEX
+        from press.commands import PARAMETRIC_ALIASES, SIMPLE_COMMAND_INDEX
+
+        # Resolve parametric aliases (e.g. "jf" → "json-format")
+        command = PARAMETRIC_ALIASES.get(command, command)
 
         # Simple commands: resolved dynamically via the central registry
         if command in SIMPLE_COMMAND_INDEX:
@@ -271,30 +274,30 @@ class CommandDispatcher:
             )
             return fn(text)
 
-        # Parametric / special commands retain explicit handling
+        # Parametric / special commands with config-driven or default kwargs
         match command:
             case "sql-in":
                 from press.transforms.sql import to_sql_in
 
                 cfg = self._config.sql_in
                 return to_sql_in(text, quote_char=cfg.quote_char, wrap=cfg.wrap)
-            case "trim" | "tm":
+            case "trim":
                 from press.transforms.lines import trim_lines
 
                 return trim_lines(text)
-            case "dedupe" | "dq":
+            case "dedupe":
                 from press.transforms.lines import dedupe_lines
 
                 return dedupe_lines(text)
-            case "sort" | "st":
+            case "sort":
                 from press.transforms.lines import sort_lines
 
                 return sort_lines(text)
-            case "json-format" | "jf":
+            case "json-format":
                 from press.transforms.json_fmt import json_format
 
                 return json_format(text)
-            case "fix-encoding" | "fe":
+            case "fix-encoding":
                 from press.transforms.encoding_repair import fix_encoding
 
                 return fix_encoding(text)
