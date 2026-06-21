@@ -22,7 +22,7 @@ Clipboard text transformer for Windows 11.
 git clone https://github.com/tay2501/textkit2.git
 cd textkit2
 uv tool install .                      # CLI transforms only
-uv tool install --extra daemon .       # + daemon / global hotkeys / ClipboardGuard
+uv tool install '.[daemon]'            # + daemon / global hotkeys / ClipboardGuard
 ```
 
 `press` and `px` are both available as command aliases.
