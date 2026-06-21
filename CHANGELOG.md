@@ -21,6 +21,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`sql-in` deduplication**: input values are deduplicated and sorted before building the `IN` clause
 - **Bug fixes**: corrected `_LAZY` omissions in `transforms/__init__.py` (missing `strip_commas`, `digits_only`); removed duplicate `except` clause; trimmed redundant docstrings
 
+### Dependencies
+- Bump pynput to `>=1.8.2`
+- Bump pywin32 to `>=312`
+- Bump pytest to `>=9.1.1`
+- Bump hypothesis to `>=6.155.7`
+- Bump ruff to `>=0.15.18`
+- Bump mypy to `>=2.1.0`
+- Bump pip-audit to `>=2.10.1`
+- Bump myst-parser to `>=5.1.0`
+- Bump pyinstaller to `>=6.21.0`
+
 ---
 
 ## [0.4.0] - 2026-05-16
