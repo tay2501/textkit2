@@ -1,22 +1,28 @@
-"""Declarative registry of simple transform commands.
+"""Declarative registry of simple and parametric transform commands.
 
 A "simple" command maps 1-to-1 onto a pure transform function that accepts
 only ``text: str`` and returns ``str`` — no extra parameters beyond the
 standard I/O flags added by ``_add_io_args()``.
 
-Parametric commands that need extra CLI arguments are excluded:
-- ``sql-in``      (--quote-char, --wrap)
-- ``fix-encoding``  (--threshold)
-- ``json-format``   (--indent)
+A "parametric" command accepts extra CLI arguments.  The daemon dispatches
+these with *default* (or config-driven) arguments only, since hotkey bindings
+cannot carry per-invocation parameters.  The optional ``daemon_kwargs``
+callable extracts config-driven kwargs from ``PressConfig``.
 
 This module is imported by both ``__main__.py`` (CLI registration) and
 ``daemon.py`` (hotkey dispatch), making it the single source of truth for
-all simple transform commands.
+all transform commands.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from press.config import PressConfig
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +34,23 @@ class SimpleCommand:
     fn: str
     aliases: tuple[str, ...] = field(default_factory=tuple)
     help: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class ParametricCommand:
+    """Metadata for one parametric transform command.
+
+    ``daemon_kwargs``, when set, is called with the running ``PressConfig``
+    to produce the keyword arguments passed to the transform function during
+    daemon hotkey dispatch.  ``None`` means call ``fn(text)`` with no extras.
+    """
+
+    name: str
+    module: str
+    fn: str
+    aliases: tuple[str, ...] = field(default_factory=tuple)
+    help: str = ""
+    daemon_kwargs: Callable[[PressConfig], dict[str, Any]] | None = None
 
 
 # fmt: off
@@ -82,24 +105,34 @@ SIMPLE_COMMAND_INDEX: dict[str, SimpleCommand] = {
     name: cmd for cmd in SIMPLE_COMMANDS for name in (cmd.name, *cmd.aliases)
 }
 
-# Alias → canonical name for parametric commands.
-# Daemon dispatch resolves these before the match block in CommandDispatcher._transform().
-PARAMETRIC_ALIASES: dict[str, str] = {
-    "tm": "trim",
-    "dq": "dedupe",
-    "st": "sort",
-    "sq": "sql-in",
-    "fe": "fix-encoding",
-    "jf": "json-format",
-}
 
 # ---------------------------------------------------------------------------
-# Design note: parametric commands in the daemon
+# Parametric commands (require extra CLI arguments)
 # ---------------------------------------------------------------------------
-# Commands not listed in SIMPLE_COMMANDS (trim, dedupe, sort, sql-in, dict, …)
-# need extra parameters.  The daemon dispatches these with *default* arguments
-# only (no CLI flags), which is intentional: hotkey bindings cannot carry
-# per-invocation parameters.  Config-driven overrides (sql-in quote_char/wrap,
-# dictionary files) live in PressConfig and are applied in
-# daemon.CommandDispatcher._transform().
-# When adding a new parametric command, update that match block as well.
+
+
+def _sql_in_daemon_kwargs(cfg: PressConfig) -> dict[str, Any]:
+    return {"quote_char": cfg.sql_in.quote_char, "wrap": cfg.sql_in.wrap}
+
+
+# fmt: off
+PARAMETRIC_COMMANDS: tuple[ParametricCommand, ...] = (
+    ParametricCommand("trim",         "press.transforms.lines",           "trim_lines",   ("tm",), "Strip trailing whitespace from each line"),
+    ParametricCommand("dedupe",       "press.transforms.lines",           "dedupe_lines", ("dq",), "Remove duplicate lines"),
+    ParametricCommand("sort",         "press.transforms.lines",           "sort_lines",   ("st",), "Sort lines"),
+    ParametricCommand("json-format",  "press.transforms.json_fmt",        "json_format",  ("jf",), "Pretty-print JSON"),
+    ParametricCommand("fix-encoding", "press.transforms.encoding_repair", "fix_encoding", ("fe",), "Repair mojibake text by detecting and re-decoding the original encoding (F-15)"),
+    ParametricCommand("sql-in",       "press.transforms.sql",             "to_sql_in",    ("sq",), "Convert newline-separated values to SQL IN clause", daemon_kwargs=_sql_in_daemon_kwargs),
+)
+# fmt: on
+
+# O(1) lookup by name or alias — used by daemon.CommandDispatcher._transform()
+PARAMETRIC_COMMAND_INDEX: dict[str, ParametricCommand] = {
+    name: cmd for cmd in PARAMETRIC_COMMANDS for name in (cmd.name, *cmd.aliases)
+}
+
+# Alias → canonical name — derived from PARAMETRIC_COMMANDS (single source of truth).
+# Daemon dispatch resolves these before the registry lookup in CommandDispatcher._transform().
+PARAMETRIC_ALIASES: dict[str, str] = {
+    alias: cmd.name for cmd in PARAMETRIC_COMMANDS for alias in cmd.aliases
+}

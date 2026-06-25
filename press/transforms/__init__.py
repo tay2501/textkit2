@@ -5,25 +5,21 @@ from __future__ import annotations
 import importlib
 from typing import Any
 
-# Parametric / utility functions NOT covered by SIMPLE_COMMANDS.
-# SIMPLE_COMMANDS entries are auto-populated by _build_lazy() below.
+# Utility functions not covered by SIMPLE_COMMANDS or PARAMETRIC_COMMANDS
+# (internal helpers used by daemon and dict commands, not exposed as CLI subcommands).
 _EXTRA: dict[str, tuple[str, str]] = {
-    "dedupe_lines": ("press.transforms.lines", "dedupe_lines"),
     "dict_forward": ("press.transforms.dictionary", "dict_forward"),
     "dict_reverse": ("press.transforms.dictionary", "dict_reverse"),
-    "fix_encoding": ("press.transforms.encoding_repair", "fix_encoding"),
-    "json_format": ("press.transforms.json_fmt", "json_format"),
     "load_tsv": ("press.transforms.dictionary", "load_tsv"),
-    "sort_lines": ("press.transforms.lines", "sort_lines"),
-    "to_sql_in": ("press.transforms.sql", "to_sql_in"),
-    "trim_lines": ("press.transforms.lines", "trim_lines"),
 }
 
 
 def _build_lazy() -> dict[str, tuple[str, str]]:
-    from press.commands import SIMPLE_COMMANDS  # lightweight: dataclasses only
+    from press.commands import PARAMETRIC_COMMANDS, SIMPLE_COMMANDS
 
-    return {cmd.fn: (cmd.module, cmd.fn) for cmd in SIMPLE_COMMANDS} | _EXTRA
+    simple = {cmd.fn: (cmd.module, cmd.fn) for cmd in SIMPLE_COMMANDS}
+    parametric = {cmd.fn: (cmd.module, cmd.fn) for cmd in PARAMETRIC_COMMANDS}
+    return simple | parametric | _EXTRA
 
 
 _LAZY = _build_lazy()

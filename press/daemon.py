@@ -16,7 +16,7 @@ import sys
 import threading
 from datetime import UTC
 from pathlib import Path
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, Any, override
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -260,7 +260,11 @@ class CommandDispatcher:
         import importlib
         from typing import cast
 
-        from press.commands import PARAMETRIC_ALIASES, SIMPLE_COMMAND_INDEX
+        from press.commands import (
+            PARAMETRIC_ALIASES,
+            PARAMETRIC_COMMAND_INDEX,
+            SIMPLE_COMMAND_INDEX,
+        )
 
         # Resolve parametric aliases (e.g. "jf" → "json-format")
         command = PARAMETRIC_ALIASES.get(command, command)
@@ -274,33 +278,20 @@ class CommandDispatcher:
             )
             return fn(text)
 
-        # Parametric / special commands with config-driven or default kwargs
+        # Parametric commands: registry-driven dispatch with optional config kwargs
+        if command in PARAMETRIC_COMMAND_INDEX:
+            spec_p = PARAMETRIC_COMMAND_INDEX[command]
+            fn_p = cast(
+                "Callable[..., str]",
+                getattr(importlib.import_module(spec_p.module), spec_p.fn),
+            )
+            kwargs: dict[str, Any] = (
+                spec_p.daemon_kwargs(self._config) if spec_p.daemon_kwargs is not None else {}
+            )
+            return fn_p(text, **kwargs)
+
+        # Special commands that require internal helpers
         match command:
-            case "sql-in":
-                from press.transforms.sql import to_sql_in
-
-                cfg = self._config.sql_in
-                return to_sql_in(text, quote_char=cfg.quote_char, wrap=cfg.wrap)
-            case "trim":
-                from press.transforms.lines import trim_lines
-
-                return trim_lines(text)
-            case "dedupe":
-                from press.transforms.lines import dedupe_lines
-
-                return dedupe_lines(text)
-            case "sort":
-                from press.transforms.lines import sort_lines
-
-                return sort_lines(text)
-            case "json-format":
-                from press.transforms.json_fmt import json_format
-
-                return json_format(text)
-            case "fix-encoding":
-                from press.transforms.encoding_repair import fix_encoding
-
-                return fix_encoding(text)
             case "dict":
                 return self._run_dict(text, reverse=False)
             case "dict_reverse":
