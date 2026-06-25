@@ -95,7 +95,7 @@ Adding a **parametric** command (needs extra CLI flags like `--indent`):
 
 ```
 [IDLE]
-  │  prefix key pressed (default: Ctrl+Shift+F10)
+  │  prefix chord pressed simultaneously (default: Ctrl+Shift+0)
   ▼
 [WAITING]  ─── 2 s timeout ──→ [IDLE]
   │  binding key pressed (e.g. "w" → halfwidth)

@@ -248,7 +248,7 @@ def _register_clipboard_util_commands(sub: _SubParsers) -> None:
             "For real-time protection that survives any application overwriting\n"
             "the clipboard, use the daemon hotkey instead:\n\n"
             "  press daemon start          # start the daemon\n"
-            "  Ctrl+Shift+F10 → h         # engage ClipboardGuard\n\n"
+            "  Ctrl+Shift+0, then h        # engage ClipboardGuard\n\n"
             "The daemon hold uses a dual-layer guard:\n"
             "  Layer 1 — WM_CLIPBOARDUPDATE monitor restores on any clipboard\n"
             "            change (< 1 ms reaction time).\n"

@@ -30,7 +30,7 @@ press halfwidth -c -C     # transform clipboard in-place
 press daemon start
 ```
 
-Now press **Ctrl+Shift+F10**, then **W** — your clipboard is transformed to half-width instantly, in any application.
+Now press **Ctrl+Shift+0** simultaneously (prefix chord), release, then press **W** — your clipboard is transformed to half-width instantly, in any application.
 
 See {doc}`hotkeys` for all default bindings.
 

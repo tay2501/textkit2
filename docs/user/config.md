@@ -8,7 +8,7 @@ If the file does not exist, all defaults apply. No configuration is required to 
 
 ```toml
 [hotkeys]
-prefix = "ctrl+shift+f10"
+prefix = "ctrl+shift+0"
 
 [hotkeys.bindings]
 W         = "halfwidth"
@@ -50,7 +50,7 @@ hold_icon            = true
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `prefix` | string | `"ctrl+shift+f10"` | Prefix key in pynput notation |
+| `prefix` | string | `"ctrl+shift+0"` | Prefix key in pynput notation |
 
 ### `[hotkeys.bindings]`
 

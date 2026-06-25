@@ -2,11 +2,13 @@
 
 The `press` daemon registers a **prefix key** system similar to Emacs and nano.
 
-Press the **prefix key**, then a **single letter** to trigger a transform on the current clipboard.
+**Two-step sequence:**
+1. Press the **prefix chord** simultaneously (default: `Ctrl+Shift+0`)
+2. Release all keys, then press a **single binding key**
 
 ## Default bindings
 
-**Prefix key:** `Ctrl+Shift+F10`
+**Prefix chord:** `Ctrl+Shift+0` (simultaneous)
 
 | Key after prefix | Transform | Example |
 |---|---|---|
@@ -33,7 +35,7 @@ Edit `%APPDATA%\press\config.toml`:
 
 ```toml
 [hotkeys]
-prefix = "ctrl+shift+f10"   # change prefix key
+prefix = "ctrl+shift+0"   # change prefix key
 
 [hotkeys.bindings]
 W = "halfwidth"
