@@ -18,7 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        python-version: ["3.13"]
+        python-version: ["3.13", "3.14"]
 
     steps:
     - name: Checkout repository
@@ -51,7 +51,7 @@ jobs:
       run: uv run mypy press/ --num-workers 4
 
     - name: Test with pytest
-      run: uv run pytest --cov=. --cov-report=xml --cov-report=term-missing --cov-report=html
+      run: uv run pytest --cov=press --cov-report=xml --cov-report=term-missing --cov-report=html
       env:
         PYTHONPATH: .
 
