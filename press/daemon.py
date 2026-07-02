@@ -15,11 +15,13 @@ import re
 import sys
 import threading
 from datetime import UTC
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, override
+
+from press._paths import press_dir
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
 
     import pystray
     from PIL.Image import Image
@@ -38,9 +40,9 @@ _MUTEX_NAME = "Global\\press_daemon_singleton"
 _LEADER_TIMEOUT = 2.0  # seconds to wait for a binding key after prefix
 _ICON_SIZE = 64  # tray icon size in pixels
 
-_PID_PATH: Path = Path(os.environ.get("APPDATA", str(Path.home()))) / "press" / "press.pid"
-_LOG_PATH: Path = Path(os.environ.get("APPDATA", str(Path.home()))) / "press" / "daemon.log"
-_STATUS_PATH: Path = Path(os.environ.get("APPDATA", str(Path.home()))) / "press" / "status.json"
+_PID_PATH: Path = press_dir() / "press.pid"
+_LOG_PATH: Path = press_dir() / "daemon.log"
+_STATUS_PATH: Path = press_dir() / "status.json"
 _LOG_MAX_BYTES = 5 * 1024 * 1024  # 5 MB per SPEC §15
 _LOG_BACKUP_COUNT = 3
 

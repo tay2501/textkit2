@@ -15,6 +15,10 @@ def default_dict_path() -> Path:
     On Windows, returns ``%APPDATA%/press/dict/default.tsv``.
     On other platforms, returns ``~/.config/press/dict/default.tsv``.
 
+    Unlike :mod:`press._paths` (which falls back to the home directory),
+    this deliberately follows platform conventions (``AppData/Roaming`` /
+    XDG) for the user-editable dictionary file.
+
     Returns:
         Absolute path to the default TSV dictionary file.
     """

@@ -5,11 +5,12 @@ and returns an immutable :class:`PressConfig` dataclass with typed defaults.
 Missing files yield defaults; partial files merge with defaults.
 """
 
-import os
 import tomllib
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
+
+from press._paths import appdata_dir, press_dir
 
 __all__ = [
     "CURRENT_SCHEMA_VERSION",
@@ -82,7 +83,7 @@ class DictionaryConfig:
 
     def resolved_paths(self) -> tuple[Path, ...]:
         """Return ``files`` with ``%APPDATA%`` expanded to an absolute path."""
-        appdata = os.environ.get("APPDATA", str(Path.home()))
+        appdata = str(appdata_dir())
         return tuple(Path(f.replace("%APPDATA%", appdata)) for f in self.files)
 
 
@@ -169,8 +170,7 @@ def _parse_ui(data: dict[str, Any]) -> UiConfig:
 
 def default_config_path() -> Path:
     """Return the platform default config path (``%APPDATA%\\press\\config.toml``)."""
-    appdata = os.environ.get("APPDATA", str(Path.home()))
-    return Path(appdata) / "press" / "config.toml"
+    return press_dir() / "config.toml"
 
 
 def load_config(path: Path | None = None) -> PressConfig:

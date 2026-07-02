@@ -6,16 +6,17 @@ The daemon uses in-memory state (CommandDispatcher._held_text).
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
 from typing import TYPE_CHECKING
+
+from press._paths import press_dir
 
 if TYPE_CHECKING:  # pragma: no cover
     from collections.abc import Callable
+    from pathlib import Path
 
 __all__ = ["hold_path", "toggle_hold_file"]
 
-_HOLD_PATH: Path = Path(os.environ.get("APPDATA", str(Path.home()))) / "press" / "hold.txt"
+_HOLD_PATH: Path = press_dir() / "hold.txt"
 
 
 def hold_path() -> Path:
