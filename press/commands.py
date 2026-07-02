@@ -37,8 +37,41 @@ class SimpleCommand:
 
 
 @dataclass(frozen=True, slots=True)
+class CliArg:
+    """One declarative argparse option for a parametric command.
+
+    ``kwarg`` doubles as the argparse ``dest`` and the keyword-argument name
+    passed to the transform function (e.g. flag ``--threshold`` feeds the
+    ``confidence_threshold`` parameter of ``fix_encoding``).
+    """
+
+    flags: tuple[str, ...]
+    kwarg: str
+    help: str
+    action: str | None = None  # "store_true" for boolean flags; None = value option
+    type: Callable[[str], Any] | None = None
+    default: Any = None
+    metavar: str | None = None
+
+    def __post_init__(self) -> None:
+        # Fail fast at import time: argparse actions like "store_true" supply
+        # their own default and take no value, so combining them with the
+        # value-option fields would be silently ignored during registration.
+        if self.action is not None and (
+            self.type is not None or self.default is not None or self.metavar is not None
+        ):
+            raise ValueError(
+                f"CliArg {self.flags[0]!r}: action={self.action!r} "
+                "cannot be combined with type/default/metavar"
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class ParametricCommand:
     """Metadata for one parametric transform command.
+
+    ``cli_args`` declares the extra CLI options registered by ``__main__.py``
+    beyond the standard I/O flags.
 
     ``daemon_kwargs``, when set, is called with the running ``PressConfig``
     to produce the keyword arguments passed to the transform function during
@@ -50,6 +83,7 @@ class ParametricCommand:
     fn: str
     aliases: tuple[str, ...] = field(default_factory=tuple)
     help: str = ""
+    cli_args: tuple[CliArg, ...] = field(default_factory=tuple)
     daemon_kwargs: Callable[[PressConfig], dict[str, Any]] | None = None
 
 
@@ -115,16 +149,118 @@ def _sql_in_daemon_kwargs(cfg: PressConfig) -> dict[str, Any]:
     return {"quote_char": cfg.sql_in.quote_char, "wrap": cfg.sql_in.wrap}
 
 
-# fmt: off
 PARAMETRIC_COMMANDS: tuple[ParametricCommand, ...] = (
-    ParametricCommand("trim",         "press.transforms.lines",           "trim_lines",   ("tm",), "Strip trailing whitespace from each line"),
-    ParametricCommand("dedupe",       "press.transforms.lines",           "dedupe_lines", ("dq",), "Remove duplicate lines"),
-    ParametricCommand("sort",         "press.transforms.lines",           "sort_lines",   ("st",), "Sort lines"),
-    ParametricCommand("json-format",  "press.transforms.json_fmt",        "json_format",  ("jf",), "Pretty-print JSON"),
-    ParametricCommand("fix-encoding", "press.transforms.encoding_repair", "fix_encoding", ("fe",), "Repair mojibake text by detecting and re-decoding the original encoding (F-15)"),
-    ParametricCommand("sql-in",       "press.transforms.sql",             "to_sql_in",    ("sq",), "Convert newline-separated values to SQL IN clause", daemon_kwargs=_sql_in_daemon_kwargs),
+    ParametricCommand(
+        "trim",
+        "press.transforms.lines",
+        "trim_lines",
+        ("tm",),
+        "Strip trailing whitespace from each line",
+        cli_args=(
+            CliArg(
+                ("--both", "-b"),
+                "both",
+                "Strip leading and trailing whitespace (str.strip())",
+                action="store_true",
+            ),
+        ),
+    ),
+    ParametricCommand(
+        "dedupe",
+        "press.transforms.lines",
+        "dedupe_lines",
+        ("dq",),
+        "Remove duplicate lines",
+        cli_args=(
+            CliArg(
+                ("--ignore-case", "-i"),
+                "ignore_case",
+                "Case-insensitive comparison",
+                action="store_true",
+            ),
+            CliArg(
+                ("--adjacent", "-a"),
+                "adjacent",
+                "Remove only adjacent duplicates (like GNU uniq)",
+                action="store_true",
+            ),
+        ),
+    ),
+    ParametricCommand(
+        "sort",
+        "press.transforms.lines",
+        "sort_lines",
+        ("st",),
+        "Sort lines",
+        cli_args=(
+            CliArg(("--reverse", "-r"), "reverse", "Reverse sort order", action="store_true"),
+            CliArg(
+                ("--numeric", "-n"),
+                "numeric",
+                "Numeric sort; non-numeric lines go last",
+                action="store_true",
+            ),
+            CliArg(
+                ("--ignore-case", "-i"),
+                "ignore_case",
+                "Case-insensitive sort",
+                action="store_true",
+            ),
+        ),
+    ),
+    ParametricCommand(
+        "sql-in",
+        "press.transforms.sql",
+        "to_sql_in",
+        ("sq",),
+        "Convert newline-separated values to SQL IN clause",
+        cli_args=(
+            CliArg(
+                ("--quote-char",),
+                "quote_char",
+                "Quote character (default: ')",
+                default="'",
+                metavar="CHAR",
+            ),
+            CliArg(("--wrap",), "wrap", "Wrap result in parentheses", action="store_true"),
+        ),
+        daemon_kwargs=_sql_in_daemon_kwargs,
+    ),
+    ParametricCommand(
+        "fix-encoding",
+        "press.transforms.encoding_repair",
+        "fix_encoding",
+        ("fe",),
+        "Repair mojibake text by detecting and re-decoding the original encoding (F-15)",
+        cli_args=(
+            CliArg(
+                ("--threshold",),
+                "confidence_threshold",
+                "Minimum confidence to accept detected encoding (default: 0.7)",
+                type=float,
+                default=0.7,
+                metavar="N",
+            ),
+        ),
+    ),
+    ParametricCommand(
+        "json-format",
+        "press.transforms.json_fmt",
+        "json_format",
+        ("jf",),
+        "Pretty-print JSON",
+        cli_args=(
+            CliArg(
+                ("--indent",),
+                "indent",
+                "Indentation spaces (default: 2)",
+                type=int,
+                default=2,
+                metavar="N",
+            ),
+        ),
+    ),
 )
-# fmt: on
 
 # O(1) lookup by name or alias — used by daemon.CommandDispatcher._transform()
 PARAMETRIC_COMMAND_INDEX: dict[str, ParametricCommand] = {
@@ -136,3 +272,8 @@ PARAMETRIC_COMMAND_INDEX: dict[str, ParametricCommand] = {
 PARAMETRIC_ALIASES: dict[str, str] = {
     alias: cmd.name for cmd in PARAMETRIC_COMMANDS for alias in cmd.aliases
 }
+
+# Commands handled inside daemon.CommandDispatcher itself rather than via the
+# registries above.  Keep in sync with CommandDispatcher.dispatch() ("clear",
+# "hold") and CommandDispatcher._transform() ("dict", "dict_reverse").
+DAEMON_SPECIAL_COMMANDS: frozenset[str] = frozenset({"clear", "hold", "dict", "dict_reverse"})

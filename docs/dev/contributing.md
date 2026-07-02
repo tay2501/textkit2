@@ -34,22 +34,26 @@ beyond the standard I/O flags (`-c`, `-C`, `-v`, `-q`, `--fallback`).
 
 1. Add the pure function in `press/transforms/<module>.py`
 2. Add one `SimpleCommand(...)` entry to `SIMPLE_COMMANDS` in `press/commands.py`
-3. Add the function to **both** `_LAZY` dict and `TYPE_CHECKING` import block in
-   `press/transforms/__init__.py` — **both must be updated or mypy/IDE will break**
-4. Write tests in `test/unit/test_<module>.py`
-5. Document the command in `docs/user/transforms.md`
+3. Write tests in `test/unit/test_<module>.py`
+4. Document the command in `docs/user/transforms.md`
 
-The CLI subcommand, aliases, help text, and daemon hotkey dispatch are all wired
-automatically from `SIMPLE_COMMANDS` — no other files need to change.
+The CLI subcommand, aliases, help text, daemon hotkey dispatch, and the lazy
+export in `press/transforms/__init__.py` are all wired automatically from
+`SIMPLE_COMMANDS` — no other files need to change.
 
 ### Parametric command (extra CLI flags like `--indent`)
 
 1. Add the pure function in `press/transforms/<module>.py`
-2. Add a `_register_<name>_command()` function in `press/__main__.py`
-3. Add a `case "<name>":` branch in `CommandDispatcher._transform()` in `press/daemon.py`
-4. Update `_LAZY` and `TYPE_CHECKING` in `press/transforms/__init__.py` (same as above)
-5. Write tests in `test/unit/test_<module>.py`
-6. Document the command in `docs/user/transforms.md`
+2. Add one `ParametricCommand(...)` entry to `PARAMETRIC_COMMANDS` in
+   `press/commands.py`, declaring its options as `cli_args=(CliArg(...), ...)`.
+   Each `CliArg.kwarg` is forwarded to the transform function as a keyword
+   argument. Set `daemon_kwargs` if the daemon should pass config-driven
+   arguments during hotkey dispatch.
+3. Write tests in `test/unit/test_<module>.py`
+4. Document the command in `docs/user/transforms.md`
+
+As with simple commands, everything else (CLI registration, aliases, daemon
+dispatch, lazy exports) derives from the registry entry.
 
 ## Commit style
 

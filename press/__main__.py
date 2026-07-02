@@ -4,12 +4,12 @@ import argparse
 import contextlib
 import locale
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from press._cli_helpers import _add_io_args, _run_transform, _SubParsers
 
 if TYPE_CHECKING:
-    from press.commands import SimpleCommand
+    from press.commands import CliArg, ParametricCommand, SimpleCommand
 
 
 def _version() -> str:
@@ -22,149 +22,48 @@ def _version() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Simple command registration
+# Transform command registration (simple and parametric)
 # ---------------------------------------------------------------------------
 
 
-def _register_simple_command(sub: _SubParsers, cmd: "SimpleCommand") -> None:
-    """Register one simple transform command from the central registry.
+def _register_transform_command(sub: _SubParsers, cmd: "SimpleCommand | ParametricCommand") -> None:
+    """Register one transform command from the central registry.
 
-    "Simple" means: no extra CLI arguments beyond the standard I/O flags.
-    The transform function signature is ``fn(text: str) -> str``.
+    Simple commands take no options beyond the standard I/O flags; parametric
+    commands additionally get options generated from ``cmd.cli_args``, where
+    each option's ``kwarg`` is both the argparse dest and the keyword argument
+    forwarded to the transform function.
     """
     import importlib
 
+    from press.commands import ParametricCommand
+
+    cli_args = cmd.cli_args if isinstance(cmd, ParametricCommand) else ()
     p = sub.add_parser(cmd.name, aliases=list(cmd.aliases), help=cmd.help)
     _add_io_args(p)
+    for arg in cli_args:
+        kwargs: dict[str, Any] = {"dest": arg.kwarg, "help": arg.help}
+        if arg.action is not None:
+            kwargs["action"] = arg.action
+        else:
+            kwargs["default"] = arg.default
+            if arg.type is not None:
+                kwargs["type"] = arg.type
+            if arg.metavar is not None:
+                kwargs["metavar"] = arg.metavar
+        p.add_argument(*arg.flags, **kwargs)
 
-    # Bind cmd as a default argument to avoid the loop late-binding pitfall.
-    def _handler(a: argparse.Namespace, _cmd: "SimpleCommand" = cmd) -> int:
+    # Bind cmd/cli_args as default arguments to avoid the loop late-binding pitfall.
+    def _handler(
+        a: argparse.Namespace,
+        _cmd: "SimpleCommand | ParametricCommand" = cmd,
+        _cli_args: "tuple[CliArg, ...]" = cli_args,
+    ) -> int:
         fn = getattr(importlib.import_module(_cmd.module), _cmd.fn)
-        return _run_transform(fn, a)
+        extras = {arg.kwarg: getattr(a, arg.kwarg) for arg in _cli_args}
+        return _run_transform(fn, a, **extras)
 
     p.set_defaults(func=_handler)
-
-
-# ---------------------------------------------------------------------------
-# Parametric command registration
-# ---------------------------------------------------------------------------
-
-
-def _register_trim_command(sub: _SubParsers) -> None:
-    p = sub.add_parser("trim", aliases=["tm"], help="Strip trailing whitespace from each line")
-    _add_io_args(p)
-    p.add_argument(
-        "--both",
-        "-b",
-        action="store_true",
-        help="Strip leading and trailing whitespace (str.strip())",
-    )
-
-    def _trim(a: argparse.Namespace) -> int:
-        from press.transforms.lines import trim_lines
-
-        return _run_transform(trim_lines, a, both=a.both)
-
-    p.set_defaults(func=_trim)
-
-
-def _register_dedupe_command(sub: _SubParsers) -> None:
-    p = sub.add_parser("dedupe", aliases=["dq"], help="Remove duplicate lines")
-    _add_io_args(p)
-    p.add_argument("--ignore-case", "-i", action="store_true", help="Case-insensitive comparison")
-    p.add_argument(
-        "--adjacent",
-        "-a",
-        action="store_true",
-        help="Remove only adjacent duplicates (like GNU uniq)",
-    )
-
-    def _dd(a: argparse.Namespace) -> int:
-        from press.transforms.lines import dedupe_lines
-
-        return _run_transform(dedupe_lines, a, ignore_case=a.ignore_case, adjacent=a.adjacent)
-
-    p.set_defaults(func=_dd)
-
-
-def _register_sort_command(sub: _SubParsers) -> None:
-    p = sub.add_parser("sort", aliases=["st"], help="Sort lines")
-    _add_io_args(p)
-    p.add_argument("--reverse", "-r", action="store_true", help="Reverse sort order")
-    p.add_argument(
-        "--numeric",
-        "-n",
-        action="store_true",
-        help="Numeric sort; non-numeric lines go last",
-    )
-    p.add_argument("--ignore-case", "-i", action="store_true", help="Case-insensitive sort")
-
-    def _st(a: argparse.Namespace) -> int:
-        from press.transforms.lines import sort_lines
-
-        return _run_transform(
-            sort_lines, a, reverse=a.reverse, numeric=a.numeric, ignore_case=a.ignore_case
-        )
-
-    p.set_defaults(func=_st)
-
-
-def _register_sql_commands(sub: _SubParsers) -> None:
-    p = sub.add_parser(
-        "sql-in", aliases=["sq"], help="Convert newline-separated values to SQL IN clause"
-    )
-    _add_io_args(p)
-    p.add_argument("--quote-char", default="'", metavar="CHAR", help="Quote character (default: ')")
-    p.add_argument("--wrap", action="store_true", help="Wrap result in parentheses")
-
-    def _sq(a: argparse.Namespace) -> int:
-        from press.transforms.sql import to_sql_in
-
-        return _run_transform(to_sql_in, a, quote_char=a.quote_char, wrap=a.wrap)
-
-    p.set_defaults(func=_sq)
-
-
-def _register_encoding_repair_commands(sub: _SubParsers) -> None:
-    p = sub.add_parser(
-        "fix-encoding",
-        aliases=["fe"],
-        help="Repair mojibake text by detecting and re-decoding the original encoding (F-15)",
-    )
-    _add_io_args(p)
-    p.add_argument(
-        "--threshold",
-        type=float,
-        default=0.7,
-        metavar="N",
-        help="Minimum confidence to accept detected encoding (default: 0.7)",
-    )
-
-    def _fe(a: argparse.Namespace) -> int:
-        from press.transforms.encoding_repair import fix_encoding
-
-        return _run_transform(fix_encoding, a, confidence_threshold=a.threshold)
-
-    p.set_defaults(func=_fe)
-
-
-def _register_json_format_command(sub: _SubParsers) -> None:
-    p = sub.add_parser("json-format", aliases=["jf"], help="Pretty-print JSON")
-    _add_io_args(p)
-    p.add_argument(
-        "--indent",
-        type=int,
-        default=2,
-        metavar="N",
-        help="Indentation spaces (default: 2)",
-    )
-
-    def _jf(a: argparse.Namespace) -> int:
-        from press.transforms.json_fmt import json_format
-
-        return _run_transform(json_format, a, indent=a.indent)
-
-    p.set_defaults(func=_jf)
 
 
 def _register_genpass_command(sub: _SubParsers) -> None:
@@ -288,7 +187,7 @@ def make_parser() -> argparse.ArgumentParser:
     from press._cli_config import _register_config_commands
     from press._cli_daemon import _register_daemon_commands
     from press._cli_dict import _register_dict_commands
-    from press.commands import SIMPLE_COMMANDS
+    from press.commands import PARAMETRIC_COMMANDS, SIMPLE_COMMANDS
 
     parser = argparse.ArgumentParser(
         prog="press",
@@ -297,20 +196,16 @@ def make_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"press {_version()}")
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
 
-    # Simple commands: no extra arguments beyond the standard I/O flags
-    for cmd in SIMPLE_COMMANDS:
-        _register_simple_command(sub, cmd)
-
-    # Parametric commands: require extra CLI arguments
-    _register_trim_command(sub)
-    _register_dedupe_command(sub)
-    _register_sort_command(sub)
-    _register_sql_commands(sub)
-    _register_encoding_repair_commands(sub)
-    _register_json_format_command(sub)
-    _register_genpass_command(sub)
+    # Transform commands: parsers and handlers generated from the registry
+    all_commands: tuple[SimpleCommand | ParametricCommand, ...] = (
+        *SIMPLE_COMMANDS,
+        *PARAMETRIC_COMMANDS,
+    )
+    for cmd in all_commands:
+        _register_transform_command(sub, cmd)
 
     # Special-purpose commands
+    _register_genpass_command(sub)
     _register_dict_commands(sub)
     _register_clipboard_util_commands(sub)
     _register_config_commands(sub)

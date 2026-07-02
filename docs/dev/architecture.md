@@ -71,25 +71,27 @@
 
 ## Command registration flow
 
-Adding a **simple** command (signature `fn(text: str) -> str`, no extra CLI flags):
+Both **simple** commands (signature `fn(text: str) -> str`) and **parametric**
+commands (extra CLI flags declared as `CliArg` entries) live in one registry:
 
 ```
 press/commands.py
-  └── SIMPLE_COMMANDS: tuple[SimpleCommand, ...]
+  └── SIMPLE_COMMANDS / PARAMETRIC_COMMANDS
             │
      ┌──────┴──────┐
      │             │
 __main__.py     daemon.py
 _register_      CommandDispatcher
-simple_command  ._transform()
-  (loop)          (index lookup)
+transform_      ._transform()
+command (loop)    (index lookup)
 ```
 
-Adding a **parametric** command (needs extra CLI flags like `--indent`):
+Adding either kind of command:
 
 1. Write the transform function in `press/transforms/<domain>.py`
-2. Add a `_register_<name>_command()` function in `__main__.py`
-3. Add a `case "<name>":` branch in `CommandDispatcher._transform()` in `daemon.py`
+2. Add a `SimpleCommand(...)` or `ParametricCommand(...)` entry in `commands.py`
+   (parametric: declare options via `cli_args`; use `daemon_kwargs` for
+   config-driven arguments during daemon hotkey dispatch)
 
 ## Prefix key state machine
 
