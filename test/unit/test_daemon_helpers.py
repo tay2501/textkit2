@@ -241,3 +241,33 @@ class TestParametricCommandRegistry:
             assert cmd.fn in _t.__all__, f"{cmd.fn} missing from press.transforms.__all__"
             fn = getattr(_t, cmd.fn)
             assert callable(fn)
+
+
+# ---------------------------------------------------------------------------
+# Default hotkey bindings ↔ command registry consistency
+# ---------------------------------------------------------------------------
+
+
+class TestDefaultBindingsDispatchable:
+    """Every default hotkey binding must resolve to a dispatchable command.
+
+    Guards the last remaining sync point between ``config._DEFAULT_BINDINGS``
+    and the command registries: a typo or a renamed command would otherwise
+    only surface as a runtime notification error in the daemon.
+    """
+
+    def test_all_default_binding_values_are_dispatchable(self) -> None:
+        from press.commands import (
+            DAEMON_SPECIAL_COMMANDS,
+            PARAMETRIC_COMMAND_INDEX,
+            SIMPLE_COMMAND_INDEX,
+        )
+        from press.config import _DEFAULT_BINDINGS
+
+        dispatchable = (
+            SIMPLE_COMMAND_INDEX.keys() | PARAMETRIC_COMMAND_INDEX.keys() | DAEMON_SPECIAL_COMMANDS
+        )
+        for key, command in _DEFAULT_BINDINGS.items():
+            assert command in dispatchable, (
+                f"default binding {key!r} -> {command!r} is not a dispatchable command"
+            )
