@@ -173,6 +173,20 @@ jobs:
           name: windows-exe
           path: .
 
+      # Published so users (and IT departments vetting the unsigned exe for
+      # endpoint-security allowlisting) can verify artifact integrity.
+      - name: Generate SHA-256 checksums
+        run: |
+          sha256sum dist/*.whl dist/*.tar.gz press-windows-x64.zip > SHA256SUMS.txt
+          {
+            echo ""
+            echo "## SHA-256 checksums"
+            echo ""
+            echo '```'
+            cat SHA256SUMS.txt
+            echo '```'
+          } >> changelog.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -185,6 +199,7 @@ jobs:
             dist/*.whl
             dist/*.tar.gz
             press-windows-x64.zip
+            SHA256SUMS.txt
           fail_on_unmatched_files: false
           generate_release_notes: true
 
