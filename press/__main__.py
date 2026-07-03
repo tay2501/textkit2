@@ -1,14 +1,19 @@
 """Command-line entry point for press."""
 
+from __future__ import annotations
+
 import argparse
 import contextlib
 import locale
+import os
 import sys
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from press._cli_helpers import _add_io_args, _run_transform, _SubParsers
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from press.commands import CliArg, ParametricCommand, SimpleCommand
 
 
@@ -21,12 +26,34 @@ def _version() -> str:
         return "unknown"
 
 
+class _LazyVersionAction(argparse.Action):
+    """``--version`` action that defers the version lookup to invocation time.
+
+    argparse's built-in ``version`` action needs the version string while the
+    parser is being *built*, which would import ``importlib.metadata`` (and
+    its email/urllib dependency chain, plus a site-packages dist-info scan)
+    on every CLI startup.  Endpoint security agents amplify that file I/O,
+    so the lookup runs only when ``--version`` is actually requested.
+    """
+
+    @override
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: str | Sequence[Any] | None,
+        option_string: str | None = None,
+    ) -> None:
+        print(f"press {_version()}")
+        parser.exit()
+
+
 # ---------------------------------------------------------------------------
 # Transform command registration (simple and parametric)
 # ---------------------------------------------------------------------------
 
 
-def _register_transform_command(sub: _SubParsers, cmd: "SimpleCommand | ParametricCommand") -> None:
+def _register_transform_command(sub: _SubParsers, cmd: SimpleCommand | ParametricCommand) -> None:
     """Register one transform command from the central registry.
 
     Simple commands take no options beyond the standard I/O flags; parametric
@@ -56,8 +83,8 @@ def _register_transform_command(sub: _SubParsers, cmd: "SimpleCommand | Parametr
     # Bind cmd/cli_args as default arguments to avoid the loop late-binding pitfall.
     def _handler(
         a: argparse.Namespace,
-        _cmd: "SimpleCommand | ParametricCommand" = cmd,
-        _cli_args: "tuple[CliArg, ...]" = cli_args,
+        _cmd: SimpleCommand | ParametricCommand = cmd,
+        _cli_args: tuple[CliArg, ...] = cli_args,
     ) -> int:
         fn = getattr(importlib.import_module(_cmd.module), _cmd.fn)
         extras = {arg.kwarg: getattr(a, arg.kwarg) for arg in _cli_args}
@@ -193,7 +220,12 @@ def make_parser() -> argparse.ArgumentParser:
         prog="press",
         description="Clipboard text transformation tool",
     )
-    parser.add_argument("--version", action="version", version=f"press {_version()}")
+    parser.add_argument(
+        "--version",
+        action=_LazyVersionAction,
+        nargs=0,
+        help="show program's version number and exit",
+    )
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
 
     # Transform commands: parsers and handlers generated from the registry
@@ -235,9 +267,12 @@ def main() -> None:
         sys.stderr.reconfigure(encoding="utf-8")
 
     parser = make_parser()
-    import argcomplete
+    # argcomplete is only needed when the shell-completion hook invokes us,
+    # which it signals via _ARGCOMPLETE; skip the import on normal startup.
+    if "_ARGCOMPLETE" in os.environ:
+        import argcomplete
 
-    argcomplete.autocomplete(parser)
+        argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
     if args.command is None:
