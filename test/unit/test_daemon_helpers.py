@@ -271,3 +271,70 @@ class TestDefaultBindingsDispatchable:
             assert command in dispatchable, (
                 f"default binding {key!r} -> {command!r} is not a dispatchable command"
             )
+
+
+# ---------------------------------------------------------------------------
+# _detect_monitoring_agents (daemon_status --json diagnostics)
+# ---------------------------------------------------------------------------
+
+
+class TestMonitoringAgentDetection:
+    """Detection is best-effort and must never raise; requires psutil."""
+
+    @staticmethod
+    def _proc(name: str) -> object:
+        from unittest.mock import MagicMock
+
+        proc = MagicMock()
+        proc.info = {"name": name}
+        return proc
+
+    def test_detects_known_agents_case_insensitive(self) -> None:
+        pytest.importorskip("psutil")
+        from unittest.mock import patch
+
+        from press.daemon import _detect_monitoring_agents
+
+        procs = [self._proc("DgAgent.exe"), self._proc("MsMpEng.exe"), self._proc("notepad.exe")]
+        with patch("psutil.process_iter", return_value=procs):
+            agents = _detect_monitoring_agents()
+        assert agents == ["Digital Guardian", "Microsoft Defender AV"]
+
+    def test_no_known_agents_returns_empty(self) -> None:
+        pytest.importorskip("psutil")
+        from unittest.mock import patch
+
+        from press.daemon import _detect_monitoring_agents
+
+        with patch("psutil.process_iter", return_value=[self._proc("explorer.exe")]):
+            assert _detect_monitoring_agents() == []
+
+    def test_enumeration_failure_returns_empty(self) -> None:
+        pytest.importorskip("psutil")
+        from unittest.mock import patch
+
+        from press.daemon import _detect_monitoring_agents
+
+        with patch("psutil.process_iter", side_effect=OSError("access denied")):
+            assert _detect_monitoring_agents() == []
+
+    def test_json_status_includes_monitoring_agents(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        from unittest.mock import patch
+
+        monkeypatch.setattr("press.daemon._PID_PATH", tmp_path / "press.pid")
+        monkeypatch.setattr("press.daemon._STATUS_PATH", tmp_path / "status.json")
+        monkeypatch.setattr("sys.platform", "linux")
+
+        from press.daemon import daemon_status
+
+        with patch("press.daemon._detect_monitoring_agents", return_value=["Digital Guardian"]):
+            rc = daemon_status(as_json=True)
+        assert rc == 1
+        data = json.loads(capsys.readouterr().out)
+        assert data["monitoring_agents"] == ["Digital Guardian"]
+        assert data["running"] is False

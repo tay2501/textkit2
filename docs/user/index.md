@@ -10,4 +10,5 @@ hotkeys
 dictionary
 config
 daemon
+edr-environments
 ```

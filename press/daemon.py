@@ -64,6 +64,23 @@ _LEVEL_MIN: dict[str, int] = {
 # Token set for _to_pynput_hotkey: these need angle-bracket wrapping
 _MODIFIER_TOKENS = frozenset({"ctrl", "shift", "alt", "cmd", "win", "meta"})
 
+# Well-known endpoint security/monitoring agent processes (lowercase name →
+# product).  Used by ``daemon_status --json`` as a diagnostic: these agents
+# hook process launches, file opens, and clipboard operations, which explains
+# machine-to-machine speed differences (see docs/user/edr-environments.md).
+_KNOWN_MONITORING_AGENTS: dict[str, str] = {
+    "msmpeng.exe": "Microsoft Defender AV",
+    "mssense.exe": "Microsoft Defender for Endpoint",
+    "csfalconservice.exe": "CrowdStrike Falcon",
+    "sentinelagent.exe": "SentinelOne",
+    "dgagent.exe": "Digital Guardian",
+    "dgsvc.exe": "Digital Guardian",
+    "edpa.exe": "Symantec DLP",
+    "xagt.exe": "Trellix Endpoint (HX)",
+    "cylancesvc.exe": "Cylance PROTECT",
+    "zsaservice.exe": "Zscaler Client Connector",
+}
+
 
 # ---------------------------------------------------------------------------
 # Helpers (platform-independent logic)
@@ -753,11 +770,36 @@ def stop_daemon() -> int:
     return 0
 
 
+def _detect_monitoring_agents() -> list[str]:
+    """Return known endpoint monitoring agents currently running (best effort).
+
+    Diagnostic for ``daemon_status --json``: helps users map "press is slow
+    on this PC" to the security agent responsible.  Returns an empty list
+    when psutil is unavailable (CLI-only install) or enumeration fails.
+    """
+    try:
+        import psutil
+    except ImportError:  # pragma: no cover — daemon extra not installed
+        return []
+
+    found: set[str] = set()
+    import contextlib
+
+    with contextlib.suppress(Exception):
+        for proc in psutil.process_iter(["name"]):
+            name = str(proc.info.get("name") or "").lower()
+            if name in _KNOWN_MONITORING_AGENTS:
+                found.add(_KNOWN_MONITORING_AGENTS[name])
+    return sorted(found)
+
+
 def daemon_status(*, as_json: bool = False) -> int:
     """Print the daemon's running status and return an exit code.
 
     Args:
-        as_json: When ``True``, print a JSON object to stdout instead of plain text.
+        as_json: When ``True``, print a JSON object to stdout instead of
+            plain text.  The JSON includes ``monitoring_agents`` — known
+            endpoint security agents detected on this machine.
 
     Returns:
         0 if the daemon is running, 1 if not.
@@ -815,6 +857,7 @@ def daemon_status(*, as_json: bool = False) -> int:
         "restart_count": int(str(status.get("restart_count", 0))),
         "log_path": str(_LOG_PATH),
         "pid_file": str(_PID_PATH),
+        "monitoring_agents": _detect_monitoring_agents(),
     }
     print(_json.dumps(result, indent=2, ensure_ascii=False))
     return 0 if running else 1
