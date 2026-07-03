@@ -33,11 +33,15 @@ Add the `press config` subcommand family.
 
 Implement the `test/perf/` suite from SPEC.md §4.1 so performance regressions are caught automatically.
 
-- [ ] `test/perf/bench_startup.py` — wall-clock `press --version` (target ≤ 2.0 s)
-- [ ] `test/perf/bench_transforms.py` — per-transform throughput at 10 KB input (target ≤ 50 ms)
-- [ ] `test/perf/bench_dictionary.py` — TSV load + lookup at 50 k rows (target ≤ 100 ms)
-- [ ] `test/perf/bench_daemon.py` (`@pytest.mark.windows_only`) — RSS ≤ 40 MB, CPU ≤ 0.1 %
-- [ ] CI step: `pytest test/perf/ --benchmark-json=bench.json` on `windows-latest`
+- [x] `test/perf/test_startup.py` — wall-clock `press --version` (target ≤ 2.0 s), plus
+      lazy-import contract and file-open budget (EDR-relevant; see docs/user/edr-environments.md)
+- [x] `test/perf/test_transforms.py` — per-transform throughput at 10 KB input (target ≤ 50 ms),
+      enumerated from the command registry so new commands are covered automatically
+- [x] `test/perf/test_dictionary.py` — TSV load + lookup at 50 k rows (target ≤ 100 ms)
+- [ ] `test/perf/test_daemon.py` (`@pytest.mark.windows_only`) — RSS ≤ 40 MB, CPU ≤ 0.1 %
+      (deferred: needs a real tray/hotkey session; headless CI runners can't host it reliably)
+- [x] CI enforcement: the suite lives under `testpaths`, so the normal `pytest` job runs it on
+      every push for both OSes and both Python versions (no separate benchmark step needed)
 
 ---
 
