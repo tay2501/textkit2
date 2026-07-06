@@ -149,6 +149,10 @@ def _sql_in_daemon_kwargs(cfg: PressConfig) -> dict[str, Any]:
     return {"quote_char": cfg.sql_in.quote_char, "wrap": cfg.sql_in.wrap}
 
 
+def _trim_daemon_kwargs(cfg: PressConfig) -> dict[str, Any]:
+    return {"both": cfg.trim.both}
+
+
 PARAMETRIC_COMMANDS: tuple[ParametricCommand, ...] = (
     ParametricCommand(
         "trim",
@@ -164,6 +168,7 @@ PARAMETRIC_COMMANDS: tuple[ParametricCommand, ...] = (
                 action="store_true",
             ),
         ),
+        daemon_kwargs=_trim_daemon_kwargs,
     ),
     ParametricCommand(
         "dedupe",

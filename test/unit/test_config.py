@@ -12,6 +12,7 @@ from press.config import (
     HotkeysConfig,
     PressConfig,
     SqlInConfig,
+    TrimConfig,
     UiConfig,
     _config_to_toml,
     config_reset,
@@ -31,6 +32,7 @@ class TestDefaultConfigWhenFileNotFound:
         assert isinstance(config, PressConfig)
         assert isinstance(config.hotkeys, HotkeysConfig)
         assert isinstance(config.sql_in, SqlInConfig)
+        assert isinstance(config.trim, TrimConfig)
         assert isinstance(config.dictionary, DictionaryConfig)
         assert isinstance(config.ui, UiConfig)
 
@@ -38,6 +40,7 @@ class TestDefaultConfigWhenFileNotFound:
         assert config.hotkeys.prefix == "ctrl+shift+0"
         assert config.sql_in.quote_char == "'"
         assert config.sql_in.wrap is False
+        assert config.trim.both is False
         assert config.ui.startup_notification is True
         assert config.ui.hold_icon is True
 
@@ -58,6 +61,9 @@ class TestFullConfig:
             quote_char = '"'
             wrap = true
 
+            [trim]
+            both = true
+
             [dictionary]
             files = ["%APPDATA%/press/dict/custom.tsv"]
 
@@ -77,6 +83,7 @@ class TestFullConfig:
         assert "n" in config.hotkeys.bindings  # default key preserved
         assert config.sql_in.quote_char == '"'
         assert config.sql_in.wrap is True
+        assert config.trim.both is True
         assert config.dictionary.files == ("%APPDATA%/press/dict/custom.tsv",)
         assert config.ui.startup_notification is False
         assert config.ui.hold_icon is False
@@ -338,6 +345,7 @@ class TestConfigToToml:
         assert reloaded.hotkeys.prefix == original.hotkeys.prefix
         assert reloaded.hotkeys.bindings == original.hotkeys.bindings
         assert reloaded.sql_in == original.sql_in
+        assert reloaded.trim == original.trim
         assert reloaded.ui == original.ui
         assert reloaded.hold == original.hold
 
@@ -394,6 +402,14 @@ class TestConfigReset:
         reloaded = load_config(cfg_file)
         assert reloaded.sql_in.wrap is False
         assert reloaded.sql_in.quote_char == "'"
+
+    def test_partial_reset_key_trim(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("[trim]\nboth = true\n[sql_in]\nwrap = true\n", encoding="utf-8")
+        config_reset(cfg_file, key="trim")
+        reloaded = load_config(cfg_file)
+        assert reloaded.trim.both is False  # reset
+        assert reloaded.sql_in.wrap is True  # other section untouched
 
     def test_partial_reset_key_ui(self, tmp_path: Path) -> None:
         cfg_file = tmp_path / "config.toml"

@@ -19,6 +19,7 @@ __all__ = [
     "HotkeysConfig",
     "PressConfig",
     "SqlInConfig",
+    "TrimConfig",
     "UiConfig",
     "config_reset",
     "config_validate",
@@ -76,6 +77,13 @@ class SqlInConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class TrimConfig:
+    """Options for the ``trim`` transform when dispatched by the daemon."""
+
+    both: bool = False  # True: strip leading whitespace too (CLI --both)
+
+
+@dataclass(frozen=True, slots=True)
 class DictionaryConfig:
     """Dictionary lookup configuration."""
 
@@ -110,6 +118,7 @@ class PressConfig:
 
     hotkeys: HotkeysConfig = field(default_factory=HotkeysConfig)
     sql_in: SqlInConfig = field(default_factory=SqlInConfig)
+    trim: TrimConfig = field(default_factory=TrimConfig)
     dictionary: DictionaryConfig = field(default_factory=DictionaryConfig)
     ui: UiConfig = field(default_factory=UiConfig)
     hold: HoldConfig = field(default_factory=HoldConfig)
@@ -135,6 +144,11 @@ def _parse_sql_in(data: dict[str, Any]) -> SqlInConfig:
         quote_char=data.get("quote_char", default.quote_char),
         wrap=data.get("wrap", default.wrap),
     )
+
+
+def _parse_trim(data: dict[str, Any]) -> TrimConfig:
+    default = TrimConfig()
+    return TrimConfig(both=data.get("both", default.both))
 
 
 def _parse_dictionary(data: dict[str, Any]) -> DictionaryConfig:
@@ -189,6 +203,7 @@ def load_config(path: Path | None = None) -> PressConfig:
     schema_version = int(raw.get("schema_version", CURRENT_SCHEMA_VERSION))
     hotkeys = _parse_hotkeys(raw.get("hotkeys", {}))
     sql_in = _parse_sql_in(raw.get("sql_in", {}))
+    trim = _parse_trim(raw.get("trim", {}))
     dictionary = _parse_dictionary(raw.get("dictionary", {}))
     ui = _parse_ui(raw.get("ui", {}))
     hold = _parse_hold(raw.get("hold", {}))
@@ -196,6 +211,7 @@ def load_config(path: Path | None = None) -> PressConfig:
     return PressConfig(
         hotkeys=hotkeys,
         sql_in=sql_in,
+        trim=trim,
         dictionary=dictionary,
         ui=ui,
         hold=hold,
@@ -255,6 +271,9 @@ def _config_to_toml(config: PressConfig) -> str:
         f'quote_char = "{config.sql_in.quote_char}"',
         f"wrap = {str(config.sql_in.wrap).lower()}",
         "",
+        "[trim]",
+        f"both = {str(config.trim.both).lower()}",
+        "",
         "[dictionary]",
         "files = [" + ", ".join(f'"{f}"' for f in config.dictionary.files) + "]",
         "",
@@ -276,8 +295,8 @@ def config_reset(path: Path, *, key: str | None = None) -> bool:
 
     Args:
         path: Path to ``config.toml``.
-        key: Section name to reset (``hotkeys``, ``sql_in``, ``dictionary``,
-            ``ui``, ``hold``).  ``None`` resets the entire file.
+        key: Section name to reset (``hotkeys``, ``sql_in``, ``trim``,
+            ``dictionary``, ``ui``, ``hold``).  ``None`` resets the entire file.
 
     Returns:
         ``True`` if a backup was created, ``False`` if no previous file existed.
@@ -299,6 +318,8 @@ def config_reset(path: Path, *, key: str | None = None) -> bool:
                 config = replace(existing, hotkeys=HotkeysConfig())
             case "sql_in":
                 config = replace(existing, sql_in=SqlInConfig())
+            case "trim":
+                config = replace(existing, trim=TrimConfig())
             case "dictionary":
                 config = replace(existing, dictionary=DictionaryConfig())
             case "ui":

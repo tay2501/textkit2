@@ -226,10 +226,20 @@ class TestParametricCommandRegistry:
         kw = cmd.daemon_kwargs(cfg)
         assert kw == {"quote_char": '"', "wrap": True}
 
-    def test_non_sql_commands_have_no_daemon_kwargs(self) -> None:
+    def test_trim_daemon_kwargs_uses_config(self) -> None:
+        from press.commands import PARAMETRIC_COMMAND_INDEX
+        from press.config import PressConfig, TrimConfig
+
+        cmd = PARAMETRIC_COMMAND_INDEX["trim"]
+        assert cmd.daemon_kwargs is not None
+        assert cmd.daemon_kwargs(PressConfig()) == {"both": False}
+        cfg = PressConfig(trim=TrimConfig(both=True))
+        assert cmd.daemon_kwargs(cfg) == {"both": True}
+
+    def test_other_commands_have_no_daemon_kwargs(self) -> None:
         from press.commands import PARAMETRIC_COMMAND_INDEX
 
-        for name in ("trim", "dedupe", "sort", "json-format", "fix-encoding"):
+        for name in ("dedupe", "sort", "json-format", "fix-encoding"):
             cmd = PARAMETRIC_COMMAND_INDEX[name]
             assert cmd.daemon_kwargs is None
 

@@ -413,12 +413,13 @@ Restore the config to built-in defaults (creates a `.toml.bak` backup first):
 press config reset           # reset entire file
 press config reset --key hotkeys     # reset only [hotkeys] section
 press config reset --key sql_in      # reset only [sql_in]
+press config reset --key trim        # reset only [trim]
 press config reset --key dictionary  # reset only [dictionary]
 press config reset --key ui          # reset only [ui]
 press config reset --key hold        # reset only [hold]
 ```
 
-Valid `--key` values: `hotkeys`, `sql_in`, `dictionary`, `ui`, `hold`.
+Valid `--key` values: `hotkeys`, `sql_in`, `trim`, `dictionary`, `ui`, `hold`.
 
 ### Config file format
 
@@ -437,6 +438,9 @@ w = "halfwidth"
 [sql_in]
 quote_char = "'"
 wrap = false
+
+[trim]
+both = false   # true: hotkey trim strips leading whitespace too (CLI --both)
 
 [dictionary]
 files = ["%APPDATA%/press/dict/default.tsv"]
