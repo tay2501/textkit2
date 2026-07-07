@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`underscore` aliases `underbar` / `ub`**: syntactic-sugar aliases for the existing hyphens → underscores transform, matching the Japanese name for the `_` character ("アンダーバー"); available in both CLI and daemon dispatch
 - **`digits-only` / `dg`**: keep only digit characters — removes currency symbols, commas, periods, spaces, and any other non-digit content; retains both half-width `0-9` and full-width `０-９` as-is (`¥1,234` → `1234`, `€1.234` → `1234`, `１２３円` → `１２３`); handles international amount formats where comma and period roles are swapped
 - **`strip-commas` / `sc`**: remove comma characters from text — both ASCII `,` (U+002C) and full-width `，` (U+FF0C); designed for cleaning numbers copied from the web before pasting into Excel (`1,234,567` → `1234567`)
 - **`press config validate`**: parse `config.toml` and report TOML errors or future schema versions without starting the daemon; missing file is not an error

@@ -185,7 +185,7 @@ press dedupe --ignore-case -c -C
 | Command | Alias | Description |
 |---|---|---|
 | `hyphen` | `hy` | Underscores → hyphens (`USER_ID` → `USER-ID`) |
-| `underscore` | `us` | Hyphens → underscores (`USER-ID` → `USER_ID`) |
+| `underscore` | `us`, `underbar`, `ub` | Hyphens → underscores (`USER-ID` → `USER_ID`) |
 | `strip-commas` | `sc` | Remove commas (`1,234,567` → `1234567`; also strips full-width `，`) |
 | `digits-only` | `dg` | Keep only digit characters — removes currency symbols, punctuation, spaces (`¥1,234` → `1234`; `€1.234` → `1234`; `１２３円` → `１２３`) |
 

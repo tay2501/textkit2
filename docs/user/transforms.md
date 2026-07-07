@@ -76,7 +76,7 @@ echo "USER_ID" | press hyphen
 # → USER-ID
 ```
 
-### `underscore` (`us`)
+### `underscore` (`us`, `underbar`, `ub`)
 
 Replace all hyphens with underscores.
 
@@ -84,6 +84,9 @@ Replace all hyphens with underscores.
 echo "USER-ID" | press underscore
 # → USER_ID
 ```
+
+The `underbar` / `ub` aliases mirror the Japanese name for the `_` character
+("アンダーバー"), so the same transform reads naturally either way.
 
 ### `strip-commas` (`sc`)
 

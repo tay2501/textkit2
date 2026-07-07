@@ -194,6 +194,16 @@ class TestSeparators:
         assert result.returncode == 0
         assert result.stdout.strip() == "a_b"
 
+    def test_alias_underbar(self) -> None:
+        result = _run("underbar", input_text="a-b")
+        assert result.returncode == 0
+        assert result.stdout.strip() == "a_b"
+
+    def test_alias_ub(self) -> None:
+        result = _run("ub", input_text="a-b")
+        assert result.returncode == 0
+        assert result.stdout.strip() == "a_b"
+
     def test_hyphen(self) -> None:
         result = _run("hyphen", input_text="foo_bar_baz")
         assert result.returncode == 0
