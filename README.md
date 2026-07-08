@@ -281,6 +281,12 @@ FOOBER01	TABLE_HOGEHOGE
 USER-ID	USER_ID
 ```
 
+- Encoding: **UTF-8, no BOM** / line endings: **CRLF** — `press dict add` / `remove` always write this canonical format
+- Tab-separated, first two columns used (extra columns ignored); blank lines and `#` comments skipped
+- Hand-edited files are read leniently: a UTF-8 BOM (Notepad / Excel) is stripped and LF endings are accepted; other encodings (Shift_JIS, UTF-16) are not supported
+
+See [docs/user/dictionary.md](docs/user/dictionary.md) for details.
+
 ### SQL & JSON
 
 | Command | Alias | Description |

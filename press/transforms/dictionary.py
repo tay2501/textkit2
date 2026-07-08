@@ -6,11 +6,17 @@ from pathlib import Path
 def load_tsv(path: Path | str) -> dict[str, str]:
     """Load a TSV dictionary file into a key/value mapping.
 
+    Canonical file format: UTF-8 without BOM, CRLF line endings (what
+    ``press dict add`` writes).  The reader is deliberately more lenient:
+    a UTF-8 BOM is stripped if present (Notepad / Excel prepend one when
+    saving "UTF-8"), and LF / CR line endings are accepted — otherwise the
+    first key would silently never match.
+
     Lines beginning with ``#`` and blank lines are ignored. Only the first
     two tab-separated columns are used; additional columns are ignored.
 
     Args:
-        path: Path to the TSV file (UTF-8, no BOM).
+        path: Path to the TSV file.
 
     Returns:
         Dictionary mapping keys to values.
@@ -23,7 +29,8 @@ def load_tsv(path: Path | str) -> dict[str, str]:
         raise FileNotFoundError(f"Dictionary file not found: {resolved}")
 
     table: dict[str, str] = {}
-    for line in resolved.read_text(encoding="utf-8").splitlines():
+    # utf-8-sig strips a leading BOM if present and reads BOM-less files as-is
+    for line in resolved.read_text(encoding="utf-8-sig").splitlines():
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue

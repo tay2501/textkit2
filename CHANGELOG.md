@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`schema_version`**: new field in `PressConfig` and generated config files (current: `1`); `config validate` rejects files with a schema version newer than the installed press
 
 ### Changed
+- **Dictionary TSV format specified as UTF-8 / CRLF / no BOM**: `press dict add` / `remove` now write this canonical format on every platform (previously line endings were platform-dependent); the reader leniently strips a UTF-8 BOM (Notepad/Excel save artifact) and accepts LF, so the first key no longer silently fails to match in BOM-prefixed files
 - **PEP 639 license metadata**: `license = "MIT"` SPDX expression + `license-files`, deprecated `License ::` classifier removed; wheels now carry `License-Expression` (Metadata-Version 2.4) with `LICENSE` bundled under `dist-info/licenses/`; hatchling pinned to `>=1.27`
 - **`requires-python` upper bound removed** (`>=3.13,<3.15` → `>=3.13`): caps on Requires-Python break downstream dependency resolution and cannot be overridden by users
 - **CI/CD hardening**: third-party actions (setup-uv, codecov, action-gh-release, osv-scanner) pinned to full commit SHAs per GitHub secure-use guidance; `uv sync --frozen` → `--locked` so CI fails on a stale lockfile; security workflow now audits the same locked, all-extras dependency set as CI; codecov deprecated `file:` input → `files:`

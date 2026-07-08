@@ -60,6 +60,26 @@ class TestLoadTsv:
         result = load_tsv(tsv)
         assert result == {"猫": "cat", "犬": "dog"}
 
+    def test_crlf_line_endings(self, tmp_path: Path) -> None:
+        tsv = tmp_path / "dict.tsv"
+        tsv.write_bytes(b"a\t1\r\nb\t2\r\n")
+        result = load_tsv(tsv)
+        assert result == {"a": "1", "b": "2"}
+
+    def test_bom_is_stripped(self, tmp_path: Path) -> None:
+        # Notepad / Excel prepend a BOM when saving "UTF-8"; the first key
+        # must not silently carry a leading U+FEFF and never match
+        tsv = tmp_path / "dict.tsv"
+        tsv.write_bytes(b"\xef\xbb\xbfa\t1\r\nb\t2\r\n")
+        result = load_tsv(tsv)
+        assert result == {"a": "1", "b": "2"}
+
+    def test_bomless_utf8_japanese_crlf(self, tmp_path: Path) -> None:
+        tsv = tmp_path / "dict.tsv"
+        tsv.write_bytes("テーブル\tTABLE\r\n".encode())
+        result = load_tsv(tsv)
+        assert result == {"テーブル": "TABLE"}
+
     def test_line_without_tab_is_skipped(self, tmp_path: Path) -> None:
         tsv = tmp_path / "dict.tsv"
         tsv.write_text("no_tab_here\nhello\tworld\n", encoding="utf-8")

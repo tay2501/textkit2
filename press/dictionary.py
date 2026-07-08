@@ -51,6 +51,9 @@ def add_entry(key: str, value: str, path: Path) -> None:
     """Append a key/value entry to the TSV file.
 
     Creates the file (and any parent directories) if they do not exist.
+    Writes the canonical dictionary format: UTF-8 without BOM, CRLF line
+    endings — pinned on every platform so a file touched on both Linux
+    and Windows stays consistent.
 
     Args:
         key: Dictionary key to add.
@@ -58,7 +61,8 @@ def add_entry(key: str, value: str, path: Path) -> None:
         path: Path to the TSV file.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as fh:
+    # newline="\r\n" pins CRLF regardless of platform (default is os.linesep)
+    with path.open("a", encoding="utf-8", newline="\r\n") as fh:
         fh.write(f"{key}\t{value}\n")
 
 
@@ -67,6 +71,10 @@ def remove_entry(key: str, path: Path) -> bool:
 
     Non-data lines (comments, blank lines) are preserved. Only the first
     occurrence of a matching key is removed.
+
+    The rewritten file is normalized to the canonical dictionary format:
+    UTF-8 without BOM, CRLF line endings (a BOM or LF endings in the
+    original are dropped in the process).
 
     Args:
         key: Key to remove.
@@ -81,7 +89,8 @@ def remove_entry(key: str, path: Path) -> bool:
     if not path.exists():
         raise FileNotFoundError(f"Dictionary file not found: {path}")
 
-    lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+    # utf-8-sig tolerates a BOM; universal newlines normalize endings to "\n"
+    lines = path.read_text(encoding="utf-8-sig").splitlines(keepends=True)
     new_lines: list[str] = []
     removed = False
 
@@ -98,6 +107,7 @@ def remove_entry(key: str, path: Path) -> bool:
             new_lines.append(line)
 
     if removed:
-        path.write_text("".join(new_lines), encoding="utf-8")
+        # newline="\r\n" re-expands the normalized "\n" endings to CRLF
+        path.write_text("".join(new_lines), encoding="utf-8", newline="\r\n")
 
     return removed
