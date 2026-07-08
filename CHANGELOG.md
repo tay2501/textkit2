@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`press config reset [--key SECTION]`**: overwrite config with built-in defaults; creates a `.toml.bak` backup; `--key` limits reset to one section (`hotkeys`, `sql_in`, `dictionary`, `ui`, `hold`)
 - **`schema_version`**: new field in `PressConfig` and generated config files (current: `1`); `config validate` rejects files with a schema version newer than the installed press
 
+### Changed
+- **PEP 639 license metadata**: `license = "MIT"` SPDX expression + `license-files`, deprecated `License ::` classifier removed; wheels now carry `License-Expression` (Metadata-Version 2.4) with `LICENSE` bundled under `dist-info/licenses/`; hatchling pinned to `>=1.27`
+- **`requires-python` upper bound removed** (`>=3.13,<3.15` → `>=3.13`): caps on Requires-Python break downstream dependency resolution and cannot be overridden by users
+- **CI/CD hardening**: third-party actions (setup-uv, codecov, action-gh-release, osv-scanner) pinned to full commit SHAs per GitHub secure-use guidance; `uv sync --frozen` → `--locked` so CI fails on a stale lockfile; security workflow now audits the same locked, all-extras dependency set as CI; codecov deprecated `file:` input → `files:`
+- **ruff `target-version` removed**: inferred from `requires-python` (single source of truth)
+
+### Removed
+- **PyPI publish job**: the name `press` is occupied on PyPI by an unrelated package, so the job only ever skipped silently; distribution is via GitHub Releases (wheel + sdist + Windows zip + SHA-256 checksums)
+
 ### Refactored
 - **`__main__.py` decomposed** into focused CLI modules: `_cli_helpers.py` (shared I/O), `_cli_dict.py` (dict commands), `_cli_config.py` (config commands), `_cli_daemon.py` (daemon commands) — `__main__.py` retains only parser construction and entry point
 - **`sql-in` deduplication**: input values are deduplicated and sorted before building the `IN` clause

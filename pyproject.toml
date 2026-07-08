@@ -3,20 +3,23 @@ name = "press"
 version = "0.5.0"
 description = "Clipboard text transformation tool for Windows 11"
 readme = "README.md"
-license = { text = "MIT" }
+# PEP 639: SPDX license expression + license-files (requires hatchling >= 1.27)
+license = "MIT"
+license-files = ["LICENSE"]
 keywords = ["clipboard", "text", "transform", "windows", "hotkey"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Win32 (MS Windows)",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: Microsoft :: Windows :: Windows 11",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "Topic :: Text Processing",
     "Topic :: Utilities",
 ]
-requires-python = ">=3.13,<3.15"
+# No upper bound: Requires-Python caps break downstream resolution
+# (https://discuss.python.org/t/requires-python-upper-limits/12663)
+requires-python = ">=3.13"
 dependencies = [
     "jaconv>=0.5.0",
     "argcomplete>=3.6",
@@ -65,7 +68,7 @@ dev = [
 ]
 
 [build-system]
-requires      = ["hatchling"]
+requires      = ["hatchling>=1.27"]  # 1.27+ implements PEP 639 license expressions
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
@@ -73,7 +76,7 @@ packages = ["press"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py313"
+# target-version is inferred from requires-python; keeping only one source of truth
 
 [tool.ruff.lint]
 select = [
