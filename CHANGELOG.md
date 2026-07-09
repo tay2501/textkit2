@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Daemon delegation**: while `press daemon` is running, `press <command>` sends the text to it over a per-user named pipe instead of importing the transform module. On EDR/DLP machines this caps every command at the same file-open cost (`fix-encoding`: 155 → 55 opens, 151 ms → 100 ms). Falls back to the in-process transform when no daemon answers; `PRESS_NO_DAEMON=1` opts out
+- **Code signing pipeline**: `release.yml` submits the Windows executable to SignPath, dormant until the SignPath Foundation application is approved and the `SIGNPATH_*` repository variables are set. Code signing policy published in `docs/dev/code-signing.md`
+- **Python 3.15 pre-release CI lane** (GA 2026-10-01) to catch pystray/pynput breakage early; `requires-python` widened to `>=3.13,<3.16`
+
 - **`digits-only` / `dg`**: keep only digit characters — removes currency symbols, commas, periods, spaces, and any other non-digit content; retains both half-width `0-9` and full-width `０-９` as-is (`¥1,234` → `1234`, `€1.234` → `1234`, `１２３円` → `１２３`); handles international amount formats where comma and period roles are swapped
 - **`strip-commas` / `sc`**: remove comma characters from text — both ASCII `,` (U+002C) and full-width `，` (U+FF0C); designed for cleaning numbers copied from the web before pasting into Excel (`1,234,567` → `1234567`)
 - **`press config validate`**: parse `config.toml` and report TOML errors or future schema versions without starting the daemon; missing file is not an error
@@ -17,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`schema_version`**: new field in `PressConfig` and generated config files (current: `1`); `config validate` rejects files with a schema version newer than the installed press
 
 ### Refactored
+- **`daemon.py` split into a package** (863 lines → `press/daemon/` with `_backends`, `_tray`, `_hotkeys`, `_dispatch`, `_lifecycle`, `_logs`, `_pipe`, `_service`); public API (`run_daemon`, `stop_daemon`, `daemon_status`, `daemon_logs`) unchanged
+- **pystray/pynput confined to `daemon/_backends.py`** behind `TrayIcon` / `KeyListener` Protocols, so replacing the unmaintained pystray touches one module
 - **`__main__.py` decomposed** into focused CLI modules: `_cli_helpers.py` (shared I/O), `_cli_dict.py` (dict commands), `_cli_config.py` (config commands), `_cli_daemon.py` (daemon commands) — `__main__.py` retains only parser construction and entry point
 - **`sql-in` deduplication**: input values are deduplicated and sorted before building the `IN` clause
 - **Bug fixes**: corrected `_LAZY` omissions in `transforms/__init__.py` (missing `strip_commas`, `digits_only`); removed duplicate `except` clause; trimmed redundant docstrings

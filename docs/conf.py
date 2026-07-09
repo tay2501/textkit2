@@ -22,6 +22,10 @@ myst_enable_extensions = [
     "tasklist",  # - [ ] / - [x] checkboxes
 ]
 
+# Generate GitHub-style anchors for h1-h3 so in-page links (e.g.
+# "#daemon-delegation-named-pipe") resolve both on GitHub and in the built docs.
+myst_heading_anchors = 3
+
 # File types
 source_suffix = {
     ".rst": "restructuredtext",
