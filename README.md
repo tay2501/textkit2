@@ -499,6 +499,14 @@ uv run sphinx-autobuild docs docs/_build/html   # live preview at http://127.0.0
 
 A standalone `press.exe` (no Python required) is attached to each [GitHub Release](https://github.com/tay2501/textkit2/releases).
 
+### Code signing policy
+
+Free code signing is provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
+This program will not transfer any information to other networked systems.
+See [docs/dev/code-signing.md](docs/dev/code-signing.md) for the full policy
+(committers, approvers, and privacy details). Release artifacts also ship with
+SHA-256 checksums (`SHA256SUMS.txt`) for integrity verification.
+
 To build locally:
 
 ```bash

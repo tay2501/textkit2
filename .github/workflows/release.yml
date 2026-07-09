@@ -84,6 +84,8 @@ jobs:
     name: Build Windows Executable
     runs-on: windows-latest
     needs: validate-release
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -117,16 +119,52 @@ jobs:
         run: python -c "import shutil; shutil.make_archive('press-windows-x64', 'zip', 'dist-exe', 'press')"
 
       - name: Upload executable artifact
+        id: upload
         uses: actions/upload-artifact@v7
         with:
           name: windows-exe
           path: press-windows-x64.zip
           retention-days: 30
 
+  # Skipped until the SignPath Foundation application is approved and the
+  # repository variables/secrets are configured — see docs/dev/code-signing.md.
+  # Activation requires no workflow change: set the variables and re-run.
+  sign-windows-exe:
+    name: Sign Windows Executable (SignPath)
+    runs-on: ubuntu-latest
+    needs: build-windows-exe
+    if: vars.SIGNPATH_ORGANIZATION_ID != ''
+    steps:
+      - name: Submit signing request to SignPath
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ needs.build-windows-exe.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+
+      - name: Upload signed executable artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-exe-signed
+          path: signed/press-windows-x64.zip
+          retention-days: 30
+
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [validate-release, build-artifacts, build-windows-exe]
+    needs: [validate-release, build-artifacts, build-windows-exe, sign-windows-exe]
+    # sign-windows-exe is skipped while code signing is not yet activated;
+    # run whenever every non-optional dependency succeeded.
+    if: >-
+      !cancelled()
+      && needs.validate-release.result == 'success'
+      && needs.build-artifacts.result == 'success'
+      && needs.build-windows-exe.result == 'success'
+      && needs.sign-windows-exe.result != 'failure'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -167,14 +205,15 @@ jobs:
           name: dist
           path: dist/
 
-      - name: Download Windows executable
+      - name: Download Windows executable (signed when available)
         uses: actions/download-artifact@v8
         with:
-          name: windows-exe
+          name: ${{ needs.sign-windows-exe.result == 'success' && 'windows-exe-signed' || 'windows-exe' }}
           path: .
 
-      # Published so users (and IT departments vetting the unsigned exe for
+      # Published so users (and IT departments vetting the exe for
       # endpoint-security allowlisting) can verify artifact integrity.
+      # Computed after signing, so checksums always match the released files.
       - name: Generate SHA-256 checksums
         run: |
           sha256sum dist/*.whl dist/*.tar.gz press-windows-x64.zip > SHA256SUMS.txt
