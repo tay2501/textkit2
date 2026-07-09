@@ -86,9 +86,20 @@ def _register_transform_command(sub: _SubParsers, cmd: SimpleCommand | Parametri
         _cmd: SimpleCommand | ParametricCommand = cmd,
         _cli_args: tuple[CliArg, ...] = cli_args,
     ) -> int:
-        fn = getattr(importlib.import_module(_cmd.module), _cmd.fn)
+        def _apply(text: str, **kw: Any) -> str:
+            # A running daemon already has the transform module in memory.
+            # Delegating skips importing it here — the file opens that
+            # endpoint security agents make expensive.
+            from press._pipe import try_delegate
+
+            delegated = try_delegate(_cmd.name, text, kw)
+            if delegated is not None:
+                return delegated
+            fn = getattr(importlib.import_module(_cmd.module), _cmd.fn)
+            return str(fn(text, **kw))
+
         extras = {arg.kwarg: getattr(a, arg.kwarg) for arg in _cli_args}
-        return _run_transform(fn, a, **extras)
+        return _run_transform(_apply, a, **extras)
 
     p.set_defaults(func=_handler)
 

@@ -63,11 +63,18 @@ class CommandDispatcher:
         except Exception as exc:
             self._notify_error(command, str(exc))
 
-    def transform(self, command: str, text: str) -> str:
+    def transform(self, command: str, text: str, kwargs: dict[str, Any] | None = None) -> str:
         """Apply the named transform to *text* and return the result.
 
         Public because the named-pipe server (:mod:`press.daemon._pipe`) runs
         transforms for delegating CLI clients without touching the clipboard.
+
+        Args:
+            command: Registry command name or alias.
+            text: Input text.
+            kwargs: Options supplied by a delegating CLI process.  When
+                ``None`` (the hotkey path) a parametric command derives its
+                options from the daemon's config instead.
 
         Raises:
             ValueError: When *command* is not a known transform.
@@ -100,9 +107,10 @@ class CommandDispatcher:
                 "Callable[..., str]",
                 getattr(importlib.import_module(spec_p.module), spec_p.fn),
             )
-            kwargs: dict[str, Any] = (
-                spec_p.daemon_kwargs(self._config) if spec_p.daemon_kwargs is not None else {}
-            )
+            if kwargs is None:
+                kwargs = (
+                    spec_p.daemon_kwargs(self._config) if spec_p.daemon_kwargs is not None else {}
+                )
             return fn_p(text, **kwargs)
 
         # Special commands that require internal helpers

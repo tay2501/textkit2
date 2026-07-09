@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from press.daemon._backends import TrayIcon
+    from press.daemon._pipe import PipeServer
 
 
 def run_daemon(config_path: Path | None = None) -> None:
@@ -77,6 +78,7 @@ def run_daemon(config_path: Path | None = None) -> None:
     dispatcher = CommandDispatcher(config)
     hm = HotkeyManager(config.hotkeys, work_queue)
     worker = _WorkerThread(work_queue, dispatcher, hm)
+    pipe_server = _start_pipe_server(dispatcher)
 
     def _setup(icon: TrayIcon) -> None:
         dispatcher.set_icon(icon)
@@ -100,7 +102,27 @@ def run_daemon(config_path: Path | None = None) -> None:
         )
     finally:
         hm.stop()
+        if pipe_server is not None:
+            pipe_server.stop()
         pid_path.unlink(missing_ok=True)
         _lifecycle._STATUS_PATH.unlink(missing_ok=True)
         _logs._log.info("daemon stopped")
         _lifecycle._release_mutex(mutex_handle)
+
+
+def _start_pipe_server(dispatcher: CommandDispatcher) -> PipeServer | None:
+    """Start the named-pipe transform server, or return ``None`` on failure.
+
+    Hotkeys are the daemon's primary interface and the CLI falls back to
+    in-process transforms, so a pipe failure must never stop the daemon.
+    """
+    from press.daemon._pipe import PipeServer
+
+    try:
+        server = PipeServer(dispatcher)
+        server.start()
+    except OSError as exc:
+        _logs._log.warning("pipe server not started: %s", exc)
+        return None
+    _logs._log.info("pipe server listening")
+    return server
