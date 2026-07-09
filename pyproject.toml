@@ -13,10 +13,13 @@ classifiers = [
     "Operating System :: Microsoft :: Windows :: Windows 11",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Topic :: Text Processing",
     "Topic :: Utilities",
 ]
-requires-python = ">=3.13,<3.15"
+# <3.16: pystray 0.19.5 (unmaintained upstream) is only verified up to 3.15;
+# each new minor is admitted after the CI matrix proves it (see ci.yml).
+requires-python = ">=3.13,<3.16"
 dependencies = [
     "jaconv>=0.5.0",
     "argcomplete>=3.6",
