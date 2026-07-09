@@ -118,7 +118,7 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 # Platform-specific branches are unreachable on non-target platforms by design
-module = "press.daemon"
+module = "press.daemon.*"
 warn_unreachable = false
 
 [[tool.mypy.overrides]]
@@ -136,7 +136,7 @@ markers   = [
 [tool.coverage.run]
 branch = true
 source = ["press"]
-omit   = ["press/__main__.py", "press/_cli_*.py", "press/clipboard.py", "press/daemon.py", "test/*"]
+omit   = ["press/__main__.py", "press/_cli_*.py", "press/clipboard.py", "press/daemon/*", "test/*"]
 
 [tool.coverage.report]
 fail_under = 80

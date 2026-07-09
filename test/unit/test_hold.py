@@ -275,7 +275,7 @@ class TestCreateTrayImageHoldingFlag:
         pytest.importorskip("PIL")
 
     def test_default_background_is_dark(self) -> None:
-        from press.daemon import _create_tray_image
+        from press.daemon._tray import _create_tray_image
 
         img = _create_tray_image(holding=False)
         pixel = img.getpixel((0, 0))
@@ -283,7 +283,7 @@ class TestCreateTrayImageHoldingFlag:
         assert pixel[0] < 100  # type: ignore[index]
 
     def test_holding_background_is_red(self) -> None:
-        from press.daemon import _create_tray_image
+        from press.daemon._tray import _create_tray_image
 
         img = _create_tray_image(holding=True)
         pixel = img.getpixel((0, 0))
@@ -291,7 +291,7 @@ class TestCreateTrayImageHoldingFlag:
         assert pixel[0] > 100  # type: ignore[index]
 
     def test_holding_false_is_default(self) -> None:
-        from press.daemon import _create_tray_image
+        from press.daemon._tray import _create_tray_image
 
         img_default = _create_tray_image()
         img_not_holding = _create_tray_image(holding=False)

@@ -34,17 +34,17 @@ class TestToPynputHotkey:
         ],
     )
     def test_conversion(self, press_spec: str, expected: str) -> None:
-        from press.daemon import _to_pynput_hotkey
+        from press.daemon._hotkeys import _to_pynput_hotkey
 
         assert _to_pynput_hotkey(press_spec) == expected
 
     def test_single_char(self) -> None:
-        from press.daemon import _to_pynput_hotkey
+        from press.daemon._hotkeys import _to_pynput_hotkey
 
         assert _to_pynput_hotkey("a") == "a"
 
     def test_single_modifier(self) -> None:
-        from press.daemon import _to_pynput_hotkey
+        from press.daemon._hotkeys import _to_pynput_hotkey
 
         assert _to_pynput_hotkey("ctrl") == "<ctrl>"
 
@@ -74,7 +74,7 @@ class TestDaemonLogsBasic:
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        monkeypatch.setattr("press.daemon._LOG_PATH", tmp_path / "daemon.log")
+        monkeypatch.setattr("press.daemon._logs._LOG_PATH", tmp_path / "daemon.log")
         from press.daemon import daemon_logs
 
         rc = daemon_logs()
@@ -88,7 +88,7 @@ class TestDaemonLogsBasic:
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         log_file = self._write_log(tmp_path, _SAMPLE_LINES)
-        monkeypatch.setattr("press.daemon._LOG_PATH", log_file)
+        monkeypatch.setattr("press.daemon._logs._LOG_PATH", log_file)
         from press.daemon import daemon_logs
 
         rc = daemon_logs(lines=None, level="all")
@@ -106,7 +106,7 @@ class TestDaemonLogsBasic:
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         log_file = self._write_log(tmp_path, _SAMPLE_LINES)
-        monkeypatch.setattr("press.daemon._LOG_PATH", log_file)
+        monkeypatch.setattr("press.daemon._logs._LOG_PATH", log_file)
         from press.daemon import daemon_logs
 
         rc = daemon_logs(lines=2, level="all")
@@ -123,7 +123,7 @@ class TestDaemonLogsBasic:
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         log_file = self._write_log(tmp_path, _SAMPLE_LINES)
-        monkeypatch.setattr("press.daemon._LOG_PATH", log_file)
+        monkeypatch.setattr("press.daemon._logs._LOG_PATH", log_file)
         from press.daemon import daemon_logs
 
         rc = daemon_logs(lines=None, level="info")
@@ -139,7 +139,7 @@ class TestDaemonLogsBasic:
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         log_file = self._write_log(tmp_path, _SAMPLE_LINES)
-        monkeypatch.setattr("press.daemon._LOG_PATH", log_file)
+        monkeypatch.setattr("press.daemon._logs._LOG_PATH", log_file)
         from press.daemon import daemon_logs
 
         rc = daemon_logs(lines=None, level="error")
@@ -157,7 +157,7 @@ class TestDaemonLogsBasic:
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         log_file = self._write_log(tmp_path, _SAMPLE_LINES[:1])
-        monkeypatch.setattr("press.daemon._LOG_PATH", log_file)
+        monkeypatch.setattr("press.daemon._logs._LOG_PATH", log_file)
         from press.daemon import daemon_logs
 
         rc = daemon_logs(lines=None, level="all", as_json=True)
@@ -176,7 +176,7 @@ class TestDaemonLogsBasic:
     ) -> None:
         lines = ["not a valid log line\n", *_SAMPLE_LINES[:1]]
         log_file = self._write_log(tmp_path, lines)
-        monkeypatch.setattr("press.daemon._LOG_PATH", log_file)
+        monkeypatch.setattr("press.daemon._logs._LOG_PATH", log_file)
         from press.daemon import daemon_logs
 
         rc = daemon_logs(lines=None, level="all")
@@ -303,7 +303,7 @@ class TestMonitoringAgentDetection:
         pytest.importorskip("psutil")
         from unittest.mock import patch
 
-        from press.daemon import _detect_monitoring_agents
+        from press.daemon._lifecycle import _detect_monitoring_agents
 
         procs = [self._proc("DgAgent.exe"), self._proc("MsMpEng.exe"), self._proc("notepad.exe")]
         with patch("psutil.process_iter", return_value=procs):
@@ -314,7 +314,7 @@ class TestMonitoringAgentDetection:
         pytest.importorskip("psutil")
         from unittest.mock import patch
 
-        from press.daemon import _detect_monitoring_agents
+        from press.daemon._lifecycle import _detect_monitoring_agents
 
         with patch("psutil.process_iter", return_value=[self._proc("explorer.exe")]):
             assert _detect_monitoring_agents() == []
@@ -323,7 +323,7 @@ class TestMonitoringAgentDetection:
         pytest.importorskip("psutil")
         from unittest.mock import patch
 
-        from press.daemon import _detect_monitoring_agents
+        from press.daemon._lifecycle import _detect_monitoring_agents
 
         with patch("psutil.process_iter", side_effect=OSError("access denied")):
             assert _detect_monitoring_agents() == []
@@ -336,13 +336,15 @@ class TestMonitoringAgentDetection:
     ) -> None:
         from unittest.mock import patch
 
-        monkeypatch.setattr("press.daemon._PID_PATH", tmp_path / "press.pid")
-        monkeypatch.setattr("press.daemon._STATUS_PATH", tmp_path / "status.json")
+        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", tmp_path / "press.pid")
+        monkeypatch.setattr("press.daemon._lifecycle._STATUS_PATH", tmp_path / "status.json")
         monkeypatch.setattr("sys.platform", "linux")
 
         from press.daemon import daemon_status
 
-        with patch("press.daemon._detect_monitoring_agents", return_value=["Digital Guardian"]):
+        with patch(
+            "press.daemon._lifecycle._detect_monitoring_agents", return_value=["Digital Guardian"]
+        ):
             rc = daemon_status(as_json=True)
         assert rc == 1
         data = json.loads(capsys.readouterr().out)

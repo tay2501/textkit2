@@ -36,7 +36,7 @@ class TestToPynputHotkey:
         ],
     )
     def test_conversion(self, press_spec: str, expected: str) -> None:
-        from press.daemon import _to_pynput_hotkey
+        from press.daemon._hotkeys import _to_pynput_hotkey
 
         assert _to_pynput_hotkey(press_spec) == expected
 
@@ -61,7 +61,7 @@ class TestNormalizeKey:
     def test_lowercase_char(self) -> None:
         from pynput import keyboard as kb
 
-        from press.daemon import _normalize_key
+        from press.daemon._backends import _normalize_key
 
         key = kb.KeyCode.from_char("w")
         assert _normalize_key(key) == "w"
@@ -69,7 +69,7 @@ class TestNormalizeKey:
     def test_uppercase_char_lowercased(self) -> None:
         from pynput import keyboard as kb
 
-        from press.daemon import _normalize_key
+        from press.daemon._backends import _normalize_key
 
         key = kb.KeyCode.from_char("A")
         assert _normalize_key(key) == "a"
@@ -77,18 +77,18 @@ class TestNormalizeKey:
     def test_special_key_returns_name(self) -> None:
         from pynput import keyboard as kb
 
-        from press.daemon import _normalize_key
+        from press.daemon._backends import _normalize_key
 
         assert _normalize_key(kb.Key.shift) == "shift"
         assert _normalize_key(kb.Key.ctrl) == "ctrl"
 
     def test_none_returns_none(self) -> None:
-        from press.daemon import _normalize_key
+        from press.daemon._backends import _normalize_key
 
         assert _normalize_key(None) is None
 
     def test_unknown_object_returns_none(self) -> None:
-        from press.daemon import _normalize_key
+        from press.daemon._backends import _normalize_key
 
         assert _normalize_key(object()) is None
 
@@ -351,7 +351,7 @@ class TestHotkeyManager:
 
 class TestStopDaemon:
     def test_no_pid_file_returns_1(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr("press.daemon._PID_PATH", tmp_path / "press.pid")
+        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", tmp_path / "press.pid")
         from press.daemon import stop_daemon
 
         assert stop_daemon() == 1
@@ -361,7 +361,7 @@ class TestStopDaemon:
     ) -> None:
         pid_file = tmp_path / "press.pid"
         pid_file.write_text("not-a-number", encoding="utf-8")
-        monkeypatch.setattr("press.daemon._PID_PATH", pid_file)
+        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
         from press.daemon import stop_daemon
 
         assert stop_daemon() == 1
@@ -371,7 +371,7 @@ class TestStopDaemon:
     ) -> None:
         pid_file = tmp_path / "press.pid"
         pid_file.write_text("99999", encoding="utf-8")
-        monkeypatch.setattr("press.daemon._PID_PATH", pid_file)
+        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
 
         import psutil
 
@@ -386,7 +386,7 @@ class TestStopDaemon:
     ) -> None:
         pid_file = tmp_path / "press.pid"
         pid_file.write_text("12345", encoding="utf-8")
-        monkeypatch.setattr("press.daemon._PID_PATH", pid_file)
+        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
 
         mock_proc = MagicMock()
         with patch("psutil.Process", return_value=mock_proc):
@@ -409,7 +409,7 @@ class TestDaemonStatus:
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        monkeypatch.setattr("press.daemon._PID_PATH", tmp_path / "press.pid")
+        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", tmp_path / "press.pid")
         monkeypatch.setattr("sys.platform", "linux")
         from press.daemon import daemon_status
 
@@ -425,7 +425,7 @@ class TestDaemonStatus:
     ) -> None:
         pid_file = tmp_path / "press.pid"
         pid_file.write_text("12345", encoding="utf-8")
-        monkeypatch.setattr("press.daemon._PID_PATH", pid_file)
+        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
         monkeypatch.setattr("sys.platform", "linux")
 
         with patch("psutil.pid_exists", return_value=True):
@@ -444,14 +444,14 @@ class TestDaemonStatus:
 @pytest.mark.windows_only
 class TestAcquireMutex:
     def test_first_call_succeeds(self) -> None:
-        from press.daemon import _acquire_mutex, _release_mutex
+        from press.daemon._lifecycle import _acquire_mutex, _release_mutex
 
         handle = _acquire_mutex()
         assert handle is not None
         _release_mutex(handle)
 
     def test_second_call_returns_none(self) -> None:
-        from press.daemon import _acquire_mutex, _release_mutex
+        from press.daemon._lifecycle import _acquire_mutex, _release_mutex
 
         handle1 = _acquire_mutex()
         assert handle1 is not None
@@ -469,7 +469,7 @@ class TestAcquireMutex:
 
 class TestCreateTrayImage:
     def test_creates_valid_image(self) -> None:
-        from press.daemon import _create_tray_image
+        from press.daemon._tray import _create_tray_image
 
         img = _create_tray_image()
         assert img.size == (64, 64)
@@ -491,10 +491,10 @@ class TestDaemonStatusWindows:
     ) -> None:
         pid_file = tmp_path / "press.pid"
         pid_file.write_text("99999", encoding="utf-8")
-        monkeypatch.setattr("press.daemon._PID_PATH", pid_file)
+        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
         monkeypatch.setattr("sys.platform", "win32")
 
-        from press.daemon import _acquire_mutex, daemon_status
+        from press.daemon._lifecycle import _acquire_mutex, daemon_status
 
         # Acquire mutex to simulate daemon running
         handle = _acquire_mutex()
@@ -504,7 +504,7 @@ class TestDaemonStatusWindows:
             assert rc == 0
             assert "running" in capsys.readouterr().out
         finally:
-            from press.daemon import _release_mutex
+            from press.daemon._lifecycle import _release_mutex
 
             _release_mutex(handle)
 
@@ -517,7 +517,7 @@ class TestDaemonStatusWindows:
     ) -> None:
         pid_file = tmp_path / "press.pid"
         pid_file.write_text("99999", encoding="utf-8")
-        monkeypatch.setattr("press.daemon._PID_PATH", pid_file)
+        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
         monkeypatch.setattr("sys.platform", "win32")
 
         from press.daemon import daemon_status
@@ -538,7 +538,7 @@ class TestStopDaemonTimeout:
     ) -> None:
         pid_file = tmp_path / "press.pid"
         pid_file.write_text("12345", encoding="utf-8")
-        monkeypatch.setattr("press.daemon._PID_PATH", pid_file)
+        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
 
         import psutil
 
@@ -561,7 +561,8 @@ class TestStopDaemonTimeout:
 class TestWorkerThreadDispatch:
     def test_worker_handles_all_work_types(self) -> None:
         from press.config import PressConfig
-        from press.daemon import CommandDispatcher, HotkeyManager, _WorkerThread
+        from press.daemon import CommandDispatcher, HotkeyManager
+        from press.daemon._hotkeys import _WorkerThread
 
         config = PressConfig()
         work_queue: queue.Queue[tuple[str, ...]] = queue.Queue()
