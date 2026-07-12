@@ -100,7 +100,7 @@ SIMPLE_COMMANDS: tuple[SimpleCommand, ...] = (
     SimpleCommand("lf",             "press.transforms.lineending", "to_lf",                 (),        r"Convert line endings to LF (\n)"),
     SimpleCommand("cr",             "press.transforms.lineending", "to_cr",                 (),        r"Convert line endings to CR (\r)"),
     # --- separator ---
-    SimpleCommand("underscore",     "press.transforms.separator",  "hyphen_to_underscore",  ("us",),   "Convert hyphens to underscores"),
+    SimpleCommand("underscore",     "press.transforms.separator",  "hyphen_to_underscore",  ("us", "underbar", "ub"), "Convert hyphens to underscores"),
     SimpleCommand("hyphen",         "press.transforms.separator",  "underscore_to_hyphen",  ("hy",),   "Convert underscores to hyphens"),
     SimpleCommand("strip-commas",   "press.transforms.separator",  "strip_commas",          ("sc",),   "Remove commas from text (e.g. 1,234 → 1234)"),
     SimpleCommand("digits-only",    "press.transforms.separator",  "digits_only",           ("dg",),   "Keep only digit characters, removing everything else (e.g. ¥1,234 → 1234)"),

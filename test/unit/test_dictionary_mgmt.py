@@ -87,6 +87,14 @@ class TestAddEntry:
         result = list_entries(tsv)
         assert result == [("a", "1"), ("b", "2"), ("c", "3")]
 
+    def test_writes_canonical_utf8_crlf_no_bom(self, tmp_path: Path) -> None:
+        # Canonical dictionary format: UTF-8 without BOM, CRLF — on every platform
+        tsv = tmp_path / "dict.tsv"
+        add_entry("テーブル", "TABLE", tsv)
+        raw = tsv.read_bytes()
+        assert raw == "テーブル\tTABLE\r\n".encode()
+        assert not raw.startswith(b"\xef\xbb\xbf")
+
 
 class TestRemoveEntry:
     def test_remove_existing_key(self, tmp_path: Path) -> None:
@@ -116,3 +124,17 @@ class TestRemoveEntry:
         content = tsv.read_text(encoding="utf-8")
         assert "# comment\n" in content
         assert "b\t2\n" in content
+
+    def test_remove_normalizes_to_utf8_crlf_no_bom(self, tmp_path: Path) -> None:
+        # A BOM-prefixed, LF-ended file is rewritten in the canonical format
+        tsv = tmp_path / "dict.tsv"
+        tsv.write_bytes(b"\xef\xbb\xbfa\t1\nb\t2\nc\t3\n")
+        assert remove_entry("b", tsv) is True
+        raw = tsv.read_bytes()
+        assert raw == b"a\t1\r\nc\t3\r\n"
+
+    def test_remove_keeps_crlf_endings(self, tmp_path: Path) -> None:
+        tsv = tmp_path / "dict.tsv"
+        tsv.write_bytes(b"a\t1\r\nb\t2\r\n")
+        assert remove_entry("a", tsv) is True
+        assert tsv.read_bytes() == b"b\t2\r\n"

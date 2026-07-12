@@ -36,7 +36,7 @@ jobs:
       uses: actions/checkout@v6
 
     - name: Install uv
-      uses: astral-sh/setup-uv@v8.1.0
+      uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
       with:
         version: "latest"
         enable-cache: true
@@ -49,7 +49,9 @@ jobs:
       run: uv python install ${{ matrix.python-version }}
 
     - name: Install dependencies
-      run: uv sync --all-extras --dev --frozen
+      # --locked fails the build if uv.lock is out of date (unlike --frozen, which
+      # silently uses a stale lockfile): https://docs.astral.sh/uv/guides/integration/github/
+      run: uv sync --locked --all-extras
 
     - name: Lint with ruff (Ubuntu only)
       if: matrix.os == 'ubuntu-latest'
@@ -77,9 +79,9 @@ jobs:
         retention-days: 30
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v6
+      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v6
       with:
-        file: ./coverage.xml
+        files: ./coverage.xml
         flags: unittests
         name: codecov-umbrella
         fail_ci_if_error: false

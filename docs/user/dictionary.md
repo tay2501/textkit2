@@ -14,10 +14,19 @@ FOOBER02	TABLE_FUGAFUGA
 USER-ID	USER_ID
 ```
 
-- Encoding: **UTF-8** (no BOM)
+- Encoding: **UTF-8, no BOM**
+- Line endings: **CRLF** (`\r\n`)
 - Separator: **tab** (`\t`)
 - Column 3 and beyond are ignored
 - Empty lines are ignored
+
+`press dict add` / `press dict remove` always write this canonical format
+(UTF-8 without BOM, CRLF) on every platform.
+
+For hand-edited files the reader is lenient: a UTF-8 BOM (added by Notepad
+or Excel when saving as "UTF-8") is stripped automatically, and LF line
+endings are accepted. Other encodings (Shift_JIS, UTF-16) are **not**
+supported — re-save the file as UTF-8.
 
 ## Default location
 

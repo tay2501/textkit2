@@ -13,12 +13,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Daemon delegation**: while `press daemon` is running, `press <command>` sends the text to it over a per-user named pipe instead of importing the transform module. On EDR/DLP machines this caps every command at the same file-open cost (`fix-encoding`: 155 → 55 opens, 151 ms → 100 ms). Falls back to the in-process transform when no daemon answers; `PRESS_NO_DAEMON=1` opts out
 - **Code signing pipeline**: `release.yml` submits the Windows executable to SignPath, dormant until the SignPath Foundation application is approved and the `SIGNPATH_*` repository variables are set. Code signing policy published in `docs/dev/code-signing.md`
 - **Python 3.15 pre-release CI lane** (GA 2026-10-01) to catch pystray/pynput breakage early; `requires-python` widened to `>=3.13,<3.16`
-
+- **`underscore` aliases `underbar` / `ub`**: syntactic-sugar aliases for the existing hyphens → underscores transform, matching the Japanese name for the `_` character ("アンダーバー"); available in both CLI and daemon dispatch
 - **`digits-only` / `dg`**: keep only digit characters — removes currency symbols, commas, periods, spaces, and any other non-digit content; retains both half-width `0-9` and full-width `０-９` as-is (`¥1,234` → `1234`, `€1.234` → `1234`, `１２３円` → `１２３`); handles international amount formats where comma and period roles are swapped
 - **`strip-commas` / `sc`**: remove comma characters from text — both ASCII `,` (U+002C) and full-width `，` (U+FF0C); designed for cleaning numbers copied from the web before pasting into Excel (`1,234,567` → `1234567`)
 - **`press config validate`**: parse `config.toml` and report TOML errors or future schema versions without starting the daemon; missing file is not an error
 - **`press config reset [--key SECTION]`**: overwrite config with built-in defaults; creates a `.toml.bak` backup; `--key` limits reset to one section (`hotkeys`, `sql_in`, `dictionary`, `ui`, `hold`)
 - **`schema_version`**: new field in `PressConfig` and generated config files (current: `1`); `config validate` rejects files with a schema version newer than the installed press
+
+### Changed
+- **Dictionary TSV format specified as UTF-8 / CRLF / no BOM**: `press dict add` / `remove` now write this canonical format on every platform (previously line endings were platform-dependent); the reader leniently strips a UTF-8 BOM (Notepad/Excel save artifact) and accepts LF, so the first key no longer silently fails to match in BOM-prefixed files
+- **PEP 639 license metadata**: `license = "MIT"` SPDX expression + `license-files`, deprecated `License ::` classifier removed; wheels now carry `License-Expression` (Metadata-Version 2.4) with `LICENSE` bundled under `dist-info/licenses/`; hatchling pinned to `>=1.27`
+- **CI/CD hardening**: third-party actions (setup-uv, codecov, action-gh-release, osv-scanner) pinned to full commit SHAs per GitHub secure-use guidance; `uv sync --frozen` → `--locked` so CI fails on a stale lockfile; security workflow now audits the same locked, all-extras dependency set as CI; codecov deprecated `file:` input → `files:`
+- **ruff `target-version` removed**: inferred from `requires-python` (single source of truth)
+
+### Removed
+- **PyPI publish job**: the name `press` is occupied on PyPI by an unrelated package, so the job only ever skipped silently; distribution is via GitHub Releases (wheel + sdist + Windows zip + SHA-256 checksums)
 
 ### Refactored
 - **`daemon.py` split into a package** (863 lines → `press/daemon/` with `_backends`, `_tray`, `_hotkeys`, `_dispatch`, `_lifecycle`, `_logs`, `_pipe`, `_service`); public API (`run_daemon`, `stop_daemon`, `daemon_status`, `daemon_logs`) unchanged
