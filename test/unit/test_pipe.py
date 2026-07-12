@@ -240,6 +240,14 @@ class TestTryDelegate:
             assert _pipe.try_delegate("halfwidth", "x", {}) is None
         rt.assert_not_called()
 
+    def test_lone_surrogate_falls_back_instead_of_failing(self) -> None:
+        """A lone surrogate survives a local transform but cannot be encoded."""
+        from press import _pipe
+
+        with patch.object(_pipe, "_round_trip_with_timeout") as rt:
+            assert _pipe.try_delegate("halfwidth", "a\ud800b", {}) is None
+        rt.assert_not_called()
+
 
 class TestDelegationGate:
     def test_no_pid_file_skips_the_pipe_entirely(self, monkeypatch: pytest.MonkeyPatch) -> None:

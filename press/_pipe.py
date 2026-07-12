@@ -109,7 +109,13 @@ def try_delegate(command: str, text: str, kwargs: dict[str, object]) -> str | No
     if not _daemon_may_be_running():
         return None
 
-    raw = _round_trip_with_timeout(encode_request(command, text, kwargs))
+    try:
+        request = encode_request(command, text, kwargs)
+    except UnicodeEncodeError:
+        # Lone surrogates survive a local transform but cannot cross the wire.
+        return None
+
+    raw = _round_trip_with_timeout(request)
     if raw is None:
         return None
 
