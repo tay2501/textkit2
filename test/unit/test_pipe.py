@@ -70,6 +70,73 @@ class TestPidPathDuplication:
         assert Path(daemon_pid_path()) == _lifecycle._PID_PATH
 
 
+class _FakeK32:
+    """Stand-in kernel32 whose GetNamedPipeServerProcessId reports *pid*."""
+
+    def __init__(self, pid: int | None) -> None:
+        self._pid = pid
+
+    def GetNamedPipeServerProcessId(self, _handle: int, pid_ref: Any) -> int:
+        if self._pid is None:
+            return 0  # API failure
+        pid_ref._obj.value = self._pid
+        return 1
+
+
+class TestServerVerification:
+    """The client must never hand text to a pipe that is not our daemon."""
+
+    @pytest.fixture
+    def pid_file(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> Any:
+        pid = tmp_path / "press.pid"
+        from press import _pipe
+
+        monkeypatch.setattr(_pipe, "daemon_pid_path", lambda: str(pid))
+        return pid
+
+    def test_matching_pid_is_accepted(self, pid_file: Any) -> None:
+        from press._pipe import _server_is_our_daemon
+
+        pid_file.write_text("4242")
+        assert _server_is_our_daemon(_FakeK32(4242), handle=1) is True
+
+    def test_mismatched_pid_is_rejected(self, pid_file: Any) -> None:
+        """Pipe squatting: another process owns the name — do not send text."""
+        from press._pipe import _server_is_our_daemon
+
+        pid_file.write_text("4242")
+        assert _server_is_our_daemon(_FakeK32(6666), handle=1) is False
+
+    def test_missing_pid_file_is_rejected(self, pid_file: Any) -> None:
+        from press._pipe import _server_is_our_daemon
+
+        assert _server_is_our_daemon(_FakeK32(4242), handle=1) is False
+
+    def test_garbage_pid_file_is_rejected(self, pid_file: Any) -> None:
+        from press._pipe import _server_is_our_daemon
+
+        pid_file.write_text("not-a-pid")
+        assert _server_is_our_daemon(_FakeK32(4242), handle=1) is False
+
+    def test_api_failure_is_rejected(self, pid_file: Any) -> None:
+        from press._pipe import _server_is_our_daemon
+
+        pid_file.write_text("4242")
+        assert _server_is_our_daemon(_FakeK32(None), handle=1) is False
+
+
+@pytest.mark.windows_only
+class TestPipeServerSecurity:
+    def test_owner_only_security_descriptor_builds(self) -> None:
+        """The SDDL owner-only DACL must convert; otherwise the server would
+        silently fall back to the default DACL (Everyone gets read access)."""
+        from press.daemon._pipe import _owner_only_security
+
+        sa = _owner_only_security()
+        assert sa is not None
+        assert sa.lpSecurityDescriptor  # non-NULL descriptor
+
+
 class TestImportBudget:
     """Delegation must not slow down the machines it exists to speed up."""
 

@@ -389,11 +389,30 @@ class TestStopDaemon:
         monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
 
         mock_proc = MagicMock()
+        mock_proc.name.return_value = "python.exe"
         with patch("psutil.Process", return_value=mock_proc):
             from press.daemon import stop_daemon
 
             assert stop_daemon() == 0
         mock_proc.terminate.assert_called_once()
+        assert not pid_file.exists()
+
+    def test_recycled_pid_is_not_terminated(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A stale PID file may point at an unrelated process after PID reuse."""
+        pid_file = tmp_path / "press.pid"
+        pid_file.write_text("12345", encoding="utf-8")
+        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
+
+        mock_proc = MagicMock()
+        mock_proc.name.return_value = "notepad.exe"
+        with patch("psutil.Process", return_value=mock_proc):
+            from press.daemon import stop_daemon
+
+            assert stop_daemon() == 1
+        mock_proc.terminate.assert_not_called()
+        mock_proc.kill.assert_not_called()
         assert not pid_file.exists()
 
 
@@ -543,6 +562,7 @@ class TestStopDaemonTimeout:
         import psutil
 
         mock_proc = MagicMock()
+        mock_proc.name.return_value = "python.exe"
         mock_proc.wait.side_effect = psutil.TimeoutExpired("fake", 1.0)
         with patch("psutil.Process", return_value=mock_proc):
             from press.daemon import stop_daemon

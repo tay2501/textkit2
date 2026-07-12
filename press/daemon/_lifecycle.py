@@ -39,6 +39,24 @@ _KNOWN_MONITORING_AGENTS: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 
+def _mutex_kernel32() -> ctypes.WinDLL:
+    """Return kernel32 with mutex prototypes declared.
+
+    ``restype`` must be ``c_void_p`` — the ctypes default of ``c_int``
+    truncates 64-bit HANDLEs.  ``use_last_error=True`` because reading
+    ``GetLastError()`` through ctypes directly is unreliable (the official
+    ctypes docs prescribe :func:`ctypes.get_last_error`).
+    """
+    import ctypes.wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.wintypes.BOOL, ctypes.c_wchar_p]
+    kernel32.CreateMutexW.restype = ctypes.c_void_p
+    kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+    kernel32.CloseHandle.restype = ctypes.wintypes.BOOL
+    return kernel32
+
+
 def _acquire_mutex() -> int | None:
     """Acquire the named singleton mutex and return its HANDLE.
 
@@ -46,20 +64,20 @@ def _acquire_mutex() -> int | None:
     non-Windows platforms.
     """
     if sys.platform == "win32":
-        kernel32 = ctypes.windll.kernel32
+        kernel32 = _mutex_kernel32()
         handle = kernel32.CreateMutexW(None, True, _MUTEX_NAME)
-        if kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+        if ctypes.get_last_error() == 183:  # ERROR_ALREADY_EXISTS
             if handle:
                 kernel32.CloseHandle(handle)
             return None
-        return int(handle)
+        return int(handle) if handle else None
     return None  # pragma: no cover
 
 
 def _release_mutex(handle: int) -> None:
     """Close the mutex HANDLE."""
     if sys.platform == "win32":
-        ctypes.windll.kernel32.CloseHandle(handle)
+        _mutex_kernel32().CloseHandle(handle)
 
 
 # ---------------------------------------------------------------------------
@@ -111,8 +129,19 @@ def stop_daemon() -> int:
 
     try:
         proc = psutil.Process(pid)
-    except psutil.NoSuchProcess:
+        name = proc.name().lower()
+    except psutil.Error:  # NoSuchProcess, or AccessDenied (another user's PID)
         print("press daemon: not running (stale PID file)", file=sys.stderr)
+        _PID_PATH.unlink(missing_ok=True)
+        return 1
+
+    # PIDs are recycled: a stale file may now point at an unrelated process.
+    # Our daemon is either python*.exe (dev) or press.exe (PyInstaller build).
+    if not name.startswith(("python", "press")):
+        print(
+            f"press daemon: not running (PID {pid} belongs to {name!r}; stale PID file)",
+            file=sys.stderr,
+        )
         _PID_PATH.unlink(missing_ok=True)
         return 1
 

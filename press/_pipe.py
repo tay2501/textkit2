@@ -158,12 +158,24 @@ GENERIC_WRITE = 0x40000000
 OPEN_EXISTING = 3
 PIPE_READMODE_MESSAGE = 0x00000002
 ERROR_MORE_DATA = 234
+# SECURITY_SQOS_PRESENT with SECURITY_ANONYMOUS (impersonation level 0): a
+# rogue process squatting on the pipe name must not be able to impersonate
+# this client's token via ImpersonateNamedPipeClient.
+SECURITY_SQOS_PRESENT = 0x00100000
 
 _kernel32: Any = None
 
 
 def _load_kernel32() -> Any:
-    """Import ctypes and declare the pipe prototypes once."""
+    """Import ctypes and declare the pipe prototypes once.
+
+    Declares both the client-side and server-side pipe functions so
+    :mod:`press.daemon._pipe` can share this loader — the extra ``argtypes``
+    assignments cost no file opens, which is all this module's budget cares
+    about.  ``use_last_error=True`` because calling ``GetLastError()``
+    through ctypes is unreliable (ctypes itself may overwrite it); the
+    official ctypes docs prescribe :func:`ctypes.get_last_error` instead.
+    """
     global _kernel32
     if _kernel32 is not None:
         return _kernel32
@@ -171,7 +183,7 @@ def _load_kernel32() -> Any:
     import ctypes
     import ctypes.wintypes
 
-    k32 = ctypes.windll.kernel32
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
     # Explicit types so HANDLEs survive on 64-bit (see clipboard.py).
     k32.CreateFileW.argtypes = [
         ctypes.c_wchar_p,
@@ -190,6 +202,11 @@ def _load_kernel32() -> Any:
         ctypes.c_void_p,
     ]
     k32.SetNamedPipeHandleState.restype = ctypes.wintypes.BOOL
+    k32.GetNamedPipeServerProcessId.argtypes = [
+        ctypes.c_void_p,
+        ctypes.POINTER(ctypes.c_ulong),
+    ]
+    k32.GetNamedPipeServerProcessId.restype = ctypes.wintypes.BOOL
     k32.WriteFile.argtypes = [
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -208,9 +225,57 @@ def _load_kernel32() -> Any:
     k32.ReadFile.restype = ctypes.wintypes.BOOL
     k32.CloseHandle.argtypes = [ctypes.c_void_p]
     k32.CloseHandle.restype = ctypes.wintypes.BOOL
+    # Server side (press.daemon._pipe) — free to declare here, unused by the CLI.
+    k32.CreateNamedPipeW.argtypes = [
+        ctypes.c_wchar_p,
+        ctypes.c_ulong,
+        ctypes.c_ulong,
+        ctypes.c_ulong,
+        ctypes.c_ulong,
+        ctypes.c_ulong,
+        ctypes.c_ulong,
+        ctypes.c_void_p,
+    ]
+    k32.CreateNamedPipeW.restype = ctypes.c_void_p
+    k32.ConnectNamedPipe.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+    k32.ConnectNamedPipe.restype = ctypes.wintypes.BOOL
+    k32.DisconnectNamedPipe.argtypes = [ctypes.c_void_p]
+    k32.DisconnectNamedPipe.restype = ctypes.wintypes.BOOL
+    k32.FlushFileBuffers.argtypes = [ctypes.c_void_p]
+    k32.FlushFileBuffers.restype = ctypes.wintypes.BOOL
 
     _kernel32 = k32
     return k32
+
+
+def _daemon_pid_from_file() -> int | None:
+    """Return the PID recorded by the running daemon, or ``None``."""
+    try:
+        with open(daemon_pid_path(), encoding="utf-8") as fh:  # noqa: PTH123
+            return int(fh.read().strip())
+    except (OSError, ValueError):
+        return None
+
+
+def _server_is_our_daemon(k32: Any, handle: int) -> bool:
+    """Verify the pipe server is the process our PID file points at.
+
+    Named-pipe names are first-come-first-served, so a malicious local
+    process could claim the name while no daemon instance holds it and
+    harvest the text the CLI sends.  Comparing the server's PID against the
+    daemon's PID file closes that window; on mismatch the caller falls back
+    to the local transform.  The PID file read costs one extra file open on
+    the delegation path only — the no-daemon path still pays a single stat.
+    """
+    import ctypes
+
+    expected = _daemon_pid_from_file()
+    if expected is None:
+        return False
+    server = ctypes.c_ulong(0)
+    if not k32.GetNamedPipeServerProcessId(handle, ctypes.byref(server)):
+        return False
+    return server.value == expected
 
 
 def _round_trip(request: bytes) -> bytes | None:
@@ -224,12 +289,21 @@ def _round_trip(request: bytes) -> bytes | None:
     invalid = ctypes.c_void_p(-1).value
 
     handle = k32.CreateFileW(
-        pipe_name(), GENERIC_READ | GENERIC_WRITE, 0, None, OPEN_EXISTING, 0, None
+        pipe_name(),
+        GENERIC_READ | GENERIC_WRITE,
+        0,
+        None,
+        OPEN_EXISTING,
+        SECURITY_SQOS_PRESENT,  # anonymous impersonation level
+        None,
     )
     if handle in (invalid, None, 0):
         return None  # no daemon listening
 
     try:
+        if not _server_is_our_daemon(k32, handle):
+            return None  # not our daemon — never send it the text
+
         mode = ctypes.c_ulong(PIPE_READMODE_MESSAGE)
         if not k32.SetNamedPipeHandleState(handle, ctypes.byref(mode), None, None):
             return None
@@ -255,5 +329,5 @@ def _read_message(k32: Any, handle: int) -> bytes | None:
         chunks.append(buf.raw[: read.value])
         if ok:
             return b"".join(chunks)
-        if k32.GetLastError() != ERROR_MORE_DATA:
+        if ctypes.get_last_error() != ERROR_MORE_DATA:
             return None

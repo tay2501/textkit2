@@ -181,8 +181,29 @@ command's imports, the more it saves.
   daemon's `daemon_kwargs` config defaults (which serve the hotkey path).
 - **Only registry transforms are reachable.** The server rejects `hold`,
   `clear`, and `dict`, and rejects any option not declared in that command's
-  `cli_args`. The pipe uses the default DACL (this user and administrators) and
-  `PIPE_REJECT_REMOTE_CLIENTS`.
+  `cli_args`.
+
+**Pipe security**, hardened against local pipe-squatting (a rogue process
+claiming the pipe name to harvest clipboard text):
+
+- **Owner-only DACL.** The pipe is created with an explicit SDDL descriptor
+  (`D:P(A;;GA;;;OW)`) that grants access only to the account that started the
+  daemon. Windows' *default* named-pipe descriptor grants read access to
+  `Everyone` and the anonymous account, which would let any local user read a
+  delegated request; the owner-only DACL removes that.
+- **First-instance ownership.** The server's first `CreateNamedPipeW` sets
+  `FILE_FLAG_FIRST_PIPE_INSTANCE`, so it fails with `ERROR_ACCESS_DENIED` (and
+  logs, then disables delegation) if another process already owns the name
+  instead of silently becoming a second server.
+- **Server identity check (client side).** Before sending any text,
+  `try_delegate()` calls `GetNamedPipeServerProcessId` and compares it to the
+  PID in the daemon's PID file; on mismatch it falls back to the in-process
+  transform. This is the client's defence against a squatter that won the name
+  before the daemon started.
+- **No token impersonation.** The client opens the pipe with
+  `SECURITY_SQOS_PRESENT` at anonymous impersonation level, so a malicious
+  server cannot `ImpersonateNamedPipeClient` to borrow the caller's token.
+- **Remote clients rejected** via `PIPE_REJECT_REMOTE_CLIENTS`.
 
 ## Clipboard HOLD
 

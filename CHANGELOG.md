@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`press config reset [--key SECTION]`**: overwrite config with built-in defaults; creates a `.toml.bak` backup; `--key` limits reset to one section (`hotkeys`, `sql_in`, `dictionary`, `ui`, `hold`)
 - **`schema_version`**: new field in `PressConfig` and generated config files (current: `1`); `config validate` rejects files with a schema version newer than the installed press
 
+### Security
+- **Named-pipe delegation hardened against local pipe-squatting**: the daemon's pipe now carries an explicit owner-only DACL (`D:P(A;;GA;;;OW)`) instead of Windows' default descriptor, which grants `Everyone`/anonymous read access; the first pipe instance sets `FILE_FLAG_FIRST_PIPE_INSTANCE` so a name already owned by another process is detected (logged, delegation disabled) rather than silently shared; the CLI verifies the pipe server's PID against the daemon PID file (`GetNamedPipeServerProcessId`) before sending any clipboard text and opens the pipe with `SECURITY_SQOS_PRESENT` at anonymous impersonation level so a rogue server cannot impersonate the caller's token
+- **`press daemon stop` guards against PID recycling**: a stale PID file whose PID now belongs to an unrelated process (name not `python*`/`press*`) is treated as stale and removed instead of terminating that process
+- **Reliable `GetLastError` via ctypes**: Win32 helpers now load kernel32 with `WinDLL(use_last_error=True)` and read `ctypes.get_last_error()` per the official ctypes guidance, and declare `CreateMutexW`/HANDLE return types as `c_void_p` so 64-bit handles are not truncated
+
 ### Changed
 - **Dictionary TSV format specified as UTF-8 / CRLF / no BOM**: `press dict add` / `remove` now write this canonical format on every platform (previously line endings were platform-dependent); the reader leniently strips a UTF-8 BOM (Notepad/Excel save artifact) and accepts LF, so the first key no longer silently fails to match in BOM-prefixed files
 - **PEP 639 license metadata**: `license = "MIT"` SPDX expression + `license-files`, deprecated `License ::` classifier removed; wheels now carry `License-Expression` (Metadata-Version 2.4) with `LICENSE` bundled under `dist-info/licenses/`; hatchling pinned to `>=1.27`

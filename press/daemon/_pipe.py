@@ -73,80 +73,67 @@ if sys.platform == "win32":
     import ctypes
     import ctypes.wintypes
 
-    _kernel32 = ctypes.windll.kernel32
+    from press._pipe import (
+        GENERIC_READ,
+        GENERIC_WRITE,
+        OPEN_EXISTING,
+        PIPE_READMODE_MESSAGE,
+        SECURITY_SQOS_PRESENT,
+        _load_kernel32,
+        _read_message,
+    )
+
+    # Shared loader: one set of prototypes for the client and server ends.
+    _kernel32 = _load_kernel32()
 
     PIPE_ACCESS_DUPLEX = 0x00000003
     PIPE_TYPE_MESSAGE = 0x00000004
-    PIPE_READMODE_MESSAGE = 0x00000002
     PIPE_WAIT = 0x00000000
     PIPE_REJECT_REMOTE_CLIENTS = 0x00000008
     PIPE_UNLIMITED_INSTANCES = 255
+    # Fail pipe creation instead of silently becoming a second server when
+    # another process already owns the name (pipe-squatting detection).
+    FILE_FLAG_FIRST_PIPE_INSTANCE = 0x00080000
     INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
     ERROR_PIPE_CONNECTED = 535
-    ERROR_MORE_DATA = 234
-    GENERIC_READ = 0x80000000
-    GENERIC_WRITE = 0x40000000
-    OPEN_EXISTING = 3
+    ERROR_ACCESS_DENIED = 5
 
-    # Explicit types so HANDLEs survive on 64-bit (see clipboard.py).
-    _kernel32.CreateNamedPipeW.argtypes = [
-        ctypes.c_wchar_p,
-        ctypes.c_ulong,
-        ctypes.c_ulong,
-        ctypes.c_ulong,
-        ctypes.c_ulong,
-        ctypes.c_ulong,
-        ctypes.c_ulong,
-        ctypes.c_void_p,
-    ]
-    _kernel32.CreateNamedPipeW.restype = ctypes.c_void_p
-    _kernel32.ConnectNamedPipe.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
-    _kernel32.ConnectNamedPipe.restype = ctypes.wintypes.BOOL
-    _kernel32.DisconnectNamedPipe.argtypes = [ctypes.c_void_p]
-    _kernel32.DisconnectNamedPipe.restype = ctypes.wintypes.BOOL
-    _kernel32.CreateFileW.argtypes = [
-        ctypes.c_wchar_p,
-        ctypes.c_ulong,
-        ctypes.c_ulong,
-        ctypes.c_void_p,
-        ctypes.c_ulong,
-        ctypes.c_ulong,
-        ctypes.c_void_p,
-    ]
-    _kernel32.CreateFileW.restype = ctypes.c_void_p
-    _kernel32.ReadFile.argtypes = [
-        ctypes.c_void_p,
-        ctypes.c_void_p,
-        ctypes.c_ulong,
-        ctypes.POINTER(ctypes.c_ulong),
-        ctypes.c_void_p,
-    ]
-    _kernel32.ReadFile.restype = ctypes.wintypes.BOOL
-    _kernel32.WriteFile.argtypes = [
-        ctypes.c_void_p,
-        ctypes.c_void_p,
-        ctypes.c_ulong,
-        ctypes.POINTER(ctypes.c_ulong),
-        ctypes.c_void_p,
-    ]
-    _kernel32.WriteFile.restype = ctypes.wintypes.BOOL
-    _kernel32.FlushFileBuffers.argtypes = [ctypes.c_void_p]
-    _kernel32.FlushFileBuffers.restype = ctypes.wintypes.BOOL
-    _kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
-    _kernel32.CloseHandle.restype = ctypes.wintypes.BOOL
+    # Owner-only DACL.  The default named-pipe security descriptor grants
+    # read access to Everyone and the anonymous account; OWNER_RIGHTS (OW)
+    # restricts every access — including connecting and creating further
+    # instances — to the account that started the daemon.
+    _SDDL_OWNER_ONLY = "D:P(A;;GA;;;OW)"
+    _SDDL_REVISION_1 = 1
 
-    def _read_message(handle: int) -> bytes | None:
-        """Read one pipe message, following ERROR_MORE_DATA continuations."""
-        chunks: list[bytes] = []
-        buf = ctypes.create_string_buffer(_BUF_SIZE)
-        read = ctypes.c_ulong(0)
-        while True:
-            ok = _kernel32.ReadFile(handle, buf, _BUF_SIZE, ctypes.byref(read), None)
-            chunks.append(buf.raw[: read.value])
-            if ok:
-                return b"".join(chunks)
-            if _kernel32.GetLastError() != ERROR_MORE_DATA:
-                return None
+    class _SecurityAttributes(ctypes.Structure):
+        _fields_ = (
+            ("nLength", ctypes.c_ulong),
+            ("lpSecurityDescriptor", ctypes.c_void_p),
+            ("bInheritHandle", ctypes.wintypes.BOOL),
+        )
+
+    def _owner_only_security() -> _SecurityAttributes | None:
+        """Build SECURITY_ATTRIBUTES restricting the pipe to the owner.
+
+        Returns ``None`` when the SDDL conversion fails; the caller falls
+        back to the default DACL rather than losing delegation entirely.
+        The descriptor memory stays alive as long as the returned structure
+        is referenced (it is LocalAlloc'd and never freed — daemon lifetime).
+        """
+        advapi32 = ctypes.WinDLL("advapi32", use_last_error=True)
+        convert = advapi32.ConvertStringSecurityDescriptorToSecurityDescriptorW
+        convert.argtypes = [
+            ctypes.c_wchar_p,
+            ctypes.c_ulong,
+            ctypes.POINTER(ctypes.c_void_p),
+            ctypes.c_void_p,
+        ]
+        convert.restype = ctypes.wintypes.BOOL
+
+        descriptor = ctypes.c_void_p(None)
+        if not convert(_SDDL_OWNER_ONLY, _SDDL_REVISION_1, ctypes.byref(descriptor), None):
+            return None
+        return _SecurityAttributes(ctypes.sizeof(_SecurityAttributes), descriptor.value, False)
 
     class PipeServer:
         """Accept transform requests from CLI processes on a named pipe.
@@ -175,16 +162,29 @@ if sys.platform == "win32":
         def _poke(self) -> None:
             """Connect to our own pipe so the blocked accept call returns."""
             handle = _kernel32.CreateFileW(
-                pipe_name(), GENERIC_READ | GENERIC_WRITE, 0, None, OPEN_EXISTING, 0, None
+                pipe_name(),
+                GENERIC_READ | GENERIC_WRITE,
+                0,
+                None,
+                OPEN_EXISTING,
+                SECURITY_SQOS_PRESENT,
+                None,
             )
             if handle not in (INVALID_HANDLE_VALUE, None, 0):
                 _kernel32.CloseHandle(handle)
 
         def _accept_loop(self) -> None:
+            security = _owner_only_security()
+            if security is None:
+                _log.warning("pipe: owner-only DACL unavailable; using the default DACL")
+            first = True
             while not self._stopping.is_set():
+                open_mode = PIPE_ACCESS_DUPLEX
+                if first:
+                    open_mode |= FILE_FLAG_FIRST_PIPE_INSTANCE
                 handle = _kernel32.CreateNamedPipeW(
                     pipe_name(),
-                    PIPE_ACCESS_DUPLEX,
+                    open_mode,
                     PIPE_TYPE_MESSAGE
                     | PIPE_READMODE_MESSAGE
                     | PIPE_WAIT
@@ -193,14 +193,23 @@ if sys.platform == "win32":
                     _BUF_SIZE,
                     _BUF_SIZE,
                     0,
-                    None,  # default DACL: this user and administrators only
+                    ctypes.byref(security) if security is not None else None,
                 )
                 if handle in (INVALID_HANDLE_VALUE, None, 0):
-                    _log.warning("pipe: CreateNamedPipeW failed (%d)", _kernel32.GetLastError())
+                    err = ctypes.get_last_error()
+                    if first and err == ERROR_ACCESS_DENIED:
+                        _log.error(
+                            "pipe: %s is already owned by another process "
+                            "(possible pipe squatting); delegation disabled",
+                            pipe_name(),
+                        )
+                    else:
+                        _log.warning("pipe: CreateNamedPipeW failed (%d)", err)
                     return
+                first = False
 
                 connected = bool(_kernel32.ConnectNamedPipe(handle, None)) or (
-                    _kernel32.GetLastError() == ERROR_PIPE_CONNECTED
+                    ctypes.get_last_error() == ERROR_PIPE_CONNECTED
                 )
                 if self._stopping.is_set():
                     _kernel32.CloseHandle(handle)
@@ -214,7 +223,7 @@ if sys.platform == "win32":
 
         def _serve(self, handle: int) -> None:
             try:
-                raw = _read_message(handle)
+                raw = _read_message(_kernel32, handle)
                 if raw:
                     reply = handle_request(self._dispatcher, raw)
                     written = ctypes.c_ulong(0)
