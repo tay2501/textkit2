@@ -237,7 +237,7 @@ if sys.platform == "win32":
 
 else:  # pragma: no cover — the daemon only runs on Windows
 
-    class PipeServer:  # type: ignore[no-redef]
+    class PipeServer:
         """No-op stand-in; ``run_daemon`` exits before reaching it off Windows."""
 
         def __init__(self, dispatcher: CommandDispatcher) -> None:

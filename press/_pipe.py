@@ -207,6 +207,9 @@ def _load_kernel32() -> Any:
     through ctypes is unreliable (ctypes itself may overwrite it); the
     official ctypes docs prescribe :func:`ctypes.get_last_error` instead.
     """
+    if sys.platform != "win32":  # pragma: no cover — Win32 APIs only
+        raise OSError("the Win32 loader requires Windows")
+
     global _kernel32
     if _kernel32 is not None:
         return _kernel32
@@ -261,6 +264,10 @@ def _load_kernel32() -> Any:
     k32.OpenThread.restype = ctypes.c_void_p
     k32.CancelSynchronousIo.argtypes = [ctypes.c_void_p]
     k32.CancelSynchronousIo.restype = ctypes.wintypes.BOOL
+    # Daemon singleton mutex (press.daemon._lifecycle) — shared loader keeps
+    # kernel32 prototypes in one place (see CLAUDE.md).
+    k32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.wintypes.BOOL, ctypes.c_wchar_p]
+    k32.CreateMutexW.restype = ctypes.c_void_p
     # Server side (press.daemon._pipe) — free to declare here, unused by the CLI.
     k32.CreateNamedPipeW.argtypes = [
         ctypes.c_wchar_p,
@@ -355,6 +362,9 @@ def _round_trip(request: bytes) -> bytes | None:
 
 def _read_message(k32: Any, handle: int) -> bytes | None:
     """Read one pipe message, following ERROR_MORE_DATA continuations."""
+    if sys.platform != "win32":  # pragma: no cover — Win32 APIs only
+        raise OSError("named pipes require Windows")
+
     import ctypes
 
     chunks: list[bytes] = []

@@ -118,8 +118,11 @@ module = ["pystray.*", "pynput.*", "win32.*", "pywintypes", "jaconv.*", "PIL.*",
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-# Platform-specific branches are unreachable on non-target platforms by design
-module = "press.daemon.*"
+# Platform-specific branches are unreachable on non-target platforms by design.
+# press._pipe / press.clipboard / press._dpapi carry the same Win32-gated code
+# for the CLI side; mypy runs on the Ubuntu CI lane, where everything after an
+# `if sys.platform != "win32": return/raise` guard is pruned.
+module = ["press.daemon.*", "press._pipe", "press.clipboard", "press._dpapi"]
 warn_unreachable = false
 
 [[tool.mypy.overrides]]

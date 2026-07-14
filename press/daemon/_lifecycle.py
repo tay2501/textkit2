@@ -7,7 +7,7 @@ import sys
 from typing import TYPE_CHECKING
 
 from press._paths import press_dir
-from press._pipe import user_name
+from press._pipe import _load_kernel32, user_name
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -44,32 +44,19 @@ _KNOWN_MONITORING_AGENTS: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 
-def _mutex_kernel32() -> ctypes.WinDLL:
-    """Return kernel32 with mutex prototypes declared.
-
-    ``restype`` must be ``c_void_p`` — the ctypes default of ``c_int``
-    truncates 64-bit HANDLEs.  ``use_last_error=True`` because reading
-    ``GetLastError()`` through ctypes directly is unreliable (the official
-    ctypes docs prescribe :func:`ctypes.get_last_error`).
-    """
-    import ctypes.wintypes
-
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.wintypes.BOOL, ctypes.c_wchar_p]
-    kernel32.CreateMutexW.restype = ctypes.c_void_p
-    kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
-    kernel32.CloseHandle.restype = ctypes.wintypes.BOOL
-    return kernel32
-
-
 def _acquire_mutex() -> int | None:
     """Acquire the named singleton mutex and return its HANDLE.
+
+    Uses the shared Win32 loader (:func:`press._pipe._load_kernel32`), which
+    declares ``CreateMutexW``/``CloseHandle`` with ``c_void_p`` HANDLEs (the
+    ctypes default of ``c_int`` truncates 64-bit handles) and loads kernel32
+    with ``use_last_error=True`` so :func:`ctypes.get_last_error` is reliable.
 
     Returns ``None`` when another instance already holds the mutex, or on
     non-Windows platforms.
     """
     if sys.platform == "win32":
-        kernel32 = _mutex_kernel32()
+        kernel32 = _load_kernel32()
         handle = kernel32.CreateMutexW(None, True, _MUTEX_NAME)
         if ctypes.get_last_error() == 183:  # ERROR_ALREADY_EXISTS
             if handle:
@@ -82,7 +69,7 @@ def _acquire_mutex() -> int | None:
 def _release_mutex(handle: int) -> None:
     """Close the mutex HANDLE."""
     if sys.platform == "win32":
-        _mutex_kernel32().CloseHandle(handle)
+        _load_kernel32().CloseHandle(handle)
 
 
 # ---------------------------------------------------------------------------
