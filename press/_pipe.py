@@ -39,14 +39,23 @@ _CLIENT_TIMEOUT = 2.0
 _BUF_SIZE = 64 * 1024
 
 
+def user_name() -> str:
+    """Return the account name that scopes per-user daemon resources.
+
+    Shared by :func:`pipe_name` and the daemon singleton mutex
+    (:mod:`press.daemon._lifecycle`) so both resolve to the same scope;
+    ``test_pipe.py`` asserts they agree.
+    """
+    return os.environ.get("USERNAME") or os.environ.get("USER") or "default"
+
+
 def pipe_name() -> str:
     """Return the per-user named-pipe path.
 
     Named pipes share one machine-wide namespace, so the account name keeps
     two users' daemons from colliding on a shared machine.
     """
-    user = os.environ.get("USERNAME") or os.environ.get("USER") or "default"
-    return rf"\\.\pipe\press-daemon-v{PROTOCOL_VERSION}-{user}"
+    return rf"\\.\pipe\press-daemon-v{PROTOCOL_VERSION}-{user_name()}"
 
 
 def daemon_pid_path() -> str:
@@ -135,18 +144,40 @@ def _round_trip_with_timeout(request: bytes) -> bytes | None:
 
     The I/O happens on a throwaway daemon thread, so a wedged daemon costs
     ``_CLIENT_TIMEOUT`` seconds and then the local fallback, never a hang.
+    On timeout the worker's blocked pipe I/O is cancelled so it releases its
+    pipe handle instead of leaking it for the rest of the process lifetime.
     """
     import threading
 
     result: list[bytes | None] = [None]
+    worker_tid: list[int] = []
 
     def _call() -> None:
+        worker_tid.append(threading.get_native_id())
         result[0] = _round_trip(request)
 
     worker = threading.Thread(target=_call, daemon=True)
     worker.start()
     worker.join(_CLIENT_TIMEOUT)
+    if worker.is_alive() and worker_tid:
+        _cancel_pending_io(worker_tid[0])
+        worker.join(0.2)
     return result[0]
+
+
+def _cancel_pending_io(thread_id: int) -> None:
+    """Cancel blocked synchronous pipe I/O on the worker thread (best effort).
+
+    ``CancelSynchronousIo`` makes the worker's ReadFile/WriteFile return
+    ERROR_OPERATION_ABORTED, so its ``finally`` block closes the pipe handle.
+    Only called on the timeout path, where ctypes is already imported.
+    """
+    k32 = _load_kernel32()
+    thread_terminate = 0x0001  # access right CancelSynchronousIo requires
+    handle = k32.OpenThread(thread_terminate, False, thread_id)
+    if handle:
+        k32.CancelSynchronousIo(handle)
+        k32.CloseHandle(handle)
 
 
 # ---------------------------------------------------------------------------
@@ -225,6 +256,11 @@ def _load_kernel32() -> Any:
     k32.ReadFile.restype = ctypes.wintypes.BOOL
     k32.CloseHandle.argtypes = [ctypes.c_void_p]
     k32.CloseHandle.restype = ctypes.wintypes.BOOL
+    # Timeout path: cancel a worker thread's blocked synchronous pipe I/O.
+    k32.OpenThread.argtypes = [ctypes.c_ulong, ctypes.wintypes.BOOL, ctypes.c_ulong]
+    k32.OpenThread.restype = ctypes.c_void_p
+    k32.CancelSynchronousIo.argtypes = [ctypes.c_void_p]
+    k32.CancelSynchronousIo.restype = ctypes.wintypes.BOOL
     # Server side (press.daemon._pipe) — free to declare here, unused by the CLI.
     k32.CreateNamedPipeW.argtypes = [
         ctypes.c_wchar_p,

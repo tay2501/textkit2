@@ -61,8 +61,11 @@ if sys.platform == "win32":
     import ctypes
     import ctypes.wintypes
 
-    _user32 = ctypes.windll.user32
-    _kernel32 = ctypes.windll.kernel32
+    # use_last_error=True: reading GetLastError() through ctypes is unreliable
+    # (ctypes itself may overwrite it); the official ctypes docs prescribe
+    # ctypes.get_last_error() instead — same rule as _pipe.py / _lifecycle.py.
+    _user32 = ctypes.WinDLL("user32", use_last_error=True)
+    _kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 
     # 64ビット環境でポインタ/HANDLEが正しく扱われるよう型を明示する
     _user32.OpenClipboard.argtypes = [ctypes.c_void_p]
@@ -122,8 +125,20 @@ if sys.platform == "win32":
             _kernel32.GlobalFree(h_mem)
             raise RuntimeError("Failed to open clipboard")
         try:
-            _user32.EmptyClipboard()
-            _user32.SetClipboardData(CF_UNICODETEXT, h_mem)
+            # Both calls can genuinely fail (RDP sessions, clipboard managers,
+            # Office holding the clipboard).  Ownership of h_mem only passes to
+            # the system when SetClipboardData succeeds — on any failure we must
+            # free it ourselves and report the failure instead of silently
+            # leaving the old clipboard content in place.
+            if not _user32.EmptyClipboard():
+                raise RuntimeError(f"Failed to empty clipboard (error {ctypes.get_last_error()})")
+            if not _user32.SetClipboardData(CF_UNICODETEXT, h_mem):
+                raise RuntimeError(
+                    f"Failed to set clipboard data (error {ctypes.get_last_error()})"
+                )
+        except RuntimeError:
+            _kernel32.GlobalFree(h_mem)
+            raise
         finally:
             _user32.CloseClipboard()
 
@@ -131,7 +146,8 @@ if sys.platform == "win32":
         if not _user32.OpenClipboard(None):
             raise RuntimeError("Failed to open clipboard")
         try:
-            _user32.EmptyClipboard()
+            if not _user32.EmptyClipboard():
+                raise RuntimeError(f"Failed to empty clipboard (error {ctypes.get_last_error()})")
         finally:
             _user32.CloseClipboard()
 
@@ -144,8 +160,10 @@ if sys.platform == "win32":
     WM_DESTROY = 0x0002
 
     # WNDPROC function type: LRESULT CALLBACK(HWND, UINT, WPARAM, LPARAM)
+    # LRESULT is LONG_PTR — pointer-sized and signed (64-bit on x64); c_long
+    # would truncate the upper 32 bits of pointer-valued results.
     _WNDPROC = ctypes.WINFUNCTYPE(
-        ctypes.c_long,
+        ctypes.c_ssize_t,
         ctypes.c_void_p,
         ctypes.c_uint,
         ctypes.c_size_t,
@@ -208,7 +226,7 @@ if sys.platform == "win32":
         ctypes.c_size_t,
         ctypes.c_size_t,
     ]
-    _user32.DefWindowProcW.restype = ctypes.c_long
+    _user32.DefWindowProcW.restype = ctypes.c_ssize_t  # LRESULT (LONG_PTR)
     _user32.GetMessageW.argtypes = [
         ctypes.c_void_p,
         ctypes.c_void_p,
@@ -219,7 +237,7 @@ if sys.platform == "win32":
     _user32.TranslateMessage.argtypes = [ctypes.c_void_p]
     _user32.TranslateMessage.restype = ctypes.wintypes.BOOL
     _user32.DispatchMessageW.argtypes = [ctypes.c_void_p]
-    _user32.DispatchMessageW.restype = ctypes.c_long
+    _user32.DispatchMessageW.restype = ctypes.c_ssize_t  # LRESULT (LONG_PTR)
     _kernel32.GetModuleHandleW.argtypes = [ctypes.c_wchar_p]
     _kernel32.GetModuleHandleW.restype = ctypes.c_void_p
 
@@ -296,7 +314,9 @@ if sys.platform == "win32":
                 ready.set()
 
                 msg = ctypes.wintypes.MSG()
-                while _user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
+                # GetMessageW returns -1 on error, 0 on WM_QUIT; `> 0` exits on
+                # both instead of busy-looping on a persistent error.
+                while _user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
                     _user32.TranslateMessage(ctypes.byref(msg))
                     _user32.DispatchMessageW(ctypes.byref(msg))
 

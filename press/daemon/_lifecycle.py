@@ -7,11 +7,16 @@ import sys
 from typing import TYPE_CHECKING
 
 from press._paths import press_dir
+from press._pipe import user_name
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-_MUTEX_NAME = "Global\\press_daemon_singleton"
+# Per-user, like the pipe name and the PID file: a machine-wide name would let
+# one user's daemon (or a deliberately squatted mutex) block every other
+# user's daemon on a shared machine.  Derivation shared with pipe_name() via
+# press._pipe.user_name(); test_pipe.py pins the two together.
+_MUTEX_NAME = f"Global\\press_daemon_singleton_{user_name()}"
 
 _PID_PATH: Path = press_dir() / "press.pid"
 _STATUS_PATH: Path = press_dir() / "status.json"

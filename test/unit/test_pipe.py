@@ -70,6 +70,25 @@ class TestPidPathDuplication:
         assert Path(daemon_pid_path()) == _lifecycle._PID_PATH
 
 
+class TestPerUserScoping:
+    """The pipe name and the singleton mutex must scope to the same account.
+
+    A machine-wide mutex would let one user's daemon (or a squatted name)
+    block every other user's daemon on a shared machine.
+    """
+
+    def test_pipe_name_ends_with_user_name(self) -> None:
+        from press._pipe import pipe_name, user_name
+
+        assert pipe_name().endswith(f"-{user_name()}")
+
+    def test_mutex_name_shares_the_derivation(self) -> None:
+        from press._pipe import user_name
+        from press.daemon import _lifecycle
+
+        assert f"Global\\press_daemon_singleton_{user_name()}" == _lifecycle._MUTEX_NAME
+
+
 class _FakeK32:
     """Stand-in kernel32 whose GetNamedPipeServerProcessId reports *pid*."""
 
@@ -153,6 +172,32 @@ class TestImportBudget:
             [_sys.executable, "-c", code], capture_output=True, text=True, check=True
         )
         assert out.stdout.strip() == "[]"
+
+
+class TestClientTimeoutCancellation:
+    """A wedged daemon must not leak the worker thread's pipe handle."""
+
+    def test_timeout_cancels_the_workers_io(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import threading
+
+        from press import _pipe
+
+        release = threading.Event()
+        cancelled: list[int] = []
+
+        def _blocked(_request: bytes) -> bytes | None:
+            release.wait(timeout=5)
+            return None
+
+        def _fake_cancel(tid: int) -> None:
+            cancelled.append(tid)
+            release.set()  # simulate CancelSynchronousIo unblocking the worker
+
+        monkeypatch.setattr(_pipe, "_round_trip", _blocked)
+        monkeypatch.setattr(_pipe, "_cancel_pending_io", _fake_cancel)
+        monkeypatch.setattr(_pipe, "_CLIENT_TIMEOUT", 0.05)
+        assert _pipe._round_trip_with_timeout(b"x") is None
+        assert cancelled  # the wedged worker was cancelled, not abandoned
 
 
 class _FakeDispatcher:
