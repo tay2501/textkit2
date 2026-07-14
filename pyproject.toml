@@ -157,7 +157,11 @@ omit = [
 ]
 
 [tool.coverage.report]
-fail_under = 80
+# Interim gate after widening the denominator (2026-07-15): the binding lane
+# is Ubuntu (74.80% — 79 windows_only tests skip there); Windows measures
+# 81.65%. Ratchet this up in +2% steps as CLI handler tests accumulate; the
+# old 80% figure was measured against a denominator that omitted all I/O code.
+fail_under = 74
 exclude_lines = [
     "pragma: no cover",
     "if __name__ == .__main__.:",
