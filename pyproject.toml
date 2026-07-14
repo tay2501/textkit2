@@ -137,7 +137,21 @@ markers   = [
 [tool.coverage.run]
 branch = true
 source = ["press"]
-omit   = ["press/__main__.py", "press/_cli_*.py", "press/clipboard.py", "press/daemon/*", "test/*"]
+# In the denominator: _cli_*.py, clipboard.py, daemon/_lifecycle.py and
+# daemon/_pipe.py (handle_request) — their platform-independent logic and
+# mocked failure paths are unit-tested. Still omitted: __main__.py (argparse
+# wiring, exercised via subprocess tests) and the daemon modules whose event
+# loops (tray icon, pynput hooks) cannot run headless in CI.
+omit = [
+    "press/__main__.py",
+    "press/daemon/_backends.py",
+    "press/daemon/_dispatch.py",
+    "press/daemon/_hotkeys.py",
+    "press/daemon/_logs.py",
+    "press/daemon/_service.py",
+    "press/daemon/_tray.py",
+    "test/*",
+]
 
 [tool.coverage.report]
 fail_under = 80
@@ -145,4 +159,10 @@ exclude_lines = [
     "pragma: no cover",
     "if __name__ == .__main__.:",
     "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    # Win32-only blocks cannot be measured on the Linux CI lane (and the
+    # non-Windows halves cannot be measured on Windows), so platform gates
+    # are excluded on both lanes for a comparable, honest percentage. Their
+    # internals are still unit-tested with fakes (test_clipboard_win32.py).
+    'if sys\.platform == "win32":',
 ]

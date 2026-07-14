@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -36,7 +37,13 @@ class TestToggleHoldFileHold:
         toggle_hold_file(hold_file, get_text, set_text)
 
         assert hold_file.exists()
-        assert hold_file.read_text(encoding="utf-8") == "hello world"
+        raw = hold_file.read_bytes()
+        if sys.platform == "win32":
+            # DPAPI-encrypted: the clipboard text must not be readable in plaintext
+            assert b"hello world" not in raw
+            assert raw.startswith(b"press-dpapi\x00")
+        else:
+            assert raw.decode("utf-8") == "hello world"
 
     def test_set_text_not_called_on_hold(self, tmp_path: Path) -> None:
         from press.transforms.hold import toggle_hold_file
@@ -128,6 +135,95 @@ class TestToggleHoldFileRoundTrip:
         released = toggle_hold_file(hold_file, get_text, set_text)
         assert released is False
         assert clipboard[0] == original
+
+
+# ---------------------------------------------------------------------------
+# DPAPI encryption of the hold file
+# ---------------------------------------------------------------------------
+
+
+class TestLegacyPlaintextHoldFile:
+    """Pre-encryption hold files (plaintext) must still release correctly."""
+
+    def test_plaintext_file_releases(self, tmp_path: Path) -> None:
+        from press.transforms.hold import toggle_hold_file
+
+        hold_file = tmp_path / "hold.txt"
+        hold_file.write_text("legacy text\nsecond line", encoding="utf-8")
+        set_text = MagicMock()
+
+        released = toggle_hold_file(hold_file, MagicMock(), set_text)
+
+        assert released is False
+        set_text.assert_called_once_with("legacy text\nsecond line")
+        assert not hold_file.exists()
+
+
+@pytest.mark.windows_only
+class TestDpapi:
+    def test_roundtrip(self) -> None:
+        from press._dpapi import protect, unprotect
+
+        secret = "秘密 secret\r\nline2".encode()
+        blob = protect(secret)
+        assert blob != secret
+        assert secret not in blob
+        assert unprotect(blob) == secret
+
+    def test_unprotect_garbage_raises(self) -> None:
+        from press._dpapi import unprotect
+
+        with pytest.raises(RuntimeError, match="CryptUnprotectData"):
+            unprotect(b"not a dpapi blob")
+
+    def test_hold_roundtrip_through_encryption(self, tmp_path: Path) -> None:
+        """Hold then release restores the exact text via the encrypted file."""
+        from press.transforms.hold import toggle_hold_file
+
+        hold_file = tmp_path / "hold.txt"
+        clipboard: list[str] = ["CRLF text\r\nwith 日本語"]
+
+        def set_text(text: str) -> None:
+            clipboard[0] = text
+
+        toggle_hold_file(hold_file, lambda: clipboard[0], set_text)
+        clipboard[0] = "overwritten"
+        toggle_hold_file(hold_file, lambda: clipboard[0], set_text)
+
+        assert clipboard[0] == "CRLF text\r\nwith 日本語"
+
+
+# ---------------------------------------------------------------------------
+# press clear --hold — discard the hold file
+# ---------------------------------------------------------------------------
+
+
+class TestClearHoldOption:
+    def test_clear_hold_discards_hold_file(self, tmp_path: Path) -> None:
+        from press.__main__ import make_parser
+
+        hold_file = tmp_path / "hold.txt"
+        hold_file.write_text("stale", encoding="utf-8")
+        with (
+            patch("press.clipboard.clear_clipboard"),
+            patch("press.transforms.hold.hold_path", return_value=hold_file),
+        ):
+            args = make_parser().parse_args(["clear", "--hold"])
+            assert args.func(args) == 0
+        assert not hold_file.exists()
+
+    def test_clear_without_hold_keeps_the_file(self, tmp_path: Path) -> None:
+        from press.__main__ import make_parser
+
+        hold_file = tmp_path / "hold.txt"
+        hold_file.write_text("keep me", encoding="utf-8")
+        with (
+            patch("press.clipboard.clear_clipboard"),
+            patch("press.transforms.hold.hold_path", return_value=hold_file),
+        ):
+            args = make_parser().parse_args(["clear"])
+            assert args.func(args) == 0
+        assert hold_file.exists()
 
 
 # ---------------------------------------------------------------------------

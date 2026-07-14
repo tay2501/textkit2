@@ -22,14 +22,16 @@ jobs:
       security-events: write
       contents: read
     with:
-      fail-on-vuln: false
+      # Known vulnerabilities in the locked dependency set fail the build.
+      # False positives: add an OSV-Scanner ignore entry with a justification.
+      fail-on-vuln: true
 
   pip-audit:
     name: pip-audit Security Check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
@@ -47,11 +49,14 @@ jobs:
           uv sync --locked --all-extras
 
       - name: Run pip-audit security check
+        # Gating on purpose: a known CVE in the locked dependency set must turn
+        # CI red. Suppress a confirmed false positive with
+        # `--ignore-vuln <ID>` and document why next to the flag.
         run: |
-          uv run pip-audit --format json --output pip-audit-report.json || true
+          uv run pip-audit --format json --output pip-audit-report.json
 
       - name: Upload pip-audit report
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
         with:
           name: pip-audit-report
@@ -62,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Install uv
         uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
@@ -74,11 +79,13 @@ jobs:
         run: uv python install 3.13
 
       - name: Run Bandit security linter
+        # Advisory by design (SAST false-positive rate is high); findings
+        # surface in the GitHub Security tab via the SARIF upload below.
         run: |
           uvx --from "bandit[toml]" bandit -r press/ -f sarif -o bandit-report.sarif || true
 
       - name: Upload Bandit SARIF to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4
         if: always() && hashFiles('bandit-report.sarif') != ''
         with:
           sarif_file: bandit-report.sarif
@@ -92,14 +99,16 @@ jobs:
     if: (github.actor != 'dependabot[bot]')
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Run Semgrep
+        # Advisory by design (SAST false-positive rate is high); findings
+        # surface in the GitHub Security tab via the SARIF upload below.
         run: |
           semgrep --config=auto --sarif --output=semgrep-report.sarif . || true
 
       - name: Upload Semgrep SARIF to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4
         if: always() && hashFiles('semgrep-report.sarif') != ''
         with:
           sarif_file: semgrep-report.sarif

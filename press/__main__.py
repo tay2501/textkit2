@@ -147,7 +147,9 @@ def _register_genpass_command(sub: _SubParsers) -> None:
             try:
                 from press.clipboard import set_clipboard_text
 
-                set_clipboard_text(password)
+                # sensitive=True keeps the password out of the Win+V clipboard
+                # history and Cloud Clipboard sync (KeePassXC-style exclusion).
+                set_clipboard_text(password, sensitive=True)
             except Exception as exc:
                 if not a.quiet:
                     print(f"press genpass: warning: clipboard write failed: {exc}", file=sys.stderr)
@@ -159,6 +161,12 @@ def _register_genpass_command(sub: _SubParsers) -> None:
 def _register_clipboard_util_commands(sub: _SubParsers) -> None:
     p = sub.add_parser("clear", aliases=["cl"], help="Clear the clipboard")
     p.add_argument("-q", "--quiet", action="store_true", help="Suppress all stderr output")
+    p.add_argument(
+        "--hold",
+        dest="discard_hold",
+        action="store_true",
+        help="Also discard the saved 'press hold' file without restoring it",
+    )
 
     def _cl(a: argparse.Namespace) -> int:
         from press.clipboard import clear_clipboard
@@ -169,6 +177,10 @@ def _register_clipboard_util_commands(sub: _SubParsers) -> None:
             if not getattr(a, "quiet", False):
                 print(f"press clear: error: {exc}", file=sys.stderr)
             return 1
+        if a.discard_hold:
+            from press.transforms.hold import hold_path
+
+            hold_path().unlink(missing_ok=True)
         return 0
 
     p.set_defaults(func=_cl)

@@ -255,3 +255,78 @@ class TestClipboardMonitorWindowRestoringFlag:
             monitor._restoring = False
             monitor._on_clipboard_update()
             assert monitor._restoring is False
+
+
+# ---------------------------------------------------------------------------
+# _ClipboardMonitorWindow — restore-storm detection (clipboard war)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.windows_only
+class TestClipboardMonitorStormDetection:
+    """A restore war with another clipboard tool must trigger on_storm."""
+
+    def test_rapid_restores_trigger_on_storm_and_stop_restoring(self) -> None:
+        from press.clipboard import _ClipboardMonitorWindow  # type: ignore[attr-defined]
+
+        on_storm = MagicMock()
+        with patch("press.clipboard._win_set_text") as mock_set:
+            monitor = _ClipboardMonitorWindow(lambda: "protected", on_storm)
+            for _ in range(50):
+                monitor._on_clipboard_update()
+
+        on_storm.assert_called()
+        assert mock_set.call_count < 50  # restores stop once the storm triggers
+
+    def test_slow_restores_never_trigger(self) -> None:
+        from press import clipboard
+        from press.clipboard import _ClipboardMonitorWindow  # type: ignore[attr-defined]
+
+        on_storm = MagicMock()
+        fake_now = iter(float(i) for i in range(1000))  # 1 second between events
+        with (
+            patch("press.clipboard._win_set_text"),
+            patch("time.monotonic", side_effect=lambda: next(fake_now)),
+        ):
+            monitor = _ClipboardMonitorWindow(lambda: "protected", on_storm)
+            for _ in range(clipboard._STORM_LIMIT * 3):  # type: ignore[attr-defined]
+                monitor._on_clipboard_update()
+
+        on_storm.assert_not_called()
+
+
+@pytest.mark.windows_only
+class TestClipboardGuardConflictHandling:
+    """The guard stands down and notifies its owner on a restore storm."""
+
+    def test_conflict_releases_and_notifies(self) -> None:
+        from press.clipboard import ClipboardGuard
+
+        on_conflict = MagicMock()
+        guard = ClipboardGuard(on_conflict=on_conflict)
+        with (
+            patch.object(guard, "_start_layer1"),
+            patch.object(guard, "_start_layer2"),
+            patch.object(guard, "_stop_layer1"),
+            patch.object(guard, "_stop_layer2"),
+        ):
+            guard.engage("secret")
+            guard._handle_conflict()
+
+        assert guard.is_active is False
+        on_conflict.assert_called_once()
+
+    def test_conflict_without_callback_still_releases(self) -> None:
+        from press.clipboard import ClipboardGuard
+
+        guard = ClipboardGuard()
+        with (
+            patch.object(guard, "_start_layer1"),
+            patch.object(guard, "_start_layer2"),
+            patch.object(guard, "_stop_layer1"),
+            patch.object(guard, "_stop_layer2"),
+        ):
+            guard.engage("secret")
+            guard._handle_conflict()
+
+        assert guard.is_active is False

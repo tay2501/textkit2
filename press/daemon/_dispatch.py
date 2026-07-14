@@ -30,7 +30,7 @@ class CommandDispatcher:
         if sys.platform == "win32":
             from press.clipboard import ClipboardGuard as _Guard
 
-            self._guard = _Guard(config.hold)
+            self._guard = _Guard(config.hold, on_conflict=self._on_hold_conflict)
 
     def set_icon(self, icon: TrayIcon) -> None:
         """Bind the tray icon used for notifications."""
@@ -171,6 +171,15 @@ class CommandDispatcher:
             self._guard.release()
             self._update_icon(holding=False)
             self._notify_success("hold-release", "")
+
+    def _on_hold_conflict(self) -> None:
+        """Hold auto-released: another app kept rewriting the clipboard.
+
+        Called from the guard's monitor thread after it stood down, so the
+        tray reflects reality and the user learns why protection ended.
+        """
+        self._update_icon(holding=False)
+        self.notify_error("hold", "auto-released: another application is rewriting the clipboard")
 
     def _update_icon(self, *, holding: bool) -> None:
         """Swap the tray icon to reflect hold state."""

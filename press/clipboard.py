@@ -24,18 +24,23 @@ def get_clipboard_text() -> str:
     raise OSError("Clipboard access is only supported on Windows")
 
 
-def set_clipboard_text(text: str) -> None:
+def set_clipboard_text(text: str, *, sensitive: bool = False) -> None:
     """Write text to the system clipboard.
 
     Args:
         text: Text to place on the clipboard.
+        sensitive: When ``True``, mark the content as excluded from the
+            Win+V clipboard history and Cloud Clipboard sync (the formats
+            password managers use).  If the marking fails the clipboard is
+            wiped and the error raised — a secret must never sit on the
+            clipboard unmarked.
 
     Raises:
         RuntimeError: If clipboard access fails.
         OSError: On non-Windows platforms where clipboard access is unavailable.
     """
     if sys.platform == "win32":
-        _win_set_text(text)
+        _win_set_text(text, sensitive=sensitive)
         return
     raise OSError("Clipboard access is only supported on Windows")
 
@@ -84,9 +89,22 @@ if sys.platform == "win32":
     _kernel32.GlobalLock.argtypes = [ctypes.c_void_p]
     _kernel32.GlobalUnlock.argtypes = [ctypes.c_void_p]
     _kernel32.GlobalFree.argtypes = [ctypes.c_void_p]
+    _user32.RegisterClipboardFormatW.argtypes = [ctypes.c_wchar_p]
+    _user32.RegisterClipboardFormatW.restype = ctypes.c_uint
 
     CF_UNICODETEXT = 13
     GMEM_MOVEABLE = 0x0002
+
+    # Formats honoured by Win+V history and Cloud Clipboard (Microsoft Learn,
+    # "Clipboard Formats").  The presence of the Exclude… format keeps the
+    # content out of both; the DWORD-0 formats are belt-and-suspenders for
+    # monitors that only honour the specific ones.  KeePassXC and Chrome
+    # Incognito set the same formats for secrets.
+    _SENSITIVE_FORMATS = (
+        "ExcludeClipboardContentFromMonitorProcessing",
+        "CanIncludeInClipboardHistory",
+        "CanUploadToCloudClipboard",
+    )
 
     def _win_get_text() -> str:
         if not _user32.OpenClipboard(None):
@@ -105,11 +123,9 @@ if sys.platform == "win32":
         finally:
             _user32.CloseClipboard()
 
-    def _win_set_text(text: str) -> None:
-        encoded = (text + "\x00").encode("utf-16-le")
-        size = len(encoded)
-
-        h_mem = _kernel32.GlobalAlloc(GMEM_MOVEABLE, size)
+    def _alloc_global(data: bytes) -> int:
+        """Copy *data* into a GMEM_MOVEABLE block and return its handle."""
+        h_mem = _kernel32.GlobalAlloc(GMEM_MOVEABLE, len(data))
         if not h_mem:
             raise RuntimeError("Failed to allocate clipboard memory")
         ptr = _kernel32.GlobalLock(h_mem)
@@ -117,28 +133,50 @@ if sys.platform == "win32":
             _kernel32.GlobalFree(h_mem)
             raise RuntimeError("Failed to lock clipboard memory")
         try:
-            ctypes.memmove(ptr, encoded, size)
+            ctypes.memmove(ptr, data, len(data))
         finally:
             _kernel32.GlobalUnlock(h_mem)
+        return int(h_mem)
+
+    def _set_clipboard_format(fmt: int, data: bytes) -> None:
+        """SetClipboardData with ownership-correct cleanup on failure."""
+        h_mem = _alloc_global(data)
+        if not _user32.SetClipboardData(fmt, h_mem):
+            # Ownership only passes to the system on success.
+            _kernel32.GlobalFree(h_mem)
+            raise RuntimeError(f"Failed to set clipboard data (error {ctypes.get_last_error()})")
+
+    def _mark_clipboard_sensitive() -> None:
+        """Exclude the current clipboard content from Win+V history and sync."""
+        for name in _SENSITIVE_FORMATS:
+            fmt = _user32.RegisterClipboardFormatW(name)
+            if not fmt:
+                raise RuntimeError(
+                    f"Failed to register clipboard format {name!r} "
+                    f"(error {ctypes.get_last_error()})"
+                )
+            _set_clipboard_format(fmt, (0).to_bytes(4, "little"))  # DWORD 0 = opt out
+
+    def _win_set_text(text: str, *, sensitive: bool = False) -> None:
+        encoded = (text + "\x00").encode("utf-16-le")
 
         if not _user32.OpenClipboard(None):
-            _kernel32.GlobalFree(h_mem)
             raise RuntimeError("Failed to open clipboard")
         try:
             # Both calls can genuinely fail (RDP sessions, clipboard managers,
-            # Office holding the clipboard).  Ownership of h_mem only passes to
-            # the system when SetClipboardData succeeds — on any failure we must
-            # free it ourselves and report the failure instead of silently
-            # leaving the old clipboard content in place.
+            # Office holding the clipboard).  A failure must raise instead of
+            # silently leaving the old clipboard content in place.
             if not _user32.EmptyClipboard():
                 raise RuntimeError(f"Failed to empty clipboard (error {ctypes.get_last_error()})")
-            if not _user32.SetClipboardData(CF_UNICODETEXT, h_mem):
-                raise RuntimeError(
-                    f"Failed to set clipboard data (error {ctypes.get_last_error()})"
-                )
-        except RuntimeError:
-            _kernel32.GlobalFree(h_mem)
-            raise
+            _set_clipboard_format(CF_UNICODETEXT, encoded)
+            if sensitive:
+                try:
+                    _mark_clipboard_sensitive()
+                except RuntimeError:
+                    # Never leave a secret on the clipboard without the
+                    # exclusion marks — wipe it, then report the failure.
+                    _user32.EmptyClipboard()
+                    raise
         finally:
             _user32.CloseClipboard()
 
@@ -245,6 +283,14 @@ if sys.platform == "win32":
     # _ClipboardMonitorWindow
     # -----------------------------------------------------------------------
 
+    # Layer-1 conflict detection: if another resident tool (clipboard history
+    # manager, sync agent) also rewrites the clipboard, mutual restores
+    # ping-pong indefinitely.  More than _STORM_LIMIT restores within
+    # _STORM_WINDOW seconds triggers on_storm so the guard can auto-release
+    # instead of fighting forever.
+    _STORM_LIMIT = 15
+    _STORM_WINDOW = 3.0
+
     class _ClipboardMonitorWindow:
         """Layer 1: Hidden Win32 window that listens for WM_CLIPBOARDUPDATE.
 
@@ -254,12 +300,21 @@ if sys.platform == "win32":
         Args:
             get_text: Callable that returns the current protected text, or
                 ``None`` if the guard is not active.
+            on_storm: Called (from the monitor thread) when restores exceed
+                the storm threshold — another app is fighting for the
+                clipboard and the guard should stand down.
         """
 
-        def __init__(self, get_text: Callable[[], str | None]) -> None:
+        def __init__(
+            self,
+            get_text: Callable[[], str | None],
+            on_storm: Callable[[], None] | None = None,
+        ) -> None:
             self._get_text = get_text
+            self._on_storm = on_storm
             self._restoring: bool = False
             self._hwnd: int | None = None
+            self._restore_times: list[float] = []
 
         def _on_clipboard_update(self) -> None:
             """Called when WM_CLIPBOARDUPDATE is received.
@@ -272,17 +327,33 @@ if sys.platform == "win32":
             text = self._get_text()
             if text is None:
                 return
+            if self._storm_detected():
+                # Let the other application win — restoring once more would
+                # just prolong the war.
+                if self._on_storm is not None:
+                    self._on_storm()
+                return
             self._restoring = True
             try:
                 _win_set_text(text)
             finally:
                 self._restoring = False
 
+        def _storm_detected(self) -> bool:
+            """Record a restore attempt; True when the rate exceeds the limit."""
+            import time
+
+            now = time.monotonic()
+            self._restore_times = [t for t in self._restore_times if now - t <= _STORM_WINDOW]
+            self._restore_times.append(now)
+            return len(self._restore_times) >= _STORM_LIMIT
+
         def start(self) -> None:  # pragma: no cover
             """Create the hidden window and start the message loop in a thread."""
             import threading
 
             ready = threading.Event()
+            self._restore_times = []  # re-arm resets the storm window
 
             # Keep a strong reference to the WNDPROC so it is not GC'd
             self._wnd_proc_ref = _WNDPROC(self._wnd_proc)
@@ -450,6 +521,8 @@ if sys.platform == "win32":
         Args:
             config: Optional :class:`~press.config.HoldConfig` to control which
                 layers are enabled.  When ``None``, both layers are enabled.
+            on_conflict: Called after the guard auto-releases because another
+                application kept rewriting the clipboard (restore storm).
 
         Usage::
 
@@ -459,8 +532,14 @@ if sys.platform == "win32":
             guard.release()
         """
 
-        def __init__(self, config: object | None = None) -> None:
+        def __init__(
+            self,
+            config: object | None = None,
+            *,
+            on_conflict: Callable[[], None] | None = None,
+        ) -> None:
             self._protected_text: str | None = None
+            self._on_conflict = on_conflict
             # Resolve layer flags from config (if provided) or default to True
             self._layer1_enabled: bool = (
                 bool(getattr(config, "monitor_clipboard", True)) if config is not None else True
@@ -468,8 +547,18 @@ if sys.platform == "win32":
             self._layer2_enabled: bool = (
                 bool(getattr(config, "intercept_paste_keys", True)) if config is not None else True
             )
-            self._monitor = _ClipboardMonitorWindow(self._get_protected)
+            self._monitor = _ClipboardMonitorWindow(self._get_protected, self._handle_conflict)
             self._interceptor = _PasteInterceptor()
+
+        def _handle_conflict(self) -> None:
+            """Layer 1 detected a restore war with another clipboard tool.
+
+            Runs on the monitor thread: stand down (release) so the two tools
+            stop fighting, then let the owner surface a notification.
+            """
+            self.release()
+            if self._on_conflict is not None:
+                self._on_conflict()
 
         def _get_protected(self) -> str | None:
             return self._protected_text
@@ -532,12 +621,12 @@ if sys.platform == "win32":
             """The currently protected text, or ``None`` when inactive."""
             return self._protected_text
 
-else:
+else:  # pragma: no cover — stubs; the win32 block above is the implementation
 
     def _win_get_text() -> str:
         raise OSError("Clipboard access is only supported on Windows")
 
-    def _win_set_text(_text: str) -> None:
+    def _win_set_text(_text: str, *, sensitive: bool = False) -> None:  # noqa: ARG001
         raise OSError("Clipboard access is only supported on Windows")
 
     def _win_clear() -> None:
@@ -549,7 +638,12 @@ else:
         is_active: bool = False
         protected_text: str | None = None
 
-        def __init__(self, _config: object | None = None) -> None:
+        def __init__(
+            self,
+            _config: object | None = None,
+            *,
+            on_conflict: object | None = None,  # noqa: ARG002 — API-compatible stub
+        ) -> None:
             raise OSError("ClipboardGuard is only available on Windows")
 
         def engage(self, _text: str) -> None:

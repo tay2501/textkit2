@@ -176,3 +176,24 @@ class TestGenpassCLI:
         result = _run("--no-clip", "-n", "8")
         assert result.returncode == 0
         assert len(result.stdout) == 8
+
+
+# ---------------------------------------------------------------------------
+# Clipboard-history exclusion (sensitive marking)
+# ---------------------------------------------------------------------------
+
+
+class TestGenpassSensitiveClipboard:
+    """Passwords must never land in Win+V history or Cloud Clipboard sync."""
+
+    def test_clipboard_write_is_marked_sensitive(self, capsys: pytest.CaptureFixture[str]) -> None:
+        from unittest.mock import patch
+
+        from press.__main__ import make_parser
+
+        with patch("press.clipboard.set_clipboard_text") as set_text:
+            args = make_parser().parse_args(["genpass", "-C", "-n", "12"])
+            assert args.func(args) == 0
+
+        assert set_text.call_args.kwargs.get("sensitive") is True
+        capsys.readouterr()  # swallow the generated password
