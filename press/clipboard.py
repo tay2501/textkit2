@@ -58,6 +58,49 @@ def clear_clipboard() -> None:
     raise OSError("Clipboard access is only supported on Windows")
 
 
+def get_clipboard_sequence_number() -> int:
+    """Return the current clipboard sequence number.
+
+    Windows increments the number on every clipboard change, so a caller
+    that wrote a secret can later detect whether the clipboard still holds
+    that value (e.g. before auto-clearing a password).
+
+    Returns:
+        The clipboard sequence number for the current window station.
+
+    Raises:
+        OSError: On non-Windows platforms where clipboard access is unavailable.
+    """
+    if sys.platform == "win32":
+        return _win_sequence_number()
+    raise OSError("Clipboard access is only supported on Windows")
+
+
+def clear_clipboard_if_unchanged(sequence_number: int) -> bool:
+    """Clear the clipboard only if it has not changed since *sequence_number*.
+
+    The KeePass/Bitwarden-style conditional auto-clear: a timer that wipes
+    a copied secret must not destroy something else the user copied in the
+    meantime.  The check and the clear happen while the clipboard is held
+    open, so no other process can slip a write between them.
+
+    Args:
+        sequence_number: Value captured via :func:`get_clipboard_sequence_number`
+            right after writing the secret.
+
+    Returns:
+        ``True`` when the clipboard was cleared, ``False`` when another
+        application changed it in the meantime (it is left untouched).
+
+    Raises:
+        RuntimeError: If clipboard access fails.
+        OSError: On non-Windows platforms where clipboard access is unavailable.
+    """
+    if sys.platform == "win32":
+        return _win_clear_if_unchanged(sequence_number)
+    raise OSError("Clipboard access is only supported on Windows")
+
+
 # ---------------------------------------------------------------------------
 # Windows implementation via ctypes
 # ---------------------------------------------------------------------------
@@ -91,6 +134,8 @@ if sys.platform == "win32":
     _kernel32.GlobalFree.argtypes = [ctypes.c_void_p]
     _user32.RegisterClipboardFormatW.argtypes = [ctypes.c_wchar_p]
     _user32.RegisterClipboardFormatW.restype = ctypes.c_uint
+    _user32.GetClipboardSequenceNumber.argtypes = []
+    _user32.GetClipboardSequenceNumber.restype = ctypes.wintypes.DWORD
 
     CF_UNICODETEXT = 13
     GMEM_MOVEABLE = 0x0002
@@ -100,10 +145,14 @@ if sys.platform == "win32":
     # content out of both; the DWORD-0 formats are belt-and-suspenders for
     # monitors that only honour the specific ones.  KeePassXC and Chrome
     # Incognito set the same formats for secrets.
+    # "Clipboard Viewer Ignore" is the older cooperative convention honoured
+    # by classic clipboard managers (Ditto, ClipboardFusion); its mere
+    # presence is the signal, the payload is irrelevant.
     _SENSITIVE_FORMATS = (
         "ExcludeClipboardContentFromMonitorProcessing",
         "CanIncludeInClipboardHistory",
         "CanUploadToCloudClipboard",
+        "Clipboard Viewer Ignore",
     )
 
     def _win_get_text() -> str:
@@ -186,6 +235,23 @@ if sys.platform == "win32":
         try:
             if not _user32.EmptyClipboard():
                 raise RuntimeError(f"Failed to empty clipboard (error {ctypes.get_last_error()})")
+        finally:
+            _user32.CloseClipboard()
+
+    def _win_sequence_number() -> int:
+        return int(_user32.GetClipboardSequenceNumber())
+
+    def _win_clear_if_unchanged(sequence_number: int) -> bool:
+        if not _user32.OpenClipboard(None):
+            raise RuntimeError("Failed to open clipboard")
+        try:
+            # While we hold the clipboard open no other process can write to
+            # it, so the sequence check and the clear are effectively atomic.
+            if int(_user32.GetClipboardSequenceNumber()) != sequence_number:
+                return False
+            if not _user32.EmptyClipboard():
+                raise RuntimeError(f"Failed to empty clipboard (error {ctypes.get_last_error()})")
+            return True
         finally:
             _user32.CloseClipboard()
 
@@ -630,6 +696,12 @@ else:  # pragma: no cover — stubs; the win32 block above is the implementation
         raise OSError("Clipboard access is only supported on Windows")
 
     def _win_clear() -> None:
+        raise OSError("Clipboard access is only supported on Windows")
+
+    def _win_sequence_number() -> int:
+        raise OSError("Clipboard access is only supported on Windows")
+
+    def _win_clear_if_unchanged(_sequence_number: int) -> bool:
         raise OSError("Clipboard access is only supported on Windows")
 
     class ClipboardGuard:

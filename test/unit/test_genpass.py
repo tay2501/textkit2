@@ -197,3 +197,113 @@ class TestGenpassSensitiveClipboard:
 
         assert set_text.call_args.kwargs.get("sensitive") is True
         capsys.readouterr()  # swallow the generated password
+
+
+# ---------------------------------------------------------------------------
+# Conditional auto-clear (--clear-after)
+# ---------------------------------------------------------------------------
+
+
+class TestGenpassClearAfter:
+    """--clear-after wipes the clipboard only while it still holds the password."""
+
+    def test_waits_then_clears_when_unchanged(self, capsys: pytest.CaptureFixture[str]) -> None:
+        from unittest.mock import patch
+
+        from press.__main__ import make_parser
+
+        with (
+            patch("press.clipboard.set_clipboard_text"),
+            patch("press.clipboard.get_clipboard_sequence_number", return_value=7),
+            patch("press.clipboard.clear_clipboard_if_unchanged", return_value=True) as clear,
+            patch("time.sleep") as sleep,
+        ):
+            args = make_parser().parse_args(["genpass", "-C", "-n", "8", "--clear-after", "5"])
+            assert args.func(args) == 0
+
+        sleep.assert_called_once_with(5)
+        clear.assert_called_once_with(7)
+        assert "clipboard cleared" in capsys.readouterr().err
+
+    def test_reports_when_another_app_changed_the_clipboard(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        from unittest.mock import patch
+
+        from press.__main__ import make_parser
+
+        with (
+            patch("press.clipboard.set_clipboard_text"),
+            patch("press.clipboard.get_clipboard_sequence_number", return_value=7),
+            patch("press.clipboard.clear_clipboard_if_unchanged", return_value=False),
+            patch("time.sleep"),
+        ):
+            args = make_parser().parse_args(["genpass", "-C", "-n", "8", "--clear-after", "5"])
+            assert args.func(args) == 0
+
+        assert "not cleared" in capsys.readouterr().err
+
+    def test_quiet_suppresses_clear_messages(self, capsys: pytest.CaptureFixture[str]) -> None:
+        from unittest.mock import patch
+
+        from press.__main__ import make_parser
+
+        with (
+            patch("press.clipboard.set_clipboard_text"),
+            patch("press.clipboard.get_clipboard_sequence_number", return_value=7),
+            patch("press.clipboard.clear_clipboard_if_unchanged", return_value=True),
+            patch("time.sleep"),
+        ):
+            args = make_parser().parse_args(
+                ["genpass", "-C", "-q", "-n", "8", "--clear-after", "5"]
+            )
+            assert args.func(args) == 0
+
+        assert capsys.readouterr().err == ""
+
+    def test_warns_when_no_clipboard_write_happened(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        from press.__main__ import make_parser
+
+        args = make_parser().parse_args(["genpass", "-N", "-n", "8", "--clear-after", "5"])
+        assert args.func(args) == 0
+        assert "--clear-after ignored" in capsys.readouterr().err
+
+    def test_clear_failure_is_a_warning_not_an_error(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        from unittest.mock import patch
+
+        from press.__main__ import make_parser
+
+        with (
+            patch("press.clipboard.set_clipboard_text"),
+            patch("press.clipboard.get_clipboard_sequence_number", return_value=7),
+            patch(
+                "press.clipboard.clear_clipboard_if_unchanged",
+                side_effect=RuntimeError("boom"),
+            ),
+            patch("time.sleep"),
+        ):
+            args = make_parser().parse_args(["genpass", "-C", "-n", "8", "--clear-after", "5"])
+            assert args.func(args) == 0
+
+        assert "clipboard clear failed" in capsys.readouterr().err
+
+    def test_negative_seconds_exits_nonzero(self) -> None:
+        assert _run("--clear-after", "-1").returncode != 0
+
+    def test_default_is_disabled_no_sleep(self) -> None:
+        from unittest.mock import patch
+
+        from press.__main__ import make_parser
+
+        with (
+            patch("press.clipboard.set_clipboard_text"),
+            patch("time.sleep") as sleep,
+        ):
+            args = make_parser().parse_args(["genpass", "-C", "-n", "8"])
+            assert args.func(args) == 0
+
+        sleep.assert_not_called()

@@ -104,11 +104,46 @@ def _register_transform_command(sub: _SubParsers, cmd: SimpleCommand | Parametri
     p.set_defaults(func=_handler)
 
 
+def _genpass_clear_after(seconds: int, *, quiet: bool) -> None:
+    """Wait *seconds*, then clear the clipboard unless another app overwrote it.
+
+    KeePassXC-cli style conditional auto-clear: the sequence number is
+    captured now (right after the password write) and the clipboard is only
+    wiped if it is still unchanged after the delay.
+    """
+    import time
+
+    from press.clipboard import clear_clipboard_if_unchanged, get_clipboard_sequence_number
+
+    try:
+        sequence = get_clipboard_sequence_number()
+        if not quiet:
+            print(f"press genpass: clearing clipboard in {seconds}s ...", file=sys.stderr)
+        time.sleep(seconds)
+        if not clear_clipboard_if_unchanged(sequence):
+            if not quiet:
+                print(
+                    "press genpass: clipboard changed by another app — not cleared",
+                    file=sys.stderr,
+                )
+        elif not quiet:
+            print("press genpass: clipboard cleared", file=sys.stderr)
+    except (RuntimeError, OSError) as exc:
+        if not quiet:
+            print(f"press genpass: warning: clipboard clear failed: {exc}", file=sys.stderr)
+
+
 def _register_genpass_command(sub: _SubParsers) -> None:
     def _positive_int(value: str) -> int:
         n = int(value)
         if n < 1:
             raise argparse.ArgumentTypeError(f"length must be >= 1, got {n}")
+        return n
+
+    def _nonneg_int(value: str) -> int:
+        n = int(value)
+        if n < 0:
+            raise argparse.ArgumentTypeError(f"seconds must be >= 0, got {n}")
         return n
 
     p = sub.add_parser("genpass", aliases=["gp"], help="Generate a secure random password")
@@ -134,6 +169,16 @@ def _register_genpass_command(sub: _SubParsers) -> None:
         help="Do NOT write to clipboard even on a TTY (prevents accidental overwrite)",
     )
     p.add_argument("-q", "--quiet", action="store_true", help="Suppress all stderr output")
+    p.add_argument(
+        "--clear-after",
+        type=_nonneg_int,
+        default=0,
+        metavar="SEC",
+        help=(
+            "Clear the clipboard after SEC seconds if it still holds the "
+            "password (0 = disabled; KeePassXC defaults to 12)"
+        ),
+    )
 
     def _gp(a: argparse.Namespace) -> int:
         from press.genpass import generate_password
@@ -143,6 +188,7 @@ def _register_genpass_command(sub: _SubParsers) -> None:
         sys.stdout.flush()
         # On a TTY, auto-write to clipboard so the password is immediately pasteable.
         # --no-clip (-N) suppresses this to avoid overwriting an existing clipboard value.
+        wrote_clipboard = False
         if (a.clip_out or sys.stdout.isatty()) and not a.no_clip:
             try:
                 from press.clipboard import set_clipboard_text
@@ -150,9 +196,18 @@ def _register_genpass_command(sub: _SubParsers) -> None:
                 # sensitive=True keeps the password out of the Win+V clipboard
                 # history and Cloud Clipboard sync (KeePassXC-style exclusion).
                 set_clipboard_text(password, sensitive=True)
+                wrote_clipboard = True
             except Exception as exc:
                 if not a.quiet:
                     print(f"press genpass: warning: clipboard write failed: {exc}", file=sys.stderr)
+        if a.clear_after:
+            if wrote_clipboard:
+                _genpass_clear_after(a.clear_after, quiet=a.quiet)
+            elif not a.quiet:
+                print(
+                    "press genpass: warning: --clear-after ignored (no clipboard write)",
+                    file=sys.stderr,
+                )
         return 0
 
     p.set_defaults(func=_gp)

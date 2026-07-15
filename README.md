@@ -234,7 +234,7 @@ press dedupe --ignore-case -c -C
 ### Password Generation
 
 ```
-press genpass [-n N] [-s] [-N] [-C]
+press genpass [-n N] [-s] [-N] [-C] [--clear-after SEC]
 ```
 
 | Flag | Description |
@@ -243,16 +243,20 @@ press genpass [-n N] [-s] [-N] [-C]
 | `-s` / `--symbols` | Include ASCII punctuation (`!"#$%&'()*+,...`) |
 | `-N` / `--no-clip` | **Print to stdout only — do NOT write to clipboard** (prevents accidental overwrite) |
 | `-C` / `--clip-out` | Force clipboard write even in pipe mode |
+| `--clear-after SEC` | Auto-clear the clipboard after SEC seconds **if it still holds the password** (KeePassXC-style; 0 = disabled) |
 
 ```bash
-press genpass              # 20-char alphanumeric → stdout + clipboard (TTY)
-press genpass -n 32        # 32-char alphanumeric
-press genpass -n 16 -s     # 16-char with symbols
-press genpass -N           # show in terminal only, clipboard unchanged
-press gp                   # alias
+press genpass                    # 20-char alphanumeric → stdout + clipboard (TTY)
+press genpass -n 32              # 32-char alphanumeric
+press genpass -n 16 -s           # 16-char with symbols
+press genpass -N                 # show in terminal only, clipboard unchanged
+press genpass --clear-after 12   # wipe the clipboard after 12s (KeePassXC default)
+press gp                         # alias
 ```
 
 > **TTY auto-clipboard**: when running interactively, the password is written to the clipboard automatically so it is ready to paste immediately. Use `-N` if you only want to view the password without replacing the current clipboard contents.
+
+> **Conditional auto-clear**: `--clear-after` records the Windows clipboard sequence number after the write and only clears if it is unchanged after the delay — if you copied something else in the meantime, your clipboard is left untouched.
 
 Uses `secrets.choice()` (backed by `os.urandom()`) — cryptographically secure.
 

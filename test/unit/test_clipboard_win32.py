@@ -53,10 +53,14 @@ class _FakeUser32:
         self._empty_ok = True
         self._set_ok = True
         self._register_ok = True
+        self._sequence = 100
         self._formats: dict[str, int] = {}
         self.set_calls: list[int] = []  # formats passed to SetClipboardData
         self.empty_calls = 0
         self.closed = 0
+
+    def GetClipboardSequenceNumber(self) -> int:
+        return self._sequence
 
     def OpenClipboard(self, _hwnd: object) -> int:
         return 1
@@ -165,6 +169,63 @@ class TestSensitiveClipboardMarking:
             _win_set_text("hunter2", sensitive=True)
         assert u32.empty_calls == 2  # initial empty + the wipe on failure
         assert u32.closed == 1
+
+
+@pytest.mark.windows_only
+class TestSensitiveFormatNames:
+    def test_clipboard_viewer_ignore_is_included(self) -> None:
+        """The classic Ditto/ClipboardFusion opt-out convention must be set too."""
+        from press.clipboard import _SENSITIVE_FORMATS
+
+        assert "Clipboard Viewer Ignore" in _SENSITIVE_FORMATS
+
+    def test_win_v_exclusion_formats_are_included(self) -> None:
+        from press.clipboard import _SENSITIVE_FORMATS
+
+        assert "ExcludeClipboardContentFromMonitorProcessing" in _SENSITIVE_FORMATS
+        assert "CanIncludeInClipboardHistory" in _SENSITIVE_FORMATS
+        assert "CanUploadToCloudClipboard" in _SENSITIVE_FORMATS
+
+
+@pytest.mark.windows_only
+class TestClearIfUnchanged:
+    """Conditional auto-clear must never destroy someone else's clipboard."""
+
+    def test_clears_when_sequence_unchanged(self, fakes: tuple[_FakeUser32, _FakeKernel32]) -> None:
+        from press.clipboard import _win_clear_if_unchanged
+
+        u32, _ = fakes
+        assert _win_clear_if_unchanged(u32._sequence) is True
+        assert u32.empty_calls == 1
+        assert u32.closed == 1
+
+    def test_leaves_clipboard_alone_when_sequence_changed(
+        self, fakes: tuple[_FakeUser32, _FakeKernel32]
+    ) -> None:
+        from press.clipboard import _win_clear_if_unchanged
+
+        u32, _ = fakes
+        assert _win_clear_if_unchanged(u32._sequence - 1) is False
+        assert u32.empty_calls == 0  # another app's content stays untouched
+        assert u32.closed == 1
+
+    def test_empty_clipboard_failure_raises(self, fakes: tuple[_FakeUser32, _FakeKernel32]) -> None:
+        from press.clipboard import _win_clear_if_unchanged
+
+        u32, _ = fakes
+        u32._empty_ok = False
+        with pytest.raises(RuntimeError, match="empty clipboard"):
+            _win_clear_if_unchanged(u32._sequence)
+        assert u32.closed == 1
+
+    def test_sequence_number_helper_returns_current_value(
+        self, fakes: tuple[_FakeUser32, _FakeKernel32]
+    ) -> None:
+        from press.clipboard import _win_sequence_number
+
+        u32, _ = fakes
+        u32._sequence = 4242
+        assert _win_sequence_number() == 4242
 
 
 @pytest.mark.windows_only
