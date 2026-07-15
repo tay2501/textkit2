@@ -282,3 +282,32 @@ PARAMETRIC_ALIASES: dict[str, str] = {
 # registries above.  Keep in sync with CommandDispatcher.dispatch() ("clear",
 # "hold") and CommandDispatcher._transform() ("dict", "dict_reverse").
 DAEMON_SPECIAL_COMMANDS: frozenset[str] = frozenset({"clear", "hold", "dict", "dict_reverse"})
+
+
+def resolve_transform(command: str) -> Callable[[str], str] | None:
+    """Resolve *command* (name or alias) to a ``text -> text`` callable.
+
+    Simple commands map straight onto their transform function.  Parametric
+    commands are wrapped so they run with their function defaults — per-step
+    options are a CLI concern (``press <cmd> --flag``), not a chain-step one.
+
+    Returns ``None`` for unknown names so callers can layer their own
+    resolution (e.g. ``[pipelines]`` names) on top.
+    """
+    import importlib
+
+    spec = SIMPLE_COMMAND_INDEX.get(command)
+    if spec is not None:
+        fn: Callable[[str], str] = getattr(importlib.import_module(spec.module), spec.fn)
+        return fn
+
+    spec_p = PARAMETRIC_COMMAND_INDEX.get(PARAMETRIC_ALIASES.get(command, command))
+    if spec_p is not None:
+        fn_p: Callable[..., str] = getattr(importlib.import_module(spec_p.module), spec_p.fn)
+
+        def _with_defaults(text: str, _fn: Callable[..., str] = fn_p) -> str:
+            return _fn(text)
+
+        return _with_defaults
+
+    return None

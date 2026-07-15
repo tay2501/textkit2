@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`press chain` / `ch`**: apply multiple transforms in one invocation (`press chain trim dedupe lf`) — one input read, one output write, one process launch instead of one per step. Aliases resolve; any unknown or failing step aborts before anything is written
+- **`[pipelines]` config section**: named step lists (`cleanup = ["trim", "dedupe", "lf"]`) runnable via `press chain cleanup`, discoverable via `press chain --list`, and bindable to daemon hotkeys like any built-in command. `press config validate` reports unknown steps, command-name collisions, empty pipelines, and nesting; `press config reset --key pipelines` clears the section. Closes the workflow gap against CopyQ scripting / PowerToys Advanced Paste custom actions with plain TOML instead of a scripting language
 - **Daemon delegation**: while `press daemon` is running, `press <command>` sends the text to it over a per-user named pipe instead of importing the transform module. On EDR/DLP machines this caps every command at the same file-open cost (`fix-encoding`: 155 → 55 opens, 151 ms → 100 ms). Falls back to the in-process transform when no daemon answers; `PRESS_NO_DAEMON=1` opts out
 - **Code signing pipeline**: `release.yml` submits the Windows executable to SignPath, dormant until the SignPath Foundation application is approved and the `SIGNPATH_*` repository variables are set. Code signing policy published in `docs/dev/code-signing.md`
 - **Python 3.15 pre-release CI lane** (GA 2026-10-01) to catch pystray/pynput breakage early; `requires-python` widened to `>=3.13,<3.16`

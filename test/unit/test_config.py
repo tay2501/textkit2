@@ -357,6 +357,73 @@ class TestConfigToToml:
         toml_str = _config_to_toml(PressConfig())
         assert '"shift+u"' in toml_str
 
+    def test_pipelines_roundtrip(self, tmp_path: Path) -> None:
+        original = PressConfig(pipelines={"cleanup": ("trim", "dedupe", "lf")})
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(_config_to_toml(original), encoding="utf-8")
+        reloaded = load_config(cfg_file)
+        assert reloaded.pipelines == {"cleanup": ("trim", "dedupe", "lf")}
+
+    def test_empty_pipelines_emits_commented_example(self) -> None:
+        toml_str = _config_to_toml(PressConfig())
+        assert "[pipelines]" in toml_str
+        assert '# cleanup = ["trim", "dedupe", "lf"]' in toml_str
+
+
+# ---------------------------------------------------------------------------
+# [pipelines] parsing and validation
+# ---------------------------------------------------------------------------
+
+
+class TestPipelinesConfig:
+    def test_parse_pipelines_table(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(
+            '[pipelines]\ncleanup = ["trim", "dedupe", "lf"]\n',
+            encoding="utf-8",
+        )
+        cfg = load_config(cfg_file)
+        assert cfg.pipelines == {"cleanup": ("trim", "dedupe", "lf")}
+
+    def test_default_is_empty(self, tmp_path: Path) -> None:
+        assert load_config(tmp_path / "missing.toml").pipelines == {}
+
+    def test_non_array_value_raises(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text('[pipelines]\ncleanup = "trim"\n', encoding="utf-8")
+        with pytest.raises(ValueError, match="array of strings"):
+            load_config(cfg_file)
+
+    def test_non_string_step_raises(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("[pipelines]\ncleanup = [1, 2]\n", encoding="utf-8")
+        with pytest.raises(ValueError, match="array of strings"):
+            load_config(cfg_file)
+
+    def test_validate_reports_unknown_step(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text('[pipelines]\nbad = ["nope"]\n', encoding="utf-8")
+        ok, msg = config_validate(cfg_file)
+        assert ok is False
+        assert "unknown step 'nope'" in msg
+
+    def test_validate_passes_valid_pipeline(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text('[pipelines]\ncleanup = ["trim", "lf"]\n', encoding="utf-8")
+        ok, _msg = config_validate(cfg_file)
+        assert ok is True
+
+    def test_reset_key_pipelines_clears_section(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(
+            '[sql_in]\nwrap = true\n\n[pipelines]\ncleanup = ["trim"]\n',
+            encoding="utf-8",
+        )
+        config_reset(cfg_file, key="pipelines")
+        cfg = load_config(cfg_file)
+        assert cfg.pipelines == {}
+        assert cfg.sql_in.wrap is True  # other sections preserved
+
 
 # ---------------------------------------------------------------------------
 # config_reset

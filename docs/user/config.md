@@ -53,6 +53,9 @@ notify_level         = "off"
 [hold]
 monitor_clipboard    = true
 intercept_paste_keys = true
+
+[pipelines]
+cleanup = ["trim", "dedupe", "lf"]
 ```
 
 ## Keys reference
@@ -106,3 +109,24 @@ Options applied when `trim` is dispatched via hotkey (the CLI uses `--both`).
 |---|---|---|---|
 | `monitor_clipboard` | bool | `true` | Layer 1: watch `WM_CLIPBOARDUPDATE` and restore held text |
 | `intercept_paste_keys` | bool | `true` | Layer 2: hook `Ctrl+V` / `Shift+Insert` while HOLD is active |
+
+### `[pipelines]`
+
+Named transform chains. Each key maps a pipeline name to an ordered array of
+registry command names or aliases. Run with `press chain <name>` or bind the
+name to a hotkey in `[hotkeys.bindings]` like any built-in command.
+
+| Rule | Behaviour |
+|---|---|
+| Steps | Must be transform commands or aliases (`dict`, `clear`, `hold` are not allowed) |
+| Name collision | A pipeline cannot shadow a command name — the command wins; `press config validate` reports it |
+| Nesting | A pipeline cannot reference another pipeline |
+| Parametric steps | Run with defaults on the CLI; hotkey dispatch applies `[sql_in]` / `[trim]` config values |
+
+```toml
+[pipelines]
+cleanup = ["trim", "dedupe", "lf"]
+
+[hotkeys.bindings]
+x = "cleanup"
+```

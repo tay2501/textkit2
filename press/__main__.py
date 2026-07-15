@@ -289,6 +289,7 @@ def _register_clipboard_util_commands(sub: _SubParsers) -> None:
 
 def make_parser() -> argparse.ArgumentParser:
     """Build and return the top-level argument parser."""
+    from press._cli_chain import _register_chain_commands
     from press._cli_config import _register_config_commands
     from press._cli_daemon import _register_daemon_commands
     from press._cli_dict import _register_dict_commands
@@ -315,6 +316,7 @@ def make_parser() -> argparse.ArgumentParser:
         _register_transform_command(sub, cmd)
 
     # Special-purpose commands
+    _register_chain_commands(sub)
     _register_genpass_command(sub)
     _register_dict_commands(sub)
     _register_clipboard_util_commands(sub)

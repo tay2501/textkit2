@@ -25,6 +25,7 @@ __all__ = [
     "config_validate",
     "default_config_path",
     "load_config",
+    "pipeline_errors",
 ]
 
 CURRENT_SCHEMA_VERSION: int = 1
@@ -122,6 +123,9 @@ class PressConfig:
     dictionary: DictionaryConfig = field(default_factory=DictionaryConfig)
     ui: UiConfig = field(default_factory=UiConfig)
     hold: HoldConfig = field(default_factory=HoldConfig)
+    # Named transform chains: name -> ordered registry command names.
+    # Runnable via `press chain <name>` and bindable to daemon hotkeys.
+    pipelines: dict[str, tuple[str, ...]] = field(default_factory=dict)
     schema_version: int = CURRENT_SCHEMA_VERSION
 
 
@@ -166,6 +170,20 @@ def _parse_hold(data: dict[str, Any]) -> HoldConfig:
     )
 
 
+def _parse_pipelines(data: dict[str, Any]) -> dict[str, tuple[str, ...]]:
+    """Parse the ``[pipelines]`` table: each key maps to an array of strings.
+
+    Non-table values and non-string steps raise ``ValueError`` so a typo is
+    reported instead of silently producing a broken pipeline.
+    """
+    pipelines: dict[str, tuple[str, ...]] = {}
+    for name, raw_steps in data.items():
+        if not isinstance(raw_steps, list) or not all(isinstance(s, str) for s in raw_steps):
+            raise ValueError(f"[pipelines] {name!r} must be an array of strings")
+        pipelines[str(name)] = tuple(raw_steps)
+    return pipelines
+
+
 def _parse_ui(data: dict[str, Any]) -> UiConfig:
     default = UiConfig()
     raw_level = data.get("notify_level", default.notify_level)
@@ -207,6 +225,7 @@ def load_config(path: Path | None = None) -> PressConfig:
     dictionary = _parse_dictionary(raw.get("dictionary", {}))
     ui = _parse_ui(raw.get("ui", {}))
     hold = _parse_hold(raw.get("hold", {}))
+    pipelines = _parse_pipelines(raw.get("pipelines", {}))
 
     return PressConfig(
         hotkeys=hotkeys,
@@ -215,6 +234,7 @@ def load_config(path: Path | None = None) -> PressConfig:
         dictionary=dictionary,
         ui=ui,
         hold=hold,
+        pipelines=pipelines,
         schema_version=schema_version,
     )
 
@@ -240,10 +260,42 @@ def config_validate(path: Path) -> tuple[bool, str]:
             f"(current: {CURRENT_SCHEMA_VERSION}) — upgrade press or reset the config"
         )
     try:
-        load_config(path)
+        config = load_config(path)
     except ValueError as exc:
         return False, str(exc)
+    errors = pipeline_errors(config)
+    if errors:
+        return False, "; ".join(errors)
     return True, f"{path!r}: valid (schema_version={schema})"
+
+
+def pipeline_errors(config: PressConfig) -> list[str]:
+    """Validate ``[pipelines]`` against the command registry.
+
+    Checks (all reported, not just the first): empty step lists, names that
+    shadow a registry command or alias, steps that are not registry commands,
+    and steps that reference another pipeline (nesting is unsupported).
+    """
+    # Lazy import: config loading must stay cheap for the delegating CLI path.
+    from press.commands import PARAMETRIC_COMMAND_INDEX, SIMPLE_COMMAND_INDEX
+
+    def _is_command(name: str) -> bool:
+        return name in SIMPLE_COMMAND_INDEX or name in PARAMETRIC_COMMAND_INDEX
+
+    errors: list[str] = []
+    for name, steps in config.pipelines.items():
+        if _is_command(name):
+            errors.append(f"pipeline {name!r} shadows a command name — rename it")
+        if not steps:
+            errors.append(f"pipeline {name!r} has no steps")
+        for step in steps:
+            if step in config.pipelines:
+                errors.append(
+                    f"pipeline {name!r}: step {step!r} is a pipeline (nesting is not supported)"
+                )
+            elif not _is_command(step):
+                errors.append(f"pipeline {name!r}: unknown step {step!r}")
+    return errors
 
 
 def _toml_key(key: str) -> str:
@@ -286,7 +338,14 @@ def _config_to_toml(config: PressConfig) -> str:
         f"monitor_clipboard = {str(config.hold.monitor_clipboard).lower()}",
         f"intercept_paste_keys = {str(config.hold.intercept_paste_keys).lower()}",
         "",
+        "[pipelines]",
     ]
+    if config.pipelines:
+        for name, steps in config.pipelines.items():
+            lines.append(f"{_toml_key(name)} = [" + ", ".join(f'"{s}"' for s in steps) + "]")
+    else:
+        lines.append('# cleanup = ["trim", "dedupe", "lf"]  # run via: press chain cleanup')
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -296,7 +355,8 @@ def config_reset(path: Path, *, key: str | None = None) -> bool:
     Args:
         path: Path to ``config.toml``.
         key: Section name to reset (``hotkeys``, ``sql_in``, ``trim``,
-            ``dictionary``, ``ui``, ``hold``).  ``None`` resets the entire file.
+            ``dictionary``, ``ui``, ``hold``, ``pipelines``).  ``None`` resets
+            the entire file.
 
     Returns:
         ``True`` if a backup was created, ``False`` if no previous file existed.
@@ -326,6 +386,8 @@ def config_reset(path: Path, *, key: str | None = None) -> bool:
                 config = replace(existing, ui=UiConfig())
             case "hold":
                 config = replace(existing, hold=HoldConfig())
+            case "pipelines":
+                config = replace(existing, pipelines={})
             case _:
                 config = existing
 

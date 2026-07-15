@@ -120,7 +120,29 @@ class CommandDispatcher:
             case "dict_reverse":
                 return self._run_dict(text, reverse=True)
             case _:
+                pipeline = self._config.pipelines.get(command)
+                if pipeline is not None:
+                    return self._run_pipeline(command, pipeline, text)
                 raise ValueError(f"unknown command: {command!r}")
+
+    def _run_pipeline(self, name: str, steps: tuple[str, ...], text: str) -> str:
+        """Run a ``[pipelines]`` entry: registry transforms applied in order.
+
+        Steps are restricted to registry commands — the same rule as the CLI
+        ``chain`` command, and a structural guarantee against recursion.
+        """
+        from press.commands import (
+            PARAMETRIC_ALIASES,
+            PARAMETRIC_COMMAND_INDEX,
+            SIMPLE_COMMAND_INDEX,
+        )
+
+        for step in steps:
+            resolved = PARAMETRIC_ALIASES.get(step, step)
+            if resolved not in SIMPLE_COMMAND_INDEX and resolved not in PARAMETRIC_COMMAND_INDEX:
+                raise ValueError(f"pipeline {name!r}: step {step!r} is not a transform command")
+            text = self.transform(step, text)
+        return text
 
     def notify_error(self, command: str, message: str) -> None:
         """Deliver an error notification; public entry point for external callers."""

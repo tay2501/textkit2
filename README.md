@@ -299,6 +299,40 @@ See [docs/user/dictionary.md](docs/user/dictionary.md) for details.
 | `json-format` | `jf` | Pretty-print JSON (default: 2-space indent, `--indent N`) |
 | `json-compress` | `jc` | Compress JSON to a single line |
 
+### Chained Transforms & Pipelines
+
+Apply multiple transforms in one invocation — a single input read, a single
+output write, and one process launch instead of one per step:
+
+```bash
+press chain trim dedupe lf          # three transforms, left to right
+press chain tm lo -C                # aliases work; write result to clipboard
+echo "Hello World" | press chain snake upper   # composable with shell pipes
+press ch upper                      # `ch` alias
+```
+
+Name a step list once in `%APPDATA%\press\config.toml` and reuse it — or bind
+it to a daemon hotkey exactly like a built-in command:
+
+```toml
+[pipelines]
+cleanup = ["trim", "dedupe", "lf"]
+
+[hotkeys.bindings]
+x = "cleanup"        # Ctrl+Shift+0, then x → runs the whole pipeline
+```
+
+```bash
+press chain cleanup                 # run the pipeline by name
+press chain --list                  # show configured pipelines
+press config validate               # reports unknown steps / name collisions
+```
+
+Rules: registry commands always win a name collision; parametric steps run
+with their defaults (daemon hotkeys use `[sql_in]`/`[trim]` config values);
+pipelines cannot reference other pipelines; any unknown or failing step
+aborts before anything is written.
+
 ### Common options
 
 | Flag | Description |
