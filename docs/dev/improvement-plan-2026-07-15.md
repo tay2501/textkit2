@@ -152,7 +152,12 @@ KeePassXC/Chrome が採用する公式クリップボード形式で塞げる。
 
 ---
 
-## 第 10 位: pystray 脱出先の技術検証(Review #12)— 調査のみ
+## 第 10 位: pystray 脱出先の技術検証(Review #12)— 調査のみ ✅ 実施済み(2026-07-15)
+
+> 結論: [pystray-exit-strategy-2026-07-15.md](pystray-exit-strategy-2026-07-15.md) 参照。
+> 本命は ctypes 直実装(pystray + Pillow を一掃、~250-350 行、既存の隠しウィンドウ
+> パターンを流用)。WinRT はトレイ API が存在せず不成立。副次的発見として
+> **pywin32 がデッド依存**(press 内で未使用)— 発動条件と無関係に削除可。
 
 - コードは書かない。Shell_NotifyIcon 直実装(ctypes)と winrt 系の 2 案について、
   (a) 実装規模 (b) メッセージループと daemon 構造の適合 (c) EDR 観点の import 数
