@@ -369,6 +369,30 @@ press hold        # deactivate
 
 See {doc}`daemon` for using `hold` via hotkey in the background daemon.
 
+### `undo`
+
+Restore the clipboard text the last clipboard-writing press command
+(`-C` transform or `clear`) overwrote. Running `undo` again swaps back
+(redo). The snapshot is a single slot, DPAPI-encrypted on Windows
+(`%APPDATA%\press\undo.txt`).
+
+```bash
+press snake -c -C   # oops — wrong transform
+press undo          # clipboard is back to the pre-transform text
+press undo          # redo (swap again)
+```
+
+Notes:
+
+- Content marked with the clipboard-history exclusion formats (a `genpass`
+  password, a KeePassXC/Bitwarden copy) is **never** snapshotted.
+- Set `PRESS_NO_UNDO=1` to disable the snapshot file entirely (EDR-strict
+  environments avoiding the extra file write).
+- Only press-initiated clipboard writes are undoable — text replaced by a
+  normal copy is the domain of Win+V. The daemon keeps its own in-memory
+  undo slot for hotkey transforms (`Shift+Z` by default), separate from the
+  CLI file — the same dual-layer design as `hold`.
+
 ## Dictionary lookup
 
 ### `dict`

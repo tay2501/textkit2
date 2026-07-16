@@ -248,8 +248,10 @@ def _register_clipboard_util_commands(sub: _SubParsers) -> None:
     )
 
     def _cl(a: argparse.Namespace) -> int:
+        from press._cli_helpers import _snapshot_clipboard_for_undo
         from press.clipboard import clear_clipboard
 
+        _snapshot_clipboard_for_undo()  # an accidental clear is undoable
         try:
             clear_clipboard()
         except Exception as exc:
@@ -263,6 +265,35 @@ def _register_clipboard_util_commands(sub: _SubParsers) -> None:
         return 0
 
     p.set_defaults(func=_cl)
+
+    p = sub.add_parser(
+        "undo",
+        help="Restore the clipboard text the last press command overwrote",
+        description=(
+            "Swap the clipboard with the snapshot taken before the last "
+            "clipboard-writing press command (-C transform or clear). "
+            "Running undo again swaps back (redo)."
+        ),
+    )
+    p.add_argument("-q", "--quiet", action="store_true", help="Suppress all stderr output")
+
+    def _undo(a: argparse.Namespace) -> int:
+        from press.clipboard import get_clipboard_text, set_clipboard_text
+        from press.transforms.undo import swap_undo
+
+        try:
+            swap_undo(get_clipboard_text, set_clipboard_text)
+        except FileNotFoundError:
+            if not a.quiet:
+                print("press undo: nothing to undo", file=sys.stderr)
+            return 1
+        except (OSError, RuntimeError) as exc:
+            if not a.quiet:
+                print(f"press undo: error: {exc}", file=sys.stderr)
+            return 1
+        return 0
+
+    p.set_defaults(func=_undo)
 
     p = sub.add_parser(
         "hold",

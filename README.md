@@ -306,6 +306,7 @@ Uses `secrets.choice()` (backed by `os.urandom()`) — cryptographically secure.
 |---|---|---|
 | `clear` | `cl` | Clear the clipboard |
 | `hold` | | Save clipboard text; call again to restore it (see [Clipboard Hold](#clipboard-hold) for real-time protection) |
+| `undo` | | Restore the clipboard text the last press command overwrote (run again = redo); skips sensitive-marked content; `PRESS_NO_UNDO=1` opts out |
 
 ### Dictionary
 
@@ -453,7 +454,8 @@ Two-step sequence: **press Ctrl+Shift+0 simultaneously** (prefix chord) → **re
 | `l` | lf | | `Shift+D` | dict (reverse) |
 | `r` | cr | | `h` | hold (toggle) |
 | `u` | hyphen | | `z` | clear clipboard |
-| `Shift+U` | underscore | | `k` | trim |
+| `Shift+U` | underscore | | `Shift+Z` | undo (restore pre-transform) |
+| | | | `k` | trim |
 | | | | `o` | dedupe |
 | | | | `p` | sort |
 

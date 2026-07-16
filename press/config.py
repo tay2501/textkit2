@@ -50,6 +50,7 @@ _DEFAULT_BINDINGS: dict[str, str] = {
     "shift+e": "unicode-encode",
     "h": "hold",
     "z": "clear",
+    "shift+z": "undo",
     "k": "trim",
     "o": "dedupe",
     "p": "sort",

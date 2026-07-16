@@ -410,8 +410,10 @@ PARAMETRIC_ALIASES: dict[str, str] = {
 
 # Commands handled inside daemon.CommandDispatcher itself rather than via the
 # registries above.  Keep in sync with CommandDispatcher.dispatch() ("clear",
-# "hold") and CommandDispatcher._transform() ("dict", "dict_reverse").
-DAEMON_SPECIAL_COMMANDS: frozenset[str] = frozenset({"clear", "hold", "dict", "dict_reverse"})
+# "hold", "undo") and CommandDispatcher._transform() ("dict", "dict_reverse").
+DAEMON_SPECIAL_COMMANDS: frozenset[str] = frozenset(
+    {"clear", "hold", "undo", "dict", "dict_reverse"}
+)
 
 
 # ---------------------------------------------------------------------------

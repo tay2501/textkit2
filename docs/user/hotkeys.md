@@ -27,6 +27,7 @@ The `press` daemon registers a **prefix key** system similar to Emacs and nano.
 | `Shift+E` | unicode-encode | `テスト` → `\u30c6...` |
 | `H` | hold (toggle) | protect clipboard |
 | `Z` | clear | wipe clipboard |
+| `Shift+Z` | undo | restore the clipboard text the last hotkey transform overwrote |
 | `K` | trim | `a␣␣\nb␣` → `a\nb` (see `[trim]` in {doc}`config`) |
 | `O` | dedupe | `A\nB\nA` → `A\nB` |
 | `P` | sort | `B\nA` → `A\nB` |

@@ -23,6 +23,9 @@ class CommandDispatcher:
     def __init__(self, config: PressConfig) -> None:
         self._config = config
         self._icon: TrayIcon | None = None
+        # In-memory undo slot: the clipboard text the last dispatch overwrote.
+        # File-less on purpose — the hotkey path must not gain disk I/O.
+        self._undo_text: str | None = None
         # Dual-layer clipboard guard (Windows only; None on other platforms)
         self._guard: ClipboardGuard | None = None
         if sys.platform == "win32":
@@ -44,18 +47,27 @@ class CommandDispatcher:
         writes the result back.  Notifications are emitted according to
         ``config.ui.notify_level``.
         """
+        import contextlib
+
         from press.clipboard import clear_clipboard, get_clipboard_text, set_clipboard_text
 
         try:
             if command == "clear":
+                # Empty/non-text clipboard — clear proceeds without a snapshot
+                with contextlib.suppress(OSError, RuntimeError):
+                    self._remember_for_undo(get_clipboard_text())
                 clear_clipboard()
                 self._notify_success(command, "")
                 return
             if command == "hold":
                 self._toggle_hold()
                 return
+            if command == "undo":
+                self._undo_swap()
+                return
             text = get_clipboard_text()
             result = self.transform(command, text)
+            self._remember_for_undo(text)
             set_clipboard_text(result)
             self._notify_success(command, result)
         except Exception as exc:
@@ -160,6 +172,41 @@ class CommandDispatcher:
             self._guard.release()
             self._update_icon(holding=False)
             self._notify_success("hold-release", "")
+
+    def _remember_for_undo(self, text: str) -> None:
+        """Keep the pre-overwrite clipboard text for the undo command.
+
+        Skipped for content carrying the sensitive-exclusion formats (press
+        honours its own genpass marks) and under ``PRESS_NO_UNDO=1``.
+        """
+        from press.transforms.undo import undo_disabled
+
+        if undo_disabled():
+            return
+        try:
+            from press.clipboard import clipboard_has_sensitive_marks
+
+            if clipboard_has_sensitive_marks():
+                return
+        except (OSError, RuntimeError):
+            return  # cannot verify the marks — err on the side of not keeping it
+        self._undo_text = text
+
+    def _undo_swap(self) -> None:
+        """Swap the clipboard with the undo slot (undo twice = redo)."""
+        from press.clipboard import get_clipboard_text, set_clipboard_text
+
+        if self._undo_text is None:
+            self._notify_error("undo", "nothing to undo")
+            return
+        saved = self._undo_text
+        try:
+            current = get_clipboard_text()
+        except (OSError, RuntimeError):
+            current = ""  # empty/non-text clipboard — the redo slot becomes empty
+        set_clipboard_text(saved)
+        self._undo_text = current
+        self._notify_success("undo", "")
 
     def _on_hold_conflict(self) -> None:
         """Hold auto-released: another app kept rewriting the clipboard.

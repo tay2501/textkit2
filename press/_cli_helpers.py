@@ -70,7 +70,32 @@ def _write_output(text: str, args: argparse.Namespace) -> None:
     if getattr(args, "clip_out", False):
         from press.clipboard import set_clipboard_text
 
+        _snapshot_clipboard_for_undo()
         set_clipboard_text(text)
+
+
+def _snapshot_clipboard_for_undo() -> None:
+    """Best-effort: save the clipboard text we are about to overwrite.
+
+    Never blocks the command — losing the undo slot is acceptable, failing
+    the user's transform is not, so clipboard races (empty/non-text content)
+    and DPAPI write failures are swallowed here by design.  Content carrying
+    the sensitive-exclusion formats (a genpass password, a KeePassXC copy) is
+    never snapshotted, and ``PRESS_NO_UNDO=1`` opts out of the file write
+    entirely for EDR-strict environments.
+    """
+    from press.transforms.undo import save_snapshot, undo_disabled
+
+    if undo_disabled():
+        return
+    try:
+        from press.clipboard import clipboard_has_sensitive_marks, get_clipboard_text
+
+        if clipboard_has_sensitive_marks():
+            return
+        save_snapshot(get_clipboard_text())
+    except (OSError, RuntimeError):
+        return
 
 
 def _run_transform(

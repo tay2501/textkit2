@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`press undo`**: restore the clipboard text the last clipboard-writing press command (`-C` transform or `clear`) overwrote; running it again swaps back (redo). Single-slot snapshot, DPAPI-encrypted at `%APPDATA%\press\undo.txt`; content carrying the sensitive-exclusion formats (genpass passwords, KeePassXC/Bitwarden copies) is never captured; `PRESS_NO_UNDO=1` disables the snapshot write. The daemon keeps its own in-memory slot for hotkey transforms (default binding `Shift+Z`) — the same dual-layer design as hold. Decision record: `docs/dev/clipboard-history-decision-2026-07-17.md` §7
 - **`unix-to-date` / `u2d` and `date-to-unix` / `d2u`**: Unix time ⇔ ISO 8601 conversion applied per line; seconds vs. milliseconds auto-detected by magnitude, naive dates read as local time, `--utc` / `--ms` output switches
 - **`slug` / `sl`**: Django-style URL slug (lowercase, hyphens, NFKD ASCII folding); `--unicode` keeps non-ASCII word characters for Japanese slugs
 - **`press uuid`**: random UUID v4 generator (`-n` count, `-U` uppercase, `-C` clipboard), completing the generator pair with `genpass`

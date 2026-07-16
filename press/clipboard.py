@@ -101,6 +101,24 @@ def clear_clipboard_if_unchanged(sequence_number: int) -> bool:
     raise OSError("Clipboard access is only supported on Windows")
 
 
+def clipboard_has_sensitive_marks() -> bool:
+    """Report whether the current clipboard content carries an exclusion format.
+
+    ``True`` means the writer (press genpass, KeePassXC, Bitwarden, …) marked
+    the content with one of the cooperative exclusion formats
+    (``_SENSITIVE_FORMATS``).  press honours its own marks: such content is
+    never captured into the undo snapshot.
+
+    Uses ``IsClipboardFormatAvailable`` which needs no ``OpenClipboard``.
+
+    Raises:
+        OSError: On non-Windows platforms where clipboard access is unavailable.
+    """
+    if sys.platform == "win32":
+        return _win_has_sensitive_marks()
+    raise OSError("Clipboard access is only supported on Windows")
+
+
 # ---------------------------------------------------------------------------
 # Windows implementation via ctypes
 # ---------------------------------------------------------------------------
@@ -136,6 +154,8 @@ if sys.platform == "win32":
     _user32.RegisterClipboardFormatW.restype = ctypes.c_uint
     _user32.GetClipboardSequenceNumber.argtypes = []
     _user32.GetClipboardSequenceNumber.restype = ctypes.wintypes.DWORD
+    _user32.IsClipboardFormatAvailable.argtypes = [ctypes.c_uint]
+    _user32.IsClipboardFormatAvailable.restype = ctypes.wintypes.BOOL
 
     CF_UNICODETEXT = 13
     GMEM_MOVEABLE = 0x0002
@@ -254,6 +274,16 @@ if sys.platform == "win32":
             return True
         finally:
             _user32.CloseClipboard()
+
+    def _win_has_sensitive_marks() -> bool:
+        # A failed RegisterClipboardFormatW (fmt == 0) cannot be probed;
+        # treat it as unmarked rather than failing the caller, which only
+        # uses this as a "do not snapshot" guard.
+        return any(
+            (fmt := _user32.RegisterClipboardFormatW(name))
+            and _user32.IsClipboardFormatAvailable(fmt)
+            for name in _SENSITIVE_FORMATS
+        )
 
     # -----------------------------------------------------------------------
     # Win32 constants for clipboard monitoring
@@ -702,6 +732,9 @@ else:  # pragma: no cover — stubs; the win32 block above is the implementation
         raise OSError("Clipboard access is only supported on Windows")
 
     def _win_clear_if_unchanged(_sequence_number: int) -> bool:
+        raise OSError("Clipboard access is only supported on Windows")
+
+    def _win_has_sensitive_marks() -> bool:
         raise OSError("Clipboard access is only supported on Windows")
 
     class ClipboardGuard:
