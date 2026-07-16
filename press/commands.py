@@ -350,6 +350,51 @@ PARAMETRIC_COMMANDS: tuple[ParametricCommand, ...] = (
             ),
         ),
     ),
+    ParametricCommand(
+        "unix-to-date",
+        "press.transforms.timestamp",
+        "unix_to_date",
+        ("u2d",),
+        "Convert Unix time (seconds or ms, per line) to ISO 8601 date",
+        cli_args=(
+            CliArg(
+                ("--utc",),
+                "utc",
+                "Output in UTC instead of local time",
+                action="store_true",
+            ),
+        ),
+    ),
+    ParametricCommand(
+        "date-to-unix",
+        "press.transforms.timestamp",
+        "date_to_unix",
+        ("d2u",),
+        "Convert ISO 8601 date (per line) to Unix time in seconds",
+        cli_args=(
+            CliArg(
+                ("--ms",),
+                "ms",
+                "Output milliseconds instead of seconds",
+                action="store_true",
+            ),
+        ),
+    ),
+    ParametricCommand(
+        "slug",
+        "press.transforms.slug",
+        "slugify",
+        ("sl",),
+        "Convert text to a URL slug (lowercase, hyphens, ASCII-folded)",
+        cli_args=(
+            CliArg(
+                ("--unicode", "-u"),
+                "unicode",
+                "Keep non-ASCII word characters (e.g. Japanese)",
+                action="store_true",
+            ),
+        ),
+    ),
 )
 
 # O(1) lookup by name or alias — used by daemon.CommandDispatcher._transform()

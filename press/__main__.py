@@ -213,6 +213,54 @@ def _register_genpass_command(sub: _SubParsers) -> None:
     p.set_defaults(func=_gp)
 
 
+def _register_uuid_command(sub: _SubParsers) -> None:
+    def _positive_int(value: str) -> int:
+        n = int(value)
+        if n < 1:
+            raise argparse.ArgumentTypeError(f"count must be >= 1, got {n}")
+        return n
+
+    p = sub.add_parser("uuid", help="Generate random UUIDs (version 4)")
+    p.add_argument(
+        "-n",
+        "--count",
+        type=_positive_int,
+        default=1,
+        metavar="N",
+        help="Number of UUIDs to generate, one per line (default: 1)",
+    )
+    p.add_argument("-U", "--upper", action="store_true", help="Uppercase output")
+    p.add_argument(
+        "-C",
+        "--clip-out",
+        action="store_true",
+        help="Write output to clipboard (also prints to stdout)",
+    )
+    p.add_argument("-q", "--quiet", action="store_true", help="Suppress all stderr output")
+
+    def _uuid(a: argparse.Namespace) -> int:
+        import uuid
+
+        values = "\n".join(str(uuid.uuid4()) for _ in range(a.count))
+        if a.upper:
+            values = values.upper()
+        sys.stdout.write(values + "\n")
+        sys.stdout.flush()
+        if a.clip_out:
+            try:
+                from press.clipboard import set_clipboard_text
+
+                set_clipboard_text(values)
+            except Exception as exc:
+                # Mirrors genpass: stdout already delivered the value, so a
+                # clipboard failure is a warning, not a command failure.
+                if not a.quiet:
+                    print(f"press uuid: warning: clipboard write failed: {exc}", file=sys.stderr)
+        return 0
+
+    p.set_defaults(func=_uuid)
+
+
 def _register_clipboard_util_commands(sub: _SubParsers) -> None:
     p = sub.add_parser("clear", aliases=["cl"], help="Clear the clipboard")
     p.add_argument("-q", "--quiet", action="store_true", help="Suppress all stderr output")
@@ -318,6 +366,7 @@ def make_parser() -> argparse.ArgumentParser:
     # Special-purpose commands
     _register_chain_commands(sub)
     _register_genpass_command(sub)
+    _register_uuid_command(sub)
     _register_dict_commands(sub)
     _register_clipboard_util_commands(sub)
     _register_config_commands(sub)

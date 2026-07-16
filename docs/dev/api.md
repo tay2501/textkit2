@@ -108,6 +108,20 @@ Auto-generated from source docstrings.
    :members:
 ```
 
+### press.transforms.timestamp
+
+```{eval-rst}
+.. automodule:: press.transforms.timestamp
+   :members:
+```
+
+### press.transforms.slug
+
+```{eval-rst}
+.. automodule:: press.transforms.slug
+   :members:
+```
+
 ## press.dictionary
 
 ```{eval-rst}

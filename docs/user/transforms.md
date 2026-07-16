@@ -632,6 +632,51 @@ printf "hello world" | press count
 # bytes-utf8 11
 ```
 
+## Date & time
+
+### `unix-to-date` (`u2d`)
+
+Convert Unix timestamps (one per line) to ISO 8601 dates. Seconds vs.
+milliseconds is auto-detected by magnitude. Output is local time with UTC
+offset by default.
+
+```bash
+echo "1752710400" | press unix-to-date --utc
+# → 2025-07-17T00:00:00+00:00
+
+echo "1752710400123" | press unix-to-date --utc
+# → 2025-07-17T00:00:00.123+00:00
+```
+
+### `date-to-unix` (`d2u`)
+
+Convert ISO 8601 dates (one per line) to Unix time in seconds. Dates
+without a UTC offset are interpreted as local time.
+
+```bash
+echo "2025-07-17T09:00:00+09:00" | press date-to-unix
+# → 1752710400
+
+echo "2025-07-17T00:00:00Z" | press date-to-unix --ms
+# → 1752710400000
+```
+
+## Slug
+
+### `slug` (`sl`)
+
+Convert text to a URL slug: lowercase, hyphen-separated, ASCII-folded
+(accents stripped). `--unicode` keeps non-ASCII word characters for
+Japanese slugs.
+
+```bash
+echo "Hello, World! Café" | press slug
+# → hello-world-cafe
+
+echo "日本語 タイトル" | press slug --unicode
+# → 日本語-タイトル
+```
+
 ## Table
 
 ### `markdown-table` (`mdt`)

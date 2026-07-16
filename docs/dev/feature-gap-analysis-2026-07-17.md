@@ -33,9 +33,9 @@
 | 5 | **HTML エンコード** | DevToys HTML encoder。press は `html-decode` のみで非対称。stdlib `html.escape` | 極小 | ✅ 今回実装 |
 | 6 | **TSV/CSV → Markdown 表** | PowerToys Advanced Paste (Paste as Markdown) / DevToys 系。Excel コピー→ドキュメント貼付の頻出動線。stdlib `csv` | 中 | ✅ 今回実装 |
 | 7 | **行番号付与 / 行順反転** | Boop / Text Mechanic 系行ユーティリティ。既存 `lines.py` に自然に追加 | 小 | ✅ 今回実装 |
-| 8 | Unix time ⇔ 日時変換 | DevToys Date converter / Boop | 小 | ⏳ 次回候補 |
-| 9 | slugify (URL スラッグ化) | Boop | 小 | ⏳ 次回候補 |
-| 10 | UUID 生成 | DevToys Generators (genpass の前例あり) | 小 | ⏳ 次回候補 |
+| 8 | Unix time ⇔ 日時変換 | DevToys Date converter / Boop | 小 | ✅ 実装済 (`unix-to-date`/`date-to-unix`) |
+| 9 | slugify (URL スラッグ化) | Boop | 小 | ✅ 実装済 (`slug`) |
+| 10 | UUID 生成 | DevToys Generators (genpass の前例あり) | 小 | ✅ 実装済 (`press uuid`) |
 
 ### 見送り (理由付き)
 

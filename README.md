@@ -239,6 +239,9 @@ press dedupe --ignore-case -c -C
 | `hash` | `hs` | `--algo NAME` | Hex digest of the text (default: SHA-256; also `sha1`, `sha512`, `md5`, …) |
 | `count` | `wc` | | Count characters, words, lines, and UTF-8 bytes (`non-space` for Japanese manuscript counting) |
 | `markdown-table` | `mdt` | | TSV/CSV → Markdown table (delimiter auto-detected; Excel clipboard ready) |
+| `slug` | `sl` | `--unicode` | URL slug: lowercase, hyphens, ASCII-folded (`--unicode` keeps Japanese) |
+| `unix-to-date` | `u2d` | `--utc` | Unix time (s/ms auto-detected, per line) → ISO 8601 date |
+| `date-to-unix` | `d2u` | `--ms` | ISO 8601 date (per line) → Unix time in seconds |
 
 ### Unicode Normalization
 
@@ -276,6 +279,24 @@ press gp                         # alias
 > **TTY auto-clipboard**: when running interactively, the password is written to the clipboard automatically so it is ready to paste immediately. Use `-N` if you only want to view the password without replacing the current clipboard contents.
 
 > **Conditional auto-clear**: `--clear-after` records the Windows clipboard sequence number after the write and only clears if it is unchanged after the delay — if you copied something else in the meantime, your clipboard is left untouched.
+
+### UUID Generation
+
+```
+press uuid [-n N] [-U] [-C]
+```
+
+| Flag | Description |
+|---|---|
+| `-n N` / `--count N` | Number of UUIDs to generate, one per line (default: 1) |
+| `-U` / `--upper` | Uppercase output |
+| `-C` / `--clip-out` | Write output to clipboard (also prints to stdout) |
+
+```bash
+press uuid           # one random UUID (version 4)
+press uuid -n 5      # five UUIDs, one per line
+press uuid -U -C     # uppercase, copied to clipboard
+```
 
 Uses `secrets.choice()` (backed by `os.urandom()`) — cryptographically secure.
 

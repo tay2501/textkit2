@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`unix-to-date` / `u2d` and `date-to-unix` / `d2u`**: Unix time ⇔ ISO 8601 conversion applied per line; seconds vs. milliseconds auto-detected by magnitude, naive dates read as local time, `--utc` / `--ms` output switches
+- **`slug` / `sl`**: Django-style URL slug (lowercase, hyphens, NFKD ASCII folding); `--unicode` keeps non-ASCII word characters for Japanese slugs
+- **`press uuid`**: random UUID v4 generator (`-n` count, `-U` uppercase, `-C` clipboard), completing the generator pair with `genpass`
 - **`katakana` / `kata` and `hiragana` / `hira`**: hiragana ⇔ katakana conversion via the already-bundled jaconv (`ひらがな` → `ヒラガナ`), closing the most-requested Japanese gap against Clibor-style tools
 - **`hash` / `hs`**: hex digest of the text over its UTF-8 bytes (`--algo sha256|sha1|sha512|md5|…`, default SHA-256); line endings are hashed as-is, matching `sha256sum` semantics
 - **`replace` / `rp`**: regex search & replace with `\1` group references (`--pattern/--repl/--ignore-case`); `--fixed` switches to literal-string mode for users who don't speak regex — the press equivalent of Clibor's 整形 replacement
