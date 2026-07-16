@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`katakana` / `kata` and `hiragana` / `hira`**: hiragana ⇔ katakana conversion via the already-bundled jaconv (`ひらがな` → `ヒラガナ`), closing the most-requested Japanese gap against Clibor-style tools
+- **`hash` / `hs`**: hex digest of the text over its UTF-8 bytes (`--algo sha256|sha1|sha512|md5|…`, default SHA-256); line endings are hashed as-is, matching `sha256sum` semantics
+- **`replace` / `rp`**: regex search & replace with `\1` group references (`--pattern/--repl/--ignore-case`); `--fixed` switches to literal-string mode for users who don't speak regex — the press equivalent of Clibor's 整形 replacement
+- **`count` / `wc`**: character / word / line / UTF-8 byte report; `non-space` count excludes all whitespace for Japanese manuscript counting
+- **`html-encode` / `he`**: escape `& < > " '` to HTML entities — the missing inverse of the existing `html-decode`
+- **`markdown-table` / `mdt`**: TSV/CSV → Markdown table with auto-detected delimiter (tab wins, so an Excel-copied range converts directly); quoted CSV fields and `|` escaping handled
+- **`number-lines` / `nl`** (`--start`, `--sep`) and **`reverse-lines` / `rl`**: line numbering and line-order reversal, rounding out the line-operations group
+- Competitive gap analysis behind the above: `docs/dev/feature-gap-analysis-2026-07-17.md` (PowerToys Advanced Paste, DevToys 2.0, CopyQ, Clibor, Boop surveyed; rejected candidates documented with reasons)
 - **`press chain` / `ch`**: apply multiple transforms in one invocation (`press chain trim dedupe lf`) — one input read, one output write, one process launch instead of one per step. Aliases resolve; any unknown or failing step aborts before anything is written
 - **`[pipelines]` config section**: named step lists (`cleanup = ["trim", "dedupe", "lf"]`) runnable via `press chain cleanup`, discoverable via `press chain --list`, and bindable to daemon hotkeys like any built-in command. `press config validate` reports unknown steps, command-name collisions, empty pipelines, and nesting; `press config reset --key pipelines` clears the section. Closes the workflow gap against CopyQ scripting / PowerToys Advanced Paste custom actions with plain TOML instead of a scripting language
 - **Daemon delegation**: while `press daemon` is running, `press <command>` sends the text to it over a per-user named pipe instead of importing the transform module. On EDR/DLP machines this caps every command at the same file-open cost (`fix-encoding`: 155 → 55 opens, 151 ms → 100 ms). Falls back to the in-process transform when no daemon answers; `PRESS_NO_DAEMON=1` opts out

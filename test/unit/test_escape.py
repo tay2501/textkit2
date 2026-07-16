@@ -5,6 +5,7 @@ import pytest
 from press.transforms.escape import (
     decode_html_entities,
     decode_unicode_escape,
+    encode_html_entities,
     encode_unicode_escape,
 )
 
@@ -64,3 +65,24 @@ class TestDecodeHtmlEntities:
 
     def test_empty(self) -> None:
         assert decode_html_entities("") == ""
+
+
+class TestEncodeHtmlEntities:
+    def test_lt_gt(self) -> None:
+        assert encode_html_entities("<div>") == "&lt;div&gt;"
+
+    def test_amp(self) -> None:
+        assert encode_html_entities("a & b") == "a &amp; b"
+
+    def test_quotes(self) -> None:
+        assert encode_html_entities("\"x\" 'y'") == "&quot;x&quot; &#x27;y&#x27;"
+
+    def test_roundtrip(self) -> None:
+        original = "<a href=\"?q=1&r=2\">'link'</a>"
+        assert decode_html_entities(encode_html_entities(original)) == original
+
+    def test_plain_unchanged(self) -> None:
+        assert encode_html_entities("plain テキスト") == "plain テキスト"
+
+    def test_empty(self) -> None:
+        assert encode_html_entities("") == ""

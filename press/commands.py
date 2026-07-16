@@ -108,6 +108,10 @@ SIMPLE_COMMANDS: tuple[SimpleCommand, ...] = (
     SimpleCommand("unicode-decode", "press.transforms.escape",     "decode_unicode_escape", ("ud",),   r"Decode \uXXXX escape sequences to text"),
     SimpleCommand("unicode-encode", "press.transforms.escape",     "encode_unicode_escape", ("ue",),   r"Encode text to \uXXXX escape sequences"),
     SimpleCommand("html-decode",    "press.transforms.escape",     "decode_html_entities",  ("hd",),   "Decode HTML entities (e.g. &amp; → &)"),
+    SimpleCommand("html-encode",    "press.transforms.escape",     "encode_html_entities",  ("he",),   "Escape HTML special characters (e.g. & → &amp;)"),
+    # --- kana ---
+    SimpleCommand("katakana",       "press.transforms.kana",       "to_katakana",           ("kata",), "Convert hiragana to katakana (ひらがな → カタカナ)"),
+    SimpleCommand("hiragana",       "press.transforms.kana",       "to_hiragana",           ("hira",), "Convert katakana to hiragana (カタカナ → ひらがな)"),
     # --- case ---
     SimpleCommand("snake",          "press.transforms.case",       "to_snake_case",         ("sn",),   "Convert to snake_case"),
     SimpleCommand("camel",          "press.transforms.case",       "to_camel_case",         ("cm",),   "Convert to camelCase"),
@@ -131,6 +135,12 @@ SIMPLE_COMMANDS: tuple[SimpleCommand, ...] = (
     SimpleCommand("check-norm",     "press.transforms.unicode_norm", "check_norm",          ("cn",),   "Report which Unicode normalization forms (NFC/NFD/NFKC/NFKD) the text satisfies"),
     # --- json ---
     SimpleCommand("json-compress",  "press.transforms.json_fmt",   "json_compress",         ("jc",),   "Compress JSON to single line"),
+    # --- lines (no-arg) ---
+    SimpleCommand("reverse-lines",  "press.transforms.lines",      "reverse_lines",         ("rl",),   "Reverse the order of lines"),
+    # --- stats ---
+    SimpleCommand("count",          "press.transforms.stats",      "count_text",            ("wc",),   "Count characters, words, lines, and UTF-8 bytes"),
+    # --- table ---
+    SimpleCommand("markdown-table", "press.transforms.table",      "to_markdown_table",     ("mdt",),  "Convert TSV/CSV to a Markdown table (first row = header)"),
 )
 # fmt: on
 
@@ -262,6 +272,81 @@ PARAMETRIC_COMMANDS: tuple[ParametricCommand, ...] = (
                 type=int,
                 default=2,
                 metavar="N",
+            ),
+        ),
+    ),
+    ParametricCommand(
+        "hash",
+        "press.transforms.hashing",
+        "hash_text",
+        ("hs",),
+        "Compute a hex digest of the text (default: SHA-256)",
+        cli_args=(
+            CliArg(
+                ("--algo", "-a"),
+                "algo",
+                "Hash algorithm: sha256, sha1, sha512, md5, ... (default: sha256)",
+                default="sha256",
+                metavar="NAME",
+            ),
+        ),
+    ),
+    ParametricCommand(
+        "replace",
+        "press.transforms.replace",
+        "regex_replace",
+        ("rp",),
+        "Regex (or fixed-string) search & replace",
+        cli_args=(
+            CliArg(
+                ("--pattern", "-p"),
+                "pattern",
+                "Regex pattern to search (empty = no-op)",
+                default="",
+                metavar="REGEX",
+            ),
+            CliArg(
+                ("--repl", "-r"),
+                "repl",
+                r"Replacement text; \1 group refs allowed (default: delete matches)",
+                default="",
+                metavar="TEXT",
+            ),
+            CliArg(
+                ("--ignore-case", "-i"),
+                "ignore_case",
+                "Case-insensitive matching",
+                action="store_true",
+            ),
+            CliArg(
+                ("--fixed", "-F"),
+                "fixed",
+                "Treat pattern and replacement as literal strings",
+                action="store_true",
+            ),
+        ),
+    ),
+    ParametricCommand(
+        "number-lines",
+        "press.transforms.lines",
+        "number_lines",
+        ("nl",),
+        "Prefix each line with its line number",
+        cli_args=(
+            CliArg(
+                ("--start",),
+                "start",
+                "First line number (default: 1)",
+                type=int,
+                default=1,
+                metavar="N",
+            ),
+            CliArg(
+                ("--sep",),
+                "sep",
+                "Separator between number and line (default: TAB)",
+                default="\t",
+                metavar="SEP",
             ),
         ),
     ),

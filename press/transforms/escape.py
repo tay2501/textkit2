@@ -19,3 +19,8 @@ def decode_unicode_escape(text: str) -> str:
 def decode_html_entities(text: str) -> str:
     """Decode HTML entities (&amp;, &lt;, &#x3042;, etc.) to Unicode characters."""
     return html.unescape(text)
+
+
+def encode_html_entities(text: str) -> str:
+    """Escape HTML special characters (& < > \" ') to entities."""
+    return html.escape(text)

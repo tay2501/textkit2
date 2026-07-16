@@ -42,6 +42,26 @@ echo "ぁぃぅぇぉっゃゅょ" | press enlarge-kana
 # → あいうえおつやゆよ
 ```
 
+## Kana conversion
+
+### `katakana` (`kata`)
+
+Convert hiragana to katakana.
+
+```bash
+echo "ひらがな" | press katakana
+# → ヒラガナ
+```
+
+### `hiragana` (`hira`)
+
+Convert katakana to hiragana.
+
+```bash
+echo "カタカナ" | press hiragana
+# → かたかな
+```
+
 ## Whitespace
 
 ### `normalize` (`norm`)
@@ -247,6 +267,15 @@ echo "&lt;div&gt;&amp;" | press html-decode
 # → <div>&
 ```
 
+### `html-encode` (`he`)
+
+Escape HTML special characters (`& < > " '`) to entities.
+
+```bash
+echo '<div class="x">' | press html-encode
+# → &lt;div class=&quot;x&quot;&gt;
+```
+
 ## Base64 / URL encoding
 
 ### `base64-encode` (`be`)
@@ -442,6 +471,38 @@ printf "cherry\nApple\nbanana" | press sort --ignore-case
 # → cherry
 ```
 
+### `number-lines` (`nl`)
+
+Prefix each line with its line number (tab-separated by default).
+
+```bash
+printf "alpha\nbeta" | press number-lines
+# → 1	alpha
+# → 2	beta
+
+printf "alpha\nbeta" | press number-lines --start 10 --sep ": "
+# → 10: alpha
+# → 11: beta
+```
+
+Options:
+
+| Flag | Description |
+|---|---|
+| `--start N` | First line number (default: 1) |
+| `--sep SEP` | Separator between number and line (default: TAB) |
+
+### `reverse-lines` (`rl`)
+
+Reverse the order of lines. Trailing newline is preserved.
+
+```bash
+printf "first\nsecond\nthird" | press reverse-lines
+# → third
+# → second
+# → first
+```
+
 ## Unicode normalization
 
 ### `nfc` / `nfd` / `nfkc` / `nfkd`
@@ -503,4 +564,89 @@ Detect and fix mojibake (garbled text due to wrong encoding interpretation).
 ```bash
 # Paste garbled Shift_JIS text and fix it
 press fix-encoding -c -C
+```
+
+## Hash
+
+### `hash` (`hs`)
+
+Compute a hex digest of the text (UTF-8 bytes, hashed as-is — line endings
+are not normalized, matching `sha256sum` semantics).
+
+```bash
+printf "abc" | press hash
+# → ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+
+printf "abc" | press hash --algo md5
+# → 900150983cd24fb0d6963f7d28e17f72
+```
+
+Options:
+
+| Flag | Description |
+|---|---|
+| `--algo NAME` / `-a NAME` | Hash algorithm: `sha256` (default), `sha1`, `sha512`, `md5`, and anything else `hashlib` supports |
+
+## Search & replace
+
+### `replace` (`rp`)
+
+Regex (or fixed-string) search & replace across the whole text.
+
+```bash
+echo "2026-07-17" | press replace -p '(\d+)-(\d+)-(\d+)' -r '\3/\2/\1'
+# → 17/07/2026
+
+# Delete all matches (empty replacement is the default)
+echo "a-b-c" | press replace -p '-'
+# → abc
+
+# Literal mode: no regex metacharacters, no backslash expansion
+echo "price: 1.5" | press replace --fixed -p "1.5" -r "2.0"
+# → price: 2.0
+```
+
+Options:
+
+| Flag | Description |
+|---|---|
+| `--pattern REGEX` / `-p` | Pattern to search (empty = no-op) |
+| `--repl TEXT` / `-r` | Replacement; `\1` group refs allowed (default: delete matches) |
+| `--ignore-case` / `-i` | Case-insensitive matching |
+| `--fixed` / `-F` | Treat pattern and replacement as literal strings |
+
+## Text statistics
+
+### `count` (`wc`)
+
+Report character, word, line, and UTF-8 byte counts. `non-space` excludes
+all whitespace — useful for Japanese manuscript counting, where words are
+not space-delimited.
+
+```bash
+printf "hello world" | press count
+# chars      11
+# non-space  10
+# words      2
+# lines      1
+# bytes-utf8 11
+```
+
+## Table
+
+### `markdown-table` (`mdt`)
+
+Convert TSV or CSV text to a Markdown table (first row becomes the header).
+The delimiter is auto-detected: a tab in the first line selects TSV — the
+format Excel puts on the clipboard — otherwise comma-separated parsing with
+full quote handling.
+
+```bash
+# Copy a range in Excel, then:
+press markdown-table -c -C
+
+printf "name,age\nAlice,30" | press markdown-table
+# → | name | age |
+# → | --- | --- |
+# → | Alice | 30 |
 ```

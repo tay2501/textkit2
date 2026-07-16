@@ -52,10 +52,17 @@ Auto-generated from source docstrings.
    :members:
 ```
 
-### press.transforms.encoding
+### press.transforms.encode
 
 ```{eval-rst}
-.. automodule:: press.transforms.encoding
+.. automodule:: press.transforms.encode
+   :members:
+```
+
+### press.transforms.encoding_repair
+
+```{eval-rst}
+.. automodule:: press.transforms.encoding_repair
    :members:
 ```
 
@@ -63,6 +70,41 @@ Auto-generated from source docstrings.
 
 ```{eval-rst}
 .. automodule:: press.transforms.lines
+   :members:
+```
+
+### press.transforms.kana
+
+```{eval-rst}
+.. automodule:: press.transforms.kana
+   :members:
+```
+
+### press.transforms.hashing
+
+```{eval-rst}
+.. automodule:: press.transforms.hashing
+   :members:
+```
+
+### press.transforms.replace
+
+```{eval-rst}
+.. automodule:: press.transforms.replace
+   :members:
+```
+
+### press.transforms.stats
+
+```{eval-rst}
+.. automodule:: press.transforms.stats
+   :members:
+```
+
+### press.transforms.table
+
+```{eval-rst}
+.. automodule:: press.transforms.table
    :members:
 ```
 

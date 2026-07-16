@@ -1,6 +1,54 @@
-"""Tests for line-oriented transforms: trim, dedupe, sort."""
+"""Tests for line-oriented transforms: trim, dedupe, sort, number, reverse."""
 
-from press.transforms.lines import dedupe_lines, sort_lines, trim_lines
+from press.transforms.lines import (
+    dedupe_lines,
+    number_lines,
+    reverse_lines,
+    sort_lines,
+    trim_lines,
+)
+
+# ===========================================================================
+# number_lines / reverse_lines
+# ===========================================================================
+
+
+class TestNumberLines:
+    def test_basic_tab_separator(self) -> None:
+        assert number_lines("a\nb\nc") == "1\ta\n2\tb\n3\tc"
+
+    def test_custom_start(self) -> None:
+        assert number_lines("a\nb", start=10) == "10\ta\n11\tb"
+
+    def test_custom_separator(self) -> None:
+        assert number_lines("a\nb", sep=": ") == "1: a\n2: b"
+
+    def test_trailing_newline_preserved(self) -> None:
+        assert number_lines("a\nb\n") == "1\ta\n2\tb\n"
+
+    def test_crlf_normalised(self) -> None:
+        assert number_lines("a\r\nb") == "1\ta\n2\tb"
+
+    def test_empty(self) -> None:
+        assert number_lines("") == "1\t"
+
+
+class TestReverseLines:
+    def test_basic(self) -> None:
+        assert reverse_lines("a\nb\nc") == "c\nb\na"
+
+    def test_trailing_newline_preserved(self) -> None:
+        assert reverse_lines("a\nb\n") == "b\na\n"
+
+    def test_single_line_unchanged(self) -> None:
+        assert reverse_lines("only") == "only"
+
+    def test_crlf_normalised(self) -> None:
+        assert reverse_lines("a\r\nb") == "b\na"
+
+    def test_roundtrip(self) -> None:
+        assert reverse_lines(reverse_lines("x\ny\nz")) == "x\ny\nz"
+
 
 # ===========================================================================
 # trim_lines

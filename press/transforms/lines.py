@@ -1,4 +1,4 @@
-"""Line-oriented transforms: trim, dedupe, sort.
+"""Line-oriented transforms: trim, dedupe, sort, number, reverse.
 
 All functions are pure: fn(text: str, **kwargs) -> str.
 Line endings are normalised to LF on entry; trailing newline is preserved.
@@ -57,6 +57,19 @@ def dedupe_lines(text: str, *, ignore_case: bool = False, adjacent: bool = False
         result = list(seen.values())
 
     return _join(result, trailing)
+
+
+def number_lines(text: str, *, start: int = 1, sep: str = "\t") -> str:
+    """Prefix each line with its line number, joined by *sep*."""
+    lines, trailing = _normalise(text)
+    numbered = [f"{i}{sep}{line}" for i, line in enumerate(lines, start)]
+    return _join(numbered, trailing)
+
+
+def reverse_lines(text: str) -> str:
+    """Reverse the order of lines."""
+    lines, trailing = _normalise(text)
+    return _join(lines[::-1], trailing)
 
 
 def sort_lines(

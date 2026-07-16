@@ -163,6 +163,13 @@ press dedupe --ignore-case -c -C
 | `fullwidth` | `fw` | Half-width → full-width (`TABLE1` → `ＴＡＢＬＥ１`) |
 | `enlarge-kana` | `ek` | Expand small kana to normal size (`ぁ` → `あ`, `ァ` → `ア`) |
 
+### Kana
+
+| Command | Alias | Description |
+|---|---|---|
+| `katakana` | `kata` | Hiragana → katakana (`ひらがな` → `ヒラガナ`) |
+| `hiragana` | `hira` | Katakana → hiragana (`カタカナ` → `かたかな`) |
+
 ### Whitespace & Line Endings
 
 | Command | Alias | Description |
@@ -179,6 +186,8 @@ press dedupe --ignore-case -c -C
 | `trim` | `tm` | `--both` | Strip trailing whitespace from each line (`--both` strips leading too) |
 | `dedupe` | `dq` | `--ignore-case`, `--adjacent` | Remove duplicate lines, preserving first-occurrence order |
 | `sort` | `st` | `--reverse`, `--numeric`, `--ignore-case` | Sort lines (locale-aware; `--numeric` for natural number order) |
+| `number-lines` | `nl` | `--start N`, `--sep SEP` | Prefix each line with its line number (tab-separated by default) |
+| `reverse-lines` | `rl` | | Reverse the order of lines |
 
 ### Separators
 
@@ -220,6 +229,16 @@ press dedupe --ignore-case -c -C
 | `unicode-decode` | `ud` | Decode `\uXXXX` sequences to text |
 | `unicode-encode` | `ue` | Encode text to `\uXXXX` sequences |
 | `html-decode` | `hd` | Decode HTML entities (`&amp;` → `&`) |
+| `html-encode` | `he` | Escape HTML special characters (`&` → `&amp;`) |
+
+### Text Utilities
+
+| Command | Alias | Options | Description |
+|---|---|---|---|
+| `replace` | `rp` | `--pattern`, `--repl`, `--ignore-case`, `--fixed` | Regex (or fixed-string) search & replace (`\1` group refs supported) |
+| `hash` | `hs` | `--algo NAME` | Hex digest of the text (default: SHA-256; also `sha1`, `sha512`, `md5`, …) |
+| `count` | `wc` | | Count characters, words, lines, and UTF-8 bytes (`non-space` for Japanese manuscript counting) |
+| `markdown-table` | `mdt` | | TSV/CSV → Markdown table (delimiter auto-detected; Excel clipboard ready) |
 
 ### Unicode Normalization
 
