@@ -8,8 +8,6 @@ from typing import TYPE_CHECKING, Any
 from press.daemon._tray import _create_tray_image
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from press.clipboard import ClipboardGuard
     from press.config import PressConfig
     from press.daemon._backends import TrayIcon
@@ -79,39 +77,13 @@ class CommandDispatcher:
         Raises:
             ValueError: When *command* is not a known transform.
         """
-        import importlib
-        from typing import cast
+        from press.commands import is_registry_command, run_command
 
-        from press.commands import (
-            PARAMETRIC_ALIASES,
-            PARAMETRIC_COMMAND_INDEX,
-            SIMPLE_COMMAND_INDEX,
-        )
-
-        # Resolve parametric aliases (e.g. "jf" → "json-format")
-        command = PARAMETRIC_ALIASES.get(command, command)
-
-        # Simple commands: resolved dynamically via the central registry
-        if command in SIMPLE_COMMAND_INDEX:
-            spec = SIMPLE_COMMAND_INDEX[command]
-            fn = cast(
-                "Callable[[str], str]",
-                getattr(importlib.import_module(spec.module), spec.fn),
-            )
-            return fn(text)
-
-        # Parametric commands: registry-driven dispatch with optional config kwargs
-        if command in PARAMETRIC_COMMAND_INDEX:
-            spec_p = PARAMETRIC_COMMAND_INDEX[command]
-            fn_p = cast(
-                "Callable[..., str]",
-                getattr(importlib.import_module(spec_p.module), spec_p.fn),
-            )
-            if kwargs is None:
-                kwargs = (
-                    spec_p.daemon_kwargs(self._config) if spec_p.daemon_kwargs is not None else {}
-                )
-            return fn_p(text, **kwargs)
+        # Registry (simple or parametric) commands share the CLI's execution
+        # path.  ``kwargs`` from a delegating pipe client win; the hotkey path
+        # passes ``None`` and parametric options come from config instead.
+        if is_registry_command(command):
+            return run_command(command, text, cli_kwargs=kwargs, config=self._config)
 
         # Special commands that require internal helpers
         match command:
@@ -131,15 +103,10 @@ class CommandDispatcher:
         Steps are restricted to registry commands — the same rule as the CLI
         ``chain`` command, and a structural guarantee against recursion.
         """
-        from press.commands import (
-            PARAMETRIC_ALIASES,
-            PARAMETRIC_COMMAND_INDEX,
-            SIMPLE_COMMAND_INDEX,
-        )
+        from press.commands import is_registry_command
 
         for step in steps:
-            resolved = PARAMETRIC_ALIASES.get(step, step)
-            if resolved not in SIMPLE_COMMAND_INDEX and resolved not in PARAMETRIC_COMMAND_INDEX:
+            if not is_registry_command(step):
                 raise ValueError(f"pipeline {name!r}: step {step!r} is not a transform command")
             text = self.transform(step, text)
         return text

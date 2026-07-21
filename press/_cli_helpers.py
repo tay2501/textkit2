@@ -12,6 +12,39 @@ if TYPE_CHECKING:
 type _SubParsers = argparse._SubParsersAction[argparse.ArgumentParser]
 
 
+def bounded_int(minimum: int, label: str) -> Callable[[str], int]:
+    """Build an argparse ``type`` that parses an int and enforces a lower bound.
+
+    Shared by the generator commands (``genpass`` length/clear-after, ``uuid``
+    count) so the ``>= N`` validation and its message live in one place.
+    """
+
+    def _parse(value: str) -> int:
+        n = int(value)
+        if n < minimum:
+            raise argparse.ArgumentTypeError(f"{label} must be >= {minimum}, got {n}")
+        return n
+
+    return _parse
+
+
+def write_clipboard_or_warn(text: str, *, cmd: str, quiet: bool, sensitive: bool = False) -> bool:
+    """Write *text* to the clipboard, printing a warning (not failing) on error.
+
+    Returns whether the write succeeded.  The generator commands already
+    delivered their value on stdout, so a clipboard failure is advisory.
+    """
+    try:
+        from press.clipboard import set_clipboard_text
+
+        set_clipboard_text(text, sensitive=sensitive)
+    except Exception as exc:
+        if not quiet:
+            print(f"press {cmd}: warning: clipboard write failed: {exc}", file=sys.stderr)
+        return False
+    return True
+
+
 def _read_input(args: argparse.Namespace) -> str:
     """Read input: clipboard (TTY default), positional arg, stdin pipe, or '-' sentinel."""
     if getattr(args, "clip_in", False):

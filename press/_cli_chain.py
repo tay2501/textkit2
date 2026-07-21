@@ -21,50 +21,24 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 
-def _is_registry_command(step: str) -> bool:
-    from press.commands import (
-        PARAMETRIC_ALIASES,
-        PARAMETRIC_COMMAND_INDEX,
-        SIMPLE_COMMAND_INDEX,
-    )
-
-    return (
-        step in SIMPLE_COMMAND_INDEX
-        or PARAMETRIC_ALIASES.get(step, step) in PARAMETRIC_COMMAND_INDEX
-    )
-
-
 def _expand_steps(steps: list[str]) -> list[str]:
     """Expand ``[pipelines]`` names one level; registry commands pass through.
 
     The config file is only read when a non-registry step appears, keeping
-    the pure-registry fast path free of file I/O.
+    the pure-registry fast path free of file I/O.  The expansion itself (and
+    its nesting rule) lives in :func:`press.commands.expand_pipeline_steps`.
 
     Raises:
         ValueError: When an expanded step is itself a pipeline name (nesting).
     """
-    if all(_is_registry_command(step) for step in steps):
+    from press.commands import expand_pipeline_steps, is_registry_command
+
+    if all(is_registry_command(step) for step in steps):
         return steps
 
     from press.config import load_config
 
-    pipelines = load_config().pipelines
-    expanded: list[str] = []
-    for step in steps:
-        # Registry commands win collisions — a pipeline cannot shadow them.
-        if _is_registry_command(step):
-            expanded.append(step)
-        elif step in pipelines:
-            for sub_step in pipelines[step]:
-                if sub_step in pipelines:
-                    raise ValueError(
-                        f"pipeline {step!r}: step {sub_step!r} is a pipeline "
-                        "(nesting is not supported)"
-                    )
-                expanded.append(sub_step)
-        else:
-            expanded.append(step)  # unknown — resolve_transform reports it
-    return expanded
+    return expand_pipeline_steps(steps, load_config().pipelines)
 
 
 def _resolve_chain(steps: list[str]) -> Callable[[str], str]:

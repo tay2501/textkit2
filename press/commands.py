@@ -414,30 +414,141 @@ PARAMETRIC_ALIASES: dict[str, str] = {
 DAEMON_SPECIAL_COMMANDS: frozenset[str] = frozenset({"clear", "hold", "dict", "dict_reverse"})
 
 
+# ---------------------------------------------------------------------------
+# Single source of truth: resolution + execution
+#
+# Every entry point that turns a command name into a running transform — the
+# CLI (``__main__._register_transform_command``), the ``chain`` command
+# (``resolve_transform`` below), and the daemon (``CommandDispatcher``) — routes
+# through ``resolve_spec`` and ``run_command`` so the module import, the
+# alias handling, and the parametric-kwarg precedence live in exactly one place.
+# ---------------------------------------------------------------------------
+
+
+def resolve_spec(command: str) -> SimpleCommand | ParametricCommand | None:
+    """Resolve *command* (name or alias) to its registry spec, or ``None``.
+
+    Both indexes already carry alias keys, so a single lookup per registry
+    covers names and aliases alike.
+    """
+    simple = SIMPLE_COMMAND_INDEX.get(command)
+    if simple is not None:
+        return simple
+    return PARAMETRIC_COMMAND_INDEX.get(command)
+
+
+def is_registry_command(command: str) -> bool:
+    """Return whether *command* (name or alias) is a registered transform."""
+    return resolve_spec(command) is not None
+
+
+def run_command(
+    command: str,
+    text: str,
+    *,
+    cli_kwargs: dict[str, Any] | None = None,
+    config: PressConfig | None = None,
+) -> str:
+    """Resolve *command* and apply it to *text*, returning the result.
+
+    Parametric options are chosen by precedence:
+
+    1. ``cli_kwargs`` when not ``None`` — explicit per-invocation options from a
+       CLI process (or a delegating pipe client).
+    2. ``config`` via the command's ``daemon_kwargs`` — the daemon hotkey path,
+       where options come from ``config.toml`` rather than the command line.
+    3. Otherwise the transform function's own defaults (e.g. a ``chain`` step).
+
+    Raises:
+        ValueError: When *command* is not a known transform.
+    """
+    import importlib
+
+    spec = resolve_spec(command)
+    if spec is None:
+        raise ValueError(f"unknown command: {command!r}")
+    fn = getattr(importlib.import_module(spec.module), spec.fn)
+    if isinstance(spec, SimpleCommand):
+        return str(fn(text))
+    if cli_kwargs is not None:
+        kwargs = cli_kwargs
+    elif config is not None and spec.daemon_kwargs is not None:
+        kwargs = spec.daemon_kwargs(config)
+    else:
+        kwargs = {}
+    return str(fn(text, **kwargs))
+
+
 def resolve_transform(command: str) -> Callable[[str], str] | None:
     """Resolve *command* (name or alias) to a ``text -> text`` callable.
 
     Simple commands map straight onto their transform function.  Parametric
-    commands are wrapped so they run with their function defaults — per-step
-    options are a CLI concern (``press <cmd> --flag``), not a chain-step one.
+    commands run with their function defaults — per-step options are a CLI
+    concern (``press <cmd> --flag``), not a chain-step one.  Backed by
+    :func:`run_command` so ``chain`` shares one execution path with the CLI and
+    the daemon.
 
     Returns ``None`` for unknown names so callers can layer their own
     resolution (e.g. ``[pipelines]`` names) on top.
     """
-    import importlib
+    if resolve_spec(command) is None:
+        return None
 
-    spec = SIMPLE_COMMAND_INDEX.get(command)
-    if spec is not None:
-        fn: Callable[[str], str] = getattr(importlib.import_module(spec.module), spec.fn)
-        return fn
+    def _run(text: str, _cmd: str = command) -> str:
+        return run_command(_cmd, text)
 
-    spec_p = PARAMETRIC_COMMAND_INDEX.get(PARAMETRIC_ALIASES.get(command, command))
-    if spec_p is not None:
-        fn_p: Callable[..., str] = getattr(importlib.import_module(spec_p.module), spec_p.fn)
+    return _run
 
-        def _with_defaults(text: str, _fn: Callable[..., str] = fn_p) -> str:
-            return _fn(text)
 
-        return _with_defaults
+# ---------------------------------------------------------------------------
+# Pipeline helpers (shared by the CLI ``chain`` command, ``config validate``,
+# and daemon dispatch so the rules — registry-only steps, no nesting — and
+# their wording live in one place).
+# ---------------------------------------------------------------------------
 
-    return None
+
+def _nesting_error(name: str, step: str) -> str:
+    return f"pipeline {name!r}: step {step!r} is a pipeline (nesting is not supported)"
+
+
+def expand_pipeline_steps(steps: list[str], pipelines: dict[str, tuple[str, ...]]) -> list[str]:
+    """Expand ``[pipelines]`` names one level; registry commands pass through.
+
+    Registry commands win a name collision — a pipeline cannot shadow them.
+
+    Raises:
+        ValueError: When an expanded step is itself a pipeline name (nesting).
+    """
+    expanded: list[str] = []
+    for step in steps:
+        if is_registry_command(step):
+            expanded.append(step)
+        elif step in pipelines:
+            for sub_step in pipelines[step]:
+                if sub_step in pipelines:
+                    raise ValueError(_nesting_error(step, sub_step))
+                expanded.append(sub_step)
+        else:
+            expanded.append(step)  # unknown — resolve_transform reports it
+    return expanded
+
+
+def validate_pipelines(pipelines: dict[str, tuple[str, ...]]) -> list[str]:
+    """Validate ``[pipelines]`` against the command registry.
+
+    Checks (all reported, not just the first): empty step lists, names that
+    shadow a registry command or alias, steps that are not registry commands,
+    and steps that reference another pipeline (nesting is unsupported).
+    """
+    errors: list[str] = []
+    for name, steps in pipelines.items():
+        if is_registry_command(name):
+            errors.append(f"pipeline {name!r} shadows a command name — rename it")
+        if not steps:
+            errors.append(f"pipeline {name!r} has no steps")
+        for step in steps:
+            if step in pipelines:
+                errors.append(_nesting_error(name, step))
+            elif not is_registry_command(step):
+                errors.append(f"pipeline {name!r}: unknown step {step!r}")
+    return errors

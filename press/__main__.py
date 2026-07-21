@@ -9,7 +9,13 @@ import os
 import sys
 from typing import TYPE_CHECKING, Any, override
 
-from press._cli_helpers import _add_io_args, _run_transform, _SubParsers
+from press._cli_helpers import (
+    _add_io_args,
+    _run_transform,
+    _SubParsers,
+    bounded_int,
+    write_clipboard_or_warn,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -61,8 +67,6 @@ def _register_transform_command(sub: _SubParsers, cmd: SimpleCommand | Parametri
     each option's ``kwarg`` is both the argparse dest and the keyword argument
     forwarded to the transform function.
     """
-    import importlib
-
     from press.commands import ParametricCommand
 
     cli_args = cmd.cli_args if isinstance(cmd, ParametricCommand) else ()
@@ -95,8 +99,9 @@ def _register_transform_command(sub: _SubParsers, cmd: SimpleCommand | Parametri
             delegated = try_delegate(_cmd.name, text, kw)
             if delegated is not None:
                 return delegated
-            fn = getattr(importlib.import_module(_cmd.module), _cmd.fn)
-            return str(fn(text, **kw))
+            from press.commands import run_command
+
+            return run_command(_cmd.name, text, cli_kwargs=kw)
 
         extras = {arg.kwarg: getattr(a, arg.kwarg) for arg in _cli_args}
         return _run_transform(_apply, a, **extras)
@@ -134,23 +139,11 @@ def _genpass_clear_after(seconds: int, *, quiet: bool) -> None:
 
 
 def _register_genpass_command(sub: _SubParsers) -> None:
-    def _positive_int(value: str) -> int:
-        n = int(value)
-        if n < 1:
-            raise argparse.ArgumentTypeError(f"length must be >= 1, got {n}")
-        return n
-
-    def _nonneg_int(value: str) -> int:
-        n = int(value)
-        if n < 0:
-            raise argparse.ArgumentTypeError(f"seconds must be >= 0, got {n}")
-        return n
-
     p = sub.add_parser("genpass", aliases=["gp"], help="Generate a secure random password")
     p.add_argument(
         "-n",
         "--length",
-        type=_positive_int,
+        type=bounded_int(1, "length"),
         default=20,
         metavar="N",
         help="Password length (default: 20)",
@@ -171,7 +164,7 @@ def _register_genpass_command(sub: _SubParsers) -> None:
     p.add_argument("-q", "--quiet", action="store_true", help="Suppress all stderr output")
     p.add_argument(
         "--clear-after",
-        type=_nonneg_int,
+        type=bounded_int(0, "seconds"),
         default=0,
         metavar="SEC",
         help=(
@@ -190,16 +183,11 @@ def _register_genpass_command(sub: _SubParsers) -> None:
         # --no-clip (-N) suppresses this to avoid overwriting an existing clipboard value.
         wrote_clipboard = False
         if (a.clip_out or sys.stdout.isatty()) and not a.no_clip:
-            try:
-                from press.clipboard import set_clipboard_text
-
-                # sensitive=True keeps the password out of the Win+V clipboard
-                # history and Cloud Clipboard sync (KeePassXC-style exclusion).
-                set_clipboard_text(password, sensitive=True)
-                wrote_clipboard = True
-            except Exception as exc:
-                if not a.quiet:
-                    print(f"press genpass: warning: clipboard write failed: {exc}", file=sys.stderr)
+            # sensitive=True keeps the password out of the Win+V clipboard
+            # history and Cloud Clipboard sync (KeePassXC-style exclusion).
+            wrote_clipboard = write_clipboard_or_warn(
+                password, cmd="genpass", quiet=a.quiet, sensitive=True
+            )
         if a.clear_after:
             if wrote_clipboard:
                 _genpass_clear_after(a.clear_after, quiet=a.quiet)
@@ -214,17 +202,11 @@ def _register_genpass_command(sub: _SubParsers) -> None:
 
 
 def _register_uuid_command(sub: _SubParsers) -> None:
-    def _positive_int(value: str) -> int:
-        n = int(value)
-        if n < 1:
-            raise argparse.ArgumentTypeError(f"count must be >= 1, got {n}")
-        return n
-
     p = sub.add_parser("uuid", help="Generate random UUIDs (version 4)")
     p.add_argument(
         "-n",
         "--count",
-        type=_positive_int,
+        type=bounded_int(1, "count"),
         default=1,
         metavar="N",
         help="Number of UUIDs to generate, one per line (default: 1)",
@@ -247,15 +229,9 @@ def _register_uuid_command(sub: _SubParsers) -> None:
         sys.stdout.write(values + "\n")
         sys.stdout.flush()
         if a.clip_out:
-            try:
-                from press.clipboard import set_clipboard_text
-
-                set_clipboard_text(values)
-            except Exception as exc:
-                # Mirrors genpass: stdout already delivered the value, so a
-                # clipboard failure is a warning, not a command failure.
-                if not a.quiet:
-                    print(f"press uuid: warning: clipboard write failed: {exc}", file=sys.stderr)
+            # Mirrors genpass: stdout already delivered the value, so a
+            # clipboard failure is a warning, not a command failure.
+            write_clipboard_or_warn(values, cmd="uuid", quiet=a.quiet)
         return 0
 
     p.set_defaults(func=_uuid)

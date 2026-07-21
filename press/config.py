@@ -272,30 +272,13 @@ def config_validate(path: Path) -> tuple[bool, str]:
 def pipeline_errors(config: PressConfig) -> list[str]:
     """Validate ``[pipelines]`` against the command registry.
 
-    Checks (all reported, not just the first): empty step lists, names that
-    shadow a registry command or alias, steps that are not registry commands,
-    and steps that reference another pipeline (nesting is unsupported).
+    Thin wrapper over :func:`press.commands.validate_pipelines` — the rules and
+    their wording live there, shared with the CLI ``chain`` command.  The import
+    is lazy so config loading stays cheap for the delegating CLI path.
     """
-    # Lazy import: config loading must stay cheap for the delegating CLI path.
-    from press.commands import PARAMETRIC_COMMAND_INDEX, SIMPLE_COMMAND_INDEX
+    from press.commands import validate_pipelines
 
-    def _is_command(name: str) -> bool:
-        return name in SIMPLE_COMMAND_INDEX or name in PARAMETRIC_COMMAND_INDEX
-
-    errors: list[str] = []
-    for name, steps in config.pipelines.items():
-        if _is_command(name):
-            errors.append(f"pipeline {name!r} shadows a command name — rename it")
-        if not steps:
-            errors.append(f"pipeline {name!r} has no steps")
-        for step in steps:
-            if step in config.pipelines:
-                errors.append(
-                    f"pipeline {name!r}: step {step!r} is a pipeline (nesting is not supported)"
-                )
-            elif not _is_command(step):
-                errors.append(f"pipeline {name!r}: unknown step {step!r}")
-    return errors
+    return validate_pipelines(config.pipelines)
 
 
 def _toml_key(key: str) -> str:
