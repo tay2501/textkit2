@@ -130,3 +130,11 @@ cleanup = ["trim", "dedupe", "lf"]
 [hotkeys.bindings]
 x = "cleanup"
 ```
+
+> **Note — the same pipeline can behave differently by route.** A parametric
+> step such as `trim` uses its *function defaults* when the pipeline runs from
+> the CLI (`press chain cleanup`), but picks up your `[trim]` / `[sql_in]`
+> config values when the pipeline runs from a **hotkey**. If you need a step to
+> honour a specific option in both places, set it in the relevant config
+> section and remember the CLI `chain` path ignores it. Per-step CLI flags
+> inside a pipeline are not supported.
