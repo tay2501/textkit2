@@ -378,6 +378,7 @@ class TestConfigToToml:
         assert reloaded.trim == original.trim
         assert reloaded.ui == original.ui
         assert reloaded.hold == original.hold
+        assert reloaded.type == original.type
 
     def test_schema_version_in_output(self) -> None:
         toml_str = _config_to_toml(PressConfig())
@@ -393,6 +394,61 @@ class TestConfigToToml:
         cfg_file.write_text(_config_to_toml(original), encoding="utf-8")
         reloaded = load_config(cfg_file)
         assert reloaded.pipelines == {"cleanup": ("trim", "dedupe", "lf")}
+
+
+# ---------------------------------------------------------------------------
+# [type]
+# ---------------------------------------------------------------------------
+
+
+class TestTypeConfig:
+    def test_defaults_match_the_keystrokes_module(self) -> None:
+        """One set of defaults, so tuning config.toml is the only knob."""
+        from press.config import TypeConfig
+        from press.keystrokes import (
+            DEFAULT_CHUNK_DELAY,
+            DEFAULT_CHUNK_SIZE,
+            DEFAULT_MAX_CHARS,
+        )
+
+        cfg = TypeConfig()
+        assert cfg.max_chars == DEFAULT_MAX_CHARS
+        assert cfg.chunk_size == DEFAULT_CHUNK_SIZE
+        assert cfg.chunk_delay_ms / 1000 == DEFAULT_CHUNK_DELAY
+
+    def test_values_are_read_from_the_file(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(
+            "[type]\nmax_chars = 50\nchunk_size = 8\nchunk_delay_ms = 20\nnewline = 'skip'\n",
+            encoding="utf-8",
+        )
+        cfg = load_config(cfg_file).type
+        assert (cfg.max_chars, cfg.chunk_size, cfg.chunk_delay_ms, cfg.newline) == (
+            50,
+            8,
+            20,
+            "skip",
+        )
+
+    def test_unknown_newline_mode_falls_back(self, tmp_path: Path) -> None:
+        """A cosmetic typo must not stop the daemon from starting."""
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text('[type]\nnewline = "paste"\n', encoding="utf-8")
+        assert load_config(cfg_file).type.newline == "enter"
+
+    def test_chunk_size_is_never_zero(self, tmp_path: Path) -> None:
+        """chunk_size = 0 would make range() step by zero and never send."""
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("[type]\nchunk_size = 0\n", encoding="utf-8")
+        assert load_config(cfg_file).type.chunk_size == 1
+
+    def test_partial_reset(self, tmp_path: Path) -> None:
+        from press.config import config_reset
+
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("[type]\nmax_chars = 5\n", encoding="utf-8")
+        config_reset(cfg_file, key="type")
+        assert load_config(cfg_file).type == PressConfig().type
 
 
 # ---------------------------------------------------------------------------

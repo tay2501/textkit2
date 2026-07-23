@@ -444,6 +444,10 @@ SPECIAL_COMMANDS: tuple[SpecialCommand, ...] = (
     SpecialCommand("undo", (), hotkey=True),
     SpecialCommand("dict", (), hotkey=True),
     SpecialCommand("dict_reverse", (), hotkey=True),  # daemon-only; no CLI parser
+    # Types the clipboard into the focused window instead of pasting it.
+    # Daemon-only by nature: run from a shell it would type into that shell.
+    # "ty" resolves in two keystrokes; "type" itself stays typeable.
+    SpecialCommand("type", ("ty",), hotkey=True),
     # CLI-only.  Each exclusion is deliberate:
     # - genpass writes with sensitive=True, which suppresses the undo snapshot
     #   by design — a mistyped sequence would destroy the clipboard with no way

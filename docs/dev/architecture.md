@@ -51,6 +51,7 @@ pipe instead of importing the transform module — see
 | `__main__.py` | argparse construction, I/O wiring (`stdin`/`stdout`/clipboard), UTF-8 setup |
 | `commands.py` | Declarative registry of all simple transform commands (`SimpleCommand` + `SIMPLE_COMMANDS` + `SIMPLE_COMMAND_INDEX`); single source of truth shared by CLI and daemon |
 | `clipboard.py` | Win32 ctypes API — `get_clipboard_text`, `set_clipboard_text`, `clear_clipboard` (Windows only) |
+| `keystrokes.py` | Win32 `SendInput` synthesis for the `type` command — pure `plan_keystrokes()` plus a Windows-only sender |
 | `config.py` | TOML loader → frozen `PressConfig` dataclass hierarchy (`slots=True`) |
 | `_paths.py` | Single source for `%APPDATA%\press` locations |
 | `_pipe.py` | Named-pipe protocol + CLI client (`try_delegate`); deliberately import-light |
@@ -86,7 +87,7 @@ a future replacement (ctypes `Shell_NotifyIcon`) to a single-module change.
 | No async | Win32 message loop handles event dispatch; asyncio adds no value |
 | No ORM | TSV dictionary is an in-memory `dict` loaded on demand |
 | `transforms/` are pure functions | No side effects = trivially testable in isolation |
-| OS-specific code isolated | `clipboard.py` holds the clipboard Win32 calls; `daemon/_backends.py` holds every pystray/pynput call |
+| OS-specific code isolated | `clipboard.py` holds the clipboard Win32 calls, `keystrokes.py` the input-synthesis ones; `daemon/_backends.py` holds every pystray/pynput call |
 | Flat package structure | Single `press/` package; no Polylith components/bases split |
 | `tomllib` for config | Python 3.11+ standard library; no Pydantic needed |
 | Lazy imports everywhere | PEP 562 `__getattr__` in `transforms/__init__.py`; deferred imports in `__main__.py` and the daemon package reduce startup time on HDD/EDR-monitored systems |
@@ -280,6 +281,7 @@ press/
 ├── __main__.py          CLI entry point, argparse, I/O dispatch
 ├── commands.py          Central command registry (SimpleCommand)
 ├── clipboard.py         Win32 ctypes clipboard API
+├── keystrokes.py        Win32 SendInput synthesis (the `type` command)
 ├── config.py            TOML → PressConfig dataclass
 ├── _paths.py            %APPDATA%\press path helpers
 ├── _pipe.py             Named-pipe protocol + CLI client

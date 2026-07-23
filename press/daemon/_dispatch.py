@@ -65,6 +65,9 @@ class CommandDispatcher:
             if command == "undo":
                 self._undo_swap()
                 return
+            if command == "type":
+                self._type_clipboard()
+                return
             text = get_clipboard_text()
             result = self.transform(command, text)
             self._remember_for_undo(text)
@@ -172,6 +175,26 @@ class CommandDispatcher:
             self._guard.release()
             self._update_icon(holding=False)
             self._notify_success("hold-release", "")
+
+    def _type_clipboard(self) -> None:
+        """Type the clipboard into the focused window instead of pasting it.
+
+        The clipboard is only ever the *source* here, so there is nothing to
+        snapshot for undo — and nothing press can take back once the target
+        application has received the keystrokes.
+        """
+        from press.clipboard import get_clipboard_text
+        from press.keystrokes import type_text
+
+        cfg = self._config.type
+        type_text(
+            get_clipboard_text(),
+            newline=cfg.newline,
+            max_chars=cfg.max_chars,
+            chunk_size=cfg.chunk_size,
+            chunk_delay=cfg.chunk_delay_ms / 1000,
+        )
+        self._notify_success("type", "")
 
     def _remember_for_undo(self, text: str) -> None:
         """Keep the pre-overwrite clipboard text for the undo command.

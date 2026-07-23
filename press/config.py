@@ -8,7 +8,7 @@ Missing files yield defaults; partial files merge with defaults.
 import tomllib
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from press._paths import appdata_dir, press_dir
 
@@ -20,6 +20,7 @@ __all__ = [
     "PressConfig",
     "SqlInConfig",
     "TrimConfig",
+    "TypeConfig",
     "UiConfig",
     "binding_shadow_warnings",
     "config_reset",
@@ -107,6 +108,23 @@ class HoldConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class TypeConfig:
+    """Options for the ``type`` command (keystroke-by-keystroke pasting).
+
+    The defaults mirror :mod:`press.keystrokes`; they live here so a user whose
+    editor swallows fast input can slow it down, and so ``newline`` can be
+    switched away from Enter in applications where Enter means "send".
+    """
+
+    max_chars: int = 2000
+    chunk_size: int = 200
+    chunk_delay_ms: int = 5
+    # Spelled out rather than imported from press.keystrokes: config.py is on
+    # the CLI's import path and must not pull in the keystroke module.
+    newline: Literal["enter", "unicode", "skip"] = "enter"
+
+
+@dataclass(frozen=True, slots=True)
 class PressConfig:
     """Top-level configuration object for press."""
 
@@ -116,6 +134,7 @@ class PressConfig:
     dictionary: DictionaryConfig = field(default_factory=DictionaryConfig)
     ui: UiConfig = field(default_factory=UiConfig)
     hold: HoldConfig = field(default_factory=HoldConfig)
+    type: TypeConfig = field(default_factory=TypeConfig)
     # Named transform chains: name -> ordered registry command names.
     # Runnable via `press chain <name>` and bindable to daemon hotkeys.
     pipelines: dict[str, tuple[str, ...]] = field(default_factory=dict)
@@ -160,6 +179,20 @@ def _parse_hold(data: dict[str, Any]) -> HoldConfig:
     return HoldConfig(
         monitor_clipboard=data.get("monitor_clipboard", default.monitor_clipboard),
         intercept_paste_keys=data.get("intercept_paste_keys", default.intercept_paste_keys),
+    )
+
+
+def _parse_type(data: dict[str, Any]) -> TypeConfig:
+    default = TypeConfig()
+    raw_newline = data.get("newline", default.newline)
+    # Unknown values fall back rather than raise: an unrecognised newline mode
+    # would otherwise stop the daemon from starting over a cosmetic setting.
+    newline = raw_newline if raw_newline in ("enter", "unicode", "skip") else default.newline
+    return TypeConfig(
+        max_chars=int(data.get("max_chars", default.max_chars)),
+        chunk_size=max(1, int(data.get("chunk_size", default.chunk_size))),
+        chunk_delay_ms=int(data.get("chunk_delay_ms", default.chunk_delay_ms)),
+        newline=newline,
     )
 
 
@@ -218,6 +251,7 @@ def load_config(path: Path | None = None) -> PressConfig:
     dictionary = _parse_dictionary(raw.get("dictionary", {}))
     ui = _parse_ui(raw.get("ui", {}))
     hold = _parse_hold(raw.get("hold", {}))
+    type_cfg = _parse_type(raw.get("type", {}))
     pipelines = _parse_pipelines(raw.get("pipelines", {}))
 
     return PressConfig(
@@ -227,6 +261,7 @@ def load_config(path: Path | None = None) -> PressConfig:
         dictionary=dictionary,
         ui=ui,
         hold=hold,
+        type=type_cfg,
         pipelines=pipelines,
         schema_version=schema_version,
     )
@@ -335,6 +370,12 @@ def _config_to_toml(config: PressConfig) -> str:
         f"monitor_clipboard = {str(config.hold.monitor_clipboard).lower()}",
         f"intercept_paste_keys = {str(config.hold.intercept_paste_keys).lower()}",
         "",
+        "[type]",
+        f"max_chars = {config.type.max_chars}",
+        f"chunk_size = {config.type.chunk_size}",
+        f"chunk_delay_ms = {config.type.chunk_delay_ms}",
+        f'newline = "{config.type.newline}"',
+        "",
         "[pipelines]",
     ]
     if config.pipelines:
@@ -352,8 +393,8 @@ def config_reset(path: Path, *, key: str | None = None) -> bool:
     Args:
         path: Path to ``config.toml``.
         key: Section name to reset (``hotkeys``, ``sql_in``, ``trim``,
-            ``dictionary``, ``ui``, ``hold``, ``pipelines``).  ``None`` resets
-            the entire file.
+            ``dictionary``, ``ui``, ``hold``, ``type``, ``pipelines``).
+            ``None`` resets the entire file.
 
     Returns:
         ``True`` if a backup was created, ``False`` if no previous file existed.
@@ -383,6 +424,8 @@ def config_reset(path: Path, *, key: str | None = None) -> bool:
                 config = replace(existing, ui=UiConfig())
             case "hold":
                 config = replace(existing, hold=HoldConfig())
+            case "type":
+                config = replace(existing, type=TypeConfig())
             case "pipelines":
                 config = replace(existing, pipelines={})
             case _:

@@ -32,11 +32,11 @@ def _register_config_commands(sub: _SubParsers) -> None:
     )
     rst_p.add_argument(
         "--key",
-        choices=["hotkeys", "sql_in", "trim", "dictionary", "ui", "hold", "pipelines"],
+        choices=["hotkeys", "sql_in", "trim", "dictionary", "ui", "hold", "type", "pipelines"],
         default=None,
         metavar="SECTION",
         help=(
-            "Section to reset (hotkeys, sql_in, trim, dictionary, ui, hold, pipelines); "
+            "Section to reset (hotkeys, sql_in, trim, dictionary, ui, hold, type, pipelines); "
             "omit to reset the entire file"
         ),
     )

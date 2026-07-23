@@ -31,11 +31,18 @@ class TrayIcon(Protocol):
 
 
 class KeyListener(Protocol):
-    """Structural type for keyboard listeners (satisfied by pynput listeners)."""
+    """Structural type for keyboard listeners (satisfied by pynput listeners).
+
+    ``join`` is part of the seam because ``stop()`` is only a request: pynput
+    listeners are threads, and the OS hook stays installed until the thread
+    actually exits.  Callers that must not race the hook wait on it.
+    """
 
     def start(self) -> None: ...
 
     def stop(self) -> None: ...
+
+    def join(self, timeout: float | None = None) -> None: ...
 
 
 # ---------------------------------------------------------------------------

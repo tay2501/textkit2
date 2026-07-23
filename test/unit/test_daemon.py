@@ -126,6 +126,59 @@ class TestCommandDispatcherHalfwidth:
             mock_set.assert_not_called()
 
 
+class TestCommandDispatcherType:
+    """``type`` reads the clipboard and types it — it never writes it back."""
+
+    def test_dispatch_type_sends_clipboard_as_keystrokes(self) -> None:
+        from press.config import PressConfig
+        from press.daemon import CommandDispatcher
+
+        with (
+            patch("press.clipboard.get_clipboard_text", return_value="abc"),
+            patch("press.clipboard.set_clipboard_text") as mock_set,
+            patch("press.keystrokes.type_text") as mock_type,
+        ):
+            d = CommandDispatcher(PressConfig())
+            d.dispatch("type")
+            mock_set.assert_not_called()
+            assert mock_type.call_args.args == ("abc",)
+
+    def test_config_drives_the_keystroke_options(self) -> None:
+        from press.config import PressConfig, TypeConfig
+        from press.daemon import CommandDispatcher
+
+        config = PressConfig(
+            type=TypeConfig(max_chars=9, chunk_size=3, chunk_delay_ms=50, newline="skip")
+        )
+        with (
+            patch("press.clipboard.get_clipboard_text", return_value="abc"),
+            patch("press.keystrokes.type_text") as mock_type,
+        ):
+            CommandDispatcher(config).dispatch("type")
+        assert mock_type.call_args.kwargs == {
+            "newline": "skip",
+            "max_chars": 9,
+            "chunk_size": 3,
+            "chunk_delay": 0.05,  # milliseconds in the file, seconds at the API
+        }
+
+    def test_failure_is_reported_not_swallowed(self) -> None:
+        """An over-long clipboard must tell the user, not fail silently."""
+        from press.config import PressConfig, UiConfig
+        from press.daemon import CommandDispatcher
+
+        with (
+            patch("press.clipboard.get_clipboard_text", return_value="abc"),
+            patch("press.keystrokes.type_text", side_effect=ValueError("too long")),
+        ):
+            d = CommandDispatcher(PressConfig(ui=UiConfig(notify_level="error")))
+            mock_icon = MagicMock()
+            d.set_icon(mock_icon)
+            d.dispatch("type")
+        mock_icon.notify.assert_called_once()
+        assert "too long" in mock_icon.notify.call_args.args[0]
+
+
 class TestCommandDispatcherHold:
     def test_hold_stores_clipboard_text(self) -> None:
         """dispatch("hold") engages the guard with the clipboard text."""
@@ -506,6 +559,63 @@ class TestHotkeyManager:
         hm.reset_leader()
         hm._on_prefix()
         assert hm._leader.start.call_count == 2
+
+    def test_reset_leader_waits_for_the_suppressing_hook(self) -> None:
+        """``type`` injects keys — the suppressing hook must be gone by then."""
+        from press.config import HotkeysConfig
+        from press.daemon import HotkeyManager, LeaderKeyListener
+
+        q: queue.Queue[tuple[str, ...]] = queue.Queue()
+        hm = HotkeyManager(HotkeysConfig(), q)
+        hm._leader = MagicMock(spec=LeaderKeyListener)
+
+        hm.reset_leader()
+        hm._leader.wait_stopped.assert_called_once()
+
+
+class TestLeaderSuppressionBarrier:
+    """The hook must be released before the work item becomes visible.
+
+    A ``WH_KEYBOARD_LL`` hook receives injected events too, so a still-running
+    suppressing listener would swallow the keystrokes ``type`` synthesizes.
+    """
+
+    def _listener(self) -> tuple[Any, queue.Queue[tuple[str, ...]], Any]:
+        from press.daemon import LeaderKeyListener
+
+        q: queue.Queue[tuple[str, ...]] = queue.Queue()
+        ll = LeaderKeyListener({"w": "halfwidth"}, {}, q)
+        fake = MagicMock()
+        ll._listener = fake
+        return ll, q, fake
+
+    def test_stop_is_requested_before_the_item_is_enqueued(self) -> None:
+        ll, q, fake = self._listener()
+        order: list[str] = []
+        fake.stop.side_effect = lambda: order.append("stop")
+
+        from pynput import keyboard as kb
+
+        ll._on_press(kb.KeyCode.from_char("w"))
+        order.append("enqueued" if not q.empty() else "empty")
+        assert order == ["stop", "enqueued"]
+
+    def test_wait_stopped_joins_the_hook_thread_once(self) -> None:
+        ll, _q, fake = self._listener()
+        from pynput import keyboard as kb
+
+        ll._on_press(kb.KeyCode.from_char("w"))
+        ll.wait_stopped()
+        fake.join.assert_called_once()
+
+        ll.wait_stopped()  # nothing pending — must not join a second time
+        fake.join.assert_called_once()
+
+    def test_wait_stopped_without_a_listener_is_a_no_op(self) -> None:
+        from press.daemon import LeaderKeyListener
+
+        q: queue.Queue[tuple[str, ...]] = queue.Queue()
+        LeaderKeyListener({}, {}, q).wait_stopped()  # must not raise
 
 
 # ---------------------------------------------------------------------------

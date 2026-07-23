@@ -25,6 +25,9 @@ _LEADER_TIMEOUT = 2.0  # seconds of inactivity before the sequence is committed
 # Absolute cap on how long the suppressing listener may hold the keyboard,
 # whatever the user types.  Unlike _LEADER_TIMEOUT this is never re-armed.
 _LEADER_HARD_LIMIT = 10.0
+# How long to wait for the suppressing hook thread to actually exit.  Bounded
+# so a wedged pynput thread cannot stall the worker queue forever.
+_STOP_TIMEOUT = 1.0
 
 # Token set for _to_pynput_hotkey: these need angle-bracket wrapping
 _MODIFIER_TOKENS = frozenset({"ctrl", "shift", "alt", "cmd", "win", "meta"})
@@ -102,6 +105,8 @@ class LeaderKeyListener:
         self._queue = work_queue
         self._timeout = timeout
         self._listener: KeyListener | None = None
+        # The listener that has been asked to stop but may not have exited yet.
+        self._stopping: KeyListener | None = None
         self._shift_held = False
         self._deadline = 0.0
         self._hard_deadline = 0.0
@@ -144,13 +149,18 @@ class LeaderKeyListener:
             self._finish(self._resolver.on_timeout() or ("timeout",))
 
     def _finish(self, item: tuple[str, ...]) -> None:
-        """Enqueue *item* exactly once and stop listening (thread-safe)."""
+        """Stop listening and enqueue *item* exactly once (thread-safe).
+
+        The stop request comes *before* the enqueue so the consumer can never
+        observe the item while ``_stopping`` is still unset — that ordering is
+        what makes :meth:`wait_stopped` a reliable barrier.
+        """
         with self._finish_lock:
             if self._done.is_set():
                 return
             self._done.set()
-        self._queue.put(item)
         self._stop()
+        self._queue.put(item)
 
     def _on_press(self, key: object) -> None:
         # Track shift state without treating it as a sequence key
@@ -173,9 +183,20 @@ class LeaderKeyListener:
             self._shift_held = False
 
     def _stop(self) -> None:
-        if self._listener is not None:
-            self._listener.stop()
-            self._listener = None
+        listener, self._listener = self._listener, None
+        if listener is not None:
+            listener.stop()
+            self._stopping = listener
+
+    def wait_stopped(self, timeout: float = _STOP_TIMEOUT) -> None:
+        """Block until the suppressing hook thread has exited.
+
+        Called from the worker thread — never from the hook thread itself,
+        which would be joining itself.
+        """
+        listener, self._stopping = self._stopping, None
+        if listener is not None:
+            listener.join(timeout)
 
 
 # ---------------------------------------------------------------------------
@@ -225,7 +246,16 @@ class HotkeyManager:
             self._hotkey_listener = None
 
     def reset_leader(self) -> None:
-        """Re-arm the prefix hotkey after a leader sequence completes."""
+        """Re-arm the prefix hotkey once the leader listener has really stopped.
+
+        Waiting matters for commands that synthesize input.  ``stop()`` only
+        asks the pynput hook thread to quit; until it exits the low-level hook
+        is still installed with suppression on, and Windows delivers injected
+        events to a ``WH_KEYBOARD_LL`` hook like any other — so ``type`` would
+        have its own keystrokes swallowed by press itself.
+        """
+        if self._leader is not None:
+            self._leader.wait_stopped()
         with self._lock:
             self._leader_active = False
 

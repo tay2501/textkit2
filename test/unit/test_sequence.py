@@ -36,10 +36,16 @@ class TestSequenceResolution:
             ("up", "upper"),  # exact match whose only extension is the same command
             ("hal", "halfwidth"),  # unique prefix fires before the name is complete
             ("html-e", "html-encode"),  # hyphenated names are typeable
+            ("ty", "type"),  # keystroke paste — two strokes, ahead of trim/title/tt
         ],
     )
     def test_sequence_dispatches(self, typed: str, expected: str) -> None:
         assert _type(_resolver(), typed) == ("dispatch", expected)
+
+    def test_type_does_not_lengthen_the_other_t_sequences(self) -> None:
+        """Adding ``type``/``ty`` must not push ``tm`` or ``tt`` out to 3 keys."""
+        assert _type(_resolver(), "tm") == ("dispatch", "trim")
+        assert _type(_resolver(), "tt") == ("dispatch", "title")
 
     def test_ambiguous_prefix_keeps_collecting(self) -> None:
         resolver = _resolver()

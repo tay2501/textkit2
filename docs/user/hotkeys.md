@@ -13,6 +13,7 @@ Ctrl+Shift+0   then   t m     →  trim        (press tm)
 Ctrl+Shift+0   then   u p     →  upper       (press up)
 Ctrl+Shift+0   then   h a l   →  halfwidth
 Ctrl+Shift+0   then   h o     →  hold
+Ctrl+Shift+0   then   t y     →  type        (see below)
 ```
 
 There is no table of key assignments to memorise: **if the CLI accepts the
@@ -68,6 +69,44 @@ Ctrl+Shift+0   then   c l e a n    →  runs the whole pipeline
 
 A pipeline cannot shadow a built-in name: if both exist, the command wins.
 
+## `type` — paste by typing instead of by `Ctrl+V`
+
+`Ctrl+Shift+0` then `t`,`y` types the clipboard into the focused window one
+character at a time. It exists for the case where `Ctrl+V` stalls: a paste
+makes the *foreground* application read the clipboard and parse every rich
+format on it, so a slow read freezes the window you are looking at. `type`
+moves that read into the press daemon and hands the application nothing but
+characters.
+
+It is hotkey-only — run from a shell it would type into that shell.
+
+```{warning}
+`type` is a keyboard, not a transport. Unlike `Ctrl+V` it is **not atomic and
+not lossless**:
+
+- **Newlines are Enter presses.** In a chat client (Slack, Teams) or a search
+  box, that *sends*. Set `newline = "unicode"` or `"skip"` in `[type]` if that
+  is your usual target.
+- Auto-indent, autocomplete, and bracket completion in editors will react to
+  the characters as if you had typed them.
+- Japanese IME left switched **on** may intercept the input.
+- Anything you press while it runs is interleaved; clicking away sends the
+  rest to the new window.
+- Undo in the target application becomes per-character.
+- Emoji and other non-BMP characters travel as surrogate pairs and are
+  reassembled by the receiving application — a few do not.
+
+Tabs are safe: press sends `U+0009` as a character rather than `VK_TAB`, so
+they insert a tab instead of moving focus.
+```
+
+Defaults refuse more than **2000 characters** and send in chunks — a long run
+is visible, interruptible, and can overrun a slow application's message queue.
+Tune with `[type]` in `config.toml` (see {doc}`config`).
+
+If a modifier key is still held when the command fires, `type` refuses rather
+than typing `Ctrl+Enter` where you meant `Enter`. Let go of the prefix chord.
+
 ## Commands that are not available from a hotkey
 
 `genpass`, `uuid`, and `chain` are CLI-only:
@@ -118,7 +157,8 @@ shadows a sequence:
 ## Known limitations
 
 - Hotkeys do not work when an **elevated (administrator) process** has focus
-  (e.g. Task Manager, UAC dialogs). This is a Windows security restriction.
+  (e.g. Task Manager, UAC dialogs). This is a Windows security restriction —
+  the same restriction stops `type` from delivering keystrokes there.
 - While you are typing a sequence, press **suppresses those keystrokes** so
   they do not leak into the focused window. They are consumed, not delivered:
   if you trigger the prefix by accident, the characters you type before press
