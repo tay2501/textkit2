@@ -67,12 +67,23 @@ def is_shift_key(key: object) -> bool:
 def create_key_listener(
     on_press: Callable[[Any], None],
     on_release: Callable[[Any], None],
+    *,
+    suppress: bool = False,
 ) -> KeyListener:
-    """Return a started-on-demand listener for raw key press/release events."""
+    """Return a started-on-demand listener for raw key press/release events.
+
+    ``suppress=True`` swallows the events system-wide while the listener is
+    running (pynput's documented behaviour) — the leader-key listener uses it
+    so typed sequence characters do not leak into the foreground window.
+    Callers must guarantee the listener is short-lived (timeout-bounded).
+    """
     from pynput import keyboard as kb
 
     # pynput ships no type information; the cast is the seam's raison d'être.
-    return cast("KeyListener", kb.Listener(on_press=on_press, on_release=on_release))
+    return cast(
+        "KeyListener",
+        kb.Listener(on_press=on_press, on_release=on_release, suppress=suppress),
+    )
 
 
 def create_global_hotkeys(hotkeys: Mapping[str, Callable[[], None]]) -> KeyListener:

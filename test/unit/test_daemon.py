@@ -222,12 +222,18 @@ class TestCommandDispatcherNotifyLevel:
 
 class TestLeaderKeyListenerOnPress:
     def _make_listener(
-        self, bindings: dict[str, str] | None = None
+        self,
+        bindings: dict[str, str] | None = None,
+        candidates: dict[str, str] | None = None,
     ) -> tuple[Any, queue.Queue[tuple[str, ...]]]:
         from press.daemon import LeaderKeyListener
 
         q: queue.Queue[tuple[str, ...]] = queue.Queue()
-        ll = LeaderKeyListener(bindings or {"w": "halfwidth", "shift+u": "underscore"}, q)
+        ll = LeaderKeyListener(
+            bindings if bindings is not None else {"w": "halfwidth", "shift+u": "underscore"},
+            candidates if candidates is not None else {},
+            q,
+        )
         return ll, q
 
     def _keycode(self, char: str) -> Any:
@@ -262,8 +268,123 @@ class TestLeaderKeyListenerOnPress:
         ll._on_release(kb.Key.shift)
         ll._on_press(self._keycode("u"))
         item = q.get_nowait()
-        # "u" alone is not in bindings → unknown_key (shift+u binding doesn't match)
+        # "u" alone is neither a binding nor a candidate prefix → unknown_key
         assert item[0] == "unknown_key"
+
+
+class TestLeaderKeySequences:
+    """Alias-sequence resolution: type the CLI names after the prefix."""
+
+    def _make_listener(
+        self, bindings: dict[str, str] | None = None
+    ) -> tuple[Any, queue.Queue[tuple[str, ...]]]:
+        from press.commands import hotkey_sequence_candidates
+        from press.daemon import LeaderKeyListener
+
+        q: queue.Queue[tuple[str, ...]] = queue.Queue()
+        ll = LeaderKeyListener(bindings or {}, hotkey_sequence_candidates(), q)
+        return ll, q
+
+    def _type(self, ll: Any, text: str) -> None:
+        from pynput import keyboard as kb
+
+        for ch in text:
+            ll._on_press(kb.KeyCode.from_char(ch))
+
+    def test_alias_sequence_dispatches_canonical_command(self) -> None:
+        ll, q = self._make_listener()
+        self._type(ll, "tm")
+        assert q.get_nowait() == ("dispatch", "trim")
+
+    def test_full_name_sequence(self) -> None:
+        ll, q = self._make_listener()
+        self._type(ll, "count")
+        assert q.get_nowait() == ("dispatch", "count")
+
+    def test_prefix_keeps_collecting(self) -> None:
+        ll, q = self._make_listener()
+        self._type(ll, "t")  # tm / tt / trim / title all start with t
+        assert q.empty()
+        self._type(ll, "m")
+        assert q.get_nowait() == ("dispatch", "trim")
+
+    def test_exact_match_extending_same_command_fires_immediately(self) -> None:
+        # "up" is upper's alias; the only longer candidate ("upper") is the
+        # same command, so there is nothing to wait for.
+        ll, q = self._make_listener()
+        self._type(ll, "up")
+        assert q.get_nowait() == ("dispatch", "upper")
+
+    def test_exact_match_with_different_extension_is_pending(self) -> None:
+        # "cr" is a command AND the prefix of "crlf" (different command):
+        # it must not fire on the spot — typing "lf" reaches crlf.
+        ll, q = self._make_listener()
+        self._type(ll, "cr")
+        assert q.empty()
+        self._type(ll, "lf")
+        assert q.get_nowait() == ("dispatch", "crlf")
+
+    def test_enter_confirms_pending_match(self) -> None:
+        from pynput import keyboard as kb
+
+        ll, q = self._make_listener()
+        self._type(ll, "cr")
+        ll._on_press(kb.Key.enter)
+        assert q.get_nowait() == ("dispatch", "cr")
+
+    def test_pending_match_dispatched_on_timeout(self) -> None:
+        from press.commands import hotkey_sequence_candidates
+        from press.daemon import LeaderKeyListener
+
+        q: queue.Queue[tuple[str, ...]] = queue.Queue()
+        ll = LeaderKeyListener({}, hotkey_sequence_candidates(), q, timeout=0.15)
+        with patch("pynput.keyboard.Listener") as MockListener:
+            MockListener.return_value.start.return_value = None
+            ll.start()
+            self._type(ll, "cr")
+            time.sleep(0.5)
+        assert q.get_nowait() == ("dispatch", "cr")
+
+    def test_esc_cancels_silently(self) -> None:
+        from pynput import keyboard as kb
+
+        ll, q = self._make_listener()
+        self._type(ll, "t")
+        ll._on_press(kb.Key.esc)
+        assert q.get_nowait() == ("timeout",)
+
+    def test_backspace_edits_buffer(self) -> None:
+        from pynput import keyboard as kb
+
+        ll, q = self._make_listener()
+        self._type(ll, "t")
+        ll._on_press(kb.Key.backspace)
+        self._type(ll, "wc")
+        assert q.get_nowait() == ("dispatch", "count")
+
+    def test_nonmatching_sequence_reports_unknown(self) -> None:
+        ll, q = self._make_listener()
+        self._type(ll, "tq")  # no candidate starts with "tq"
+        assert q.get_nowait() == ("unknown_key", "tq")
+
+    def test_user_binding_wins_on_first_key(self) -> None:
+        ll, q = self._make_listener(bindings={"k": "trim"})
+        self._type(ll, "k")
+        assert q.get_nowait() == ("dispatch", "trim")
+
+    def test_hyphenated_name_typed(self) -> None:
+        ll, q = self._make_listener()
+        self._type(ll, "html-e")
+        assert q.get_nowait() == ("dispatch", "html-encode")
+
+    def test_pipeline_name_dispatchable(self) -> None:
+        from press.commands import hotkey_sequence_candidates
+        from press.daemon import LeaderKeyListener
+
+        q: queue.Queue[tuple[str, ...]] = queue.Queue()
+        ll = LeaderKeyListener({}, hotkey_sequence_candidates(["xcleanup"]), q)
+        self._type(ll, "xc")
+        assert q.get_nowait() == ("dispatch", "xcleanup")
 
 
 class TestLeaderKeyListenerTimeout:
@@ -271,7 +392,7 @@ class TestLeaderKeyListenerTimeout:
         from press.daemon import LeaderKeyListener
 
         q: queue.Queue[tuple[str, ...]] = queue.Queue()
-        ll = LeaderKeyListener({}, q, timeout=0.1)
+        ll = LeaderKeyListener({}, {}, q, timeout=0.1)
 
         with patch("pynput.keyboard.Listener") as MockListener:
             MockListener.return_value.start.return_value = None
@@ -280,6 +401,17 @@ class TestLeaderKeyListenerTimeout:
 
         item = q.get_nowait()
         assert item == ("timeout",)
+
+    def test_leader_listener_requests_suppression(self) -> None:
+        from press.daemon import LeaderKeyListener
+
+        q: queue.Queue[tuple[str, ...]] = queue.Queue()
+        ll = LeaderKeyListener({}, {}, q, timeout=0.05)
+        with patch("pynput.keyboard.Listener") as MockListener:
+            MockListener.return_value.start.return_value = None
+            ll.start()
+            time.sleep(0.2)
+        assert MockListener.call_args.kwargs.get("suppress") is True
 
 
 # ---------------------------------------------------------------------------

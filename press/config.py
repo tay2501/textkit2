@@ -21,6 +21,7 @@ __all__ = [
     "SqlInConfig",
     "TrimConfig",
     "UiConfig",
+    "binding_shadow_warnings",
     "config_reset",
     "config_validate",
     "default_config_path",
@@ -34,26 +35,17 @@ CURRENT_SCHEMA_VERSION: int = 1
 # Default bindings table
 # ---------------------------------------------------------------------------
 
+# Since the alias-sequence redesign the daemon accepts any registry name or
+# alias typed after the prefix (prefix + "t","m" = trim, same as `press tm`),
+# so per-command default bindings are gone.  Only shift+<key> chords remain:
+# they can never shadow a typed sequence (sequences are plain characters),
+# and they cover the two cases a sequence serves poorly — dict_reverse has
+# no CLI alias to type, and undo is a panic key that deserves one stroke.
+# Single-letter user bindings still work but hide every sequence starting
+# with that letter (checked first); `press config validate` warns about it.
 _DEFAULT_BINDINGS: dict[str, str] = {
-    "w": "halfwidth",
-    "f": "fullwidth",
-    "n": "normalize",
-    "c": "crlf",
-    "l": "lf",
-    "r": "cr",
-    "u": "hyphen",
-    "shift+u": "underscore",
-    "s": "sql-in",
-    "d": "dict",
     "shift+d": "dict_reverse",
-    "e": "unicode-decode",
-    "shift+e": "unicode-encode",
-    "h": "hold",
-    "z": "clear",
     "shift+z": "undo",
-    "k": "trim",
-    "o": "dedupe",
-    "p": "sort",
 }
 
 
@@ -267,7 +259,31 @@ def config_validate(path: Path) -> tuple[bool, str]:
     errors = pipeline_errors(config)
     if errors:
         return False, "; ".join(errors)
+    warnings = binding_shadow_warnings(config)
+    if warnings:
+        return True, f"{path!r}: valid (schema_version={schema}); WARNING: " + "; ".join(warnings)
     return True, f"{path!r}: valid (schema_version={schema})"
+
+
+def binding_shadow_warnings(config: PressConfig) -> list[str]:
+    """Warn about single-character bindings that hide typed hotkey sequences.
+
+    A binding like ``"k" = "trim"`` fires on the first keypress, so every
+    sequence starting with ``k`` (``kata``, ``kb``, …) becomes untypeable.
+    Valid but worth surfacing — shift+<key> chords never collide.
+    """
+    from press.commands import hotkey_sequence_candidates
+
+    candidates = hotkey_sequence_candidates(config.pipelines)
+    warnings: list[str] = []
+    for key in sorted(config.hotkeys.bindings):
+        if len(key) != 1:
+            continue
+        shadowed = sorted(name for name in candidates if name.startswith(key))
+        if shadowed:
+            preview = ", ".join(shadowed[:4]) + ("…" if len(shadowed) > 4 else "")
+            warnings.append(f"binding {key!r} hides typed sequences {preview}")
+    return warnings
 
 
 def pipeline_errors(config: PressConfig) -> list[str]:

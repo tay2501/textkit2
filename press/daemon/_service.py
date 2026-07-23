@@ -76,7 +76,13 @@ def run_daemon(config_path: Path | None = None) -> None:
 
     work_queue: queue.Queue[tuple[str, ...]] = queue.Queue()
     dispatcher = CommandDispatcher(config)
-    hm = HotkeyManager(config.hotkeys, work_queue)
+    from press.commands import hotkey_sequence_candidates
+
+    hm = HotkeyManager(
+        config.hotkeys,
+        work_queue,
+        candidates=hotkey_sequence_candidates(config.pipelines),
+    )
     worker = _WorkerThread(work_queue, dispatcher, hm)
     pipe_server = _start_pipe_server(dispatcher)
 

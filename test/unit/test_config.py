@@ -80,7 +80,7 @@ class TestFullConfig:
         # partial bindings merge with defaults — only overridden keys differ
         assert config.hotkeys.bindings["w"] == "halfwidth"
         assert config.hotkeys.bindings["f"] == "fullwidth"
-        assert "n" in config.hotkeys.bindings  # default key preserved
+        assert "shift+z" in config.hotkeys.bindings  # default key preserved
         assert config.sql_in.quote_char == '"'
         assert config.sql_in.wrap is True
         assert config.trim.both is True
@@ -168,8 +168,8 @@ class TestHotkeyPrefix:
 
         assert config.hotkeys.prefix == "ctrl+alt+space"
         # bindings not specified in TOML — default must be preserved
-        assert "w" in config.hotkeys.bindings
-        assert config.hotkeys.bindings["w"] == "halfwidth"
+        assert "shift+z" in config.hotkeys.bindings
+        assert config.hotkeys.bindings["shift+z"] == "undo"
 
 
 class TestDictionaryConfigResolvedPaths:
@@ -220,8 +220,8 @@ class TestBindingsMerge:
         config = load_config(cfg_file)
 
         assert config.hotkeys.bindings["j"] == "sort"
-        assert config.hotkeys.bindings["w"] == "halfwidth"  # default preserved
-        assert config.hotkeys.bindings["f"] == "fullwidth"  # default preserved
+        assert config.hotkeys.bindings["shift+z"] == "undo"  # default preserved
+        assert config.hotkeys.bindings["shift+d"] == "dict_reverse"  # default preserved
         assert len(config.hotkeys.bindings) > 1
 
     def test_partial_bindings_override_default_key(self, tmp_path: Path) -> None:
@@ -234,8 +234,8 @@ class TestBindingsMerge:
 
         config = load_config(cfg_file)
 
-        assert config.hotkeys.bindings["w"] == "nfc"  # overridden
-        assert config.hotkeys.bindings["f"] == "fullwidth"  # unchanged default
+        assert config.hotkeys.bindings["w"] == "nfc"  # user-defined key added
+        assert config.hotkeys.bindings["shift+z"] == "undo"  # unchanged default
 
     def test_empty_bindings_table_keeps_defaults(self, tmp_path: Path) -> None:
         toml_content = textwrap.dedent("""\
@@ -246,8 +246,8 @@ class TestBindingsMerge:
 
         config = load_config(cfg_file)
 
-        assert config.hotkeys.bindings["w"] == "halfwidth"
-        assert config.hotkeys.bindings["f"] == "fullwidth"
+        assert config.hotkeys.bindings["shift+z"] == "undo"
+        assert config.hotkeys.bindings["shift+d"] == "dict_reverse"
 
 
 # ---------------------------------------------------------------------------
@@ -355,7 +355,7 @@ class TestConfigToToml:
 
     def test_quoted_key_for_shift_modifier(self) -> None:
         toml_str = _config_to_toml(PressConfig())
-        assert '"shift+u"' in toml_str
+        assert '"shift+z"' in toml_str
 
     def test_pipelines_roundtrip(self, tmp_path: Path) -> None:
         original = PressConfig(pipelines={"cleanup": ("trim", "dedupe", "lf")})
@@ -363,6 +363,40 @@ class TestConfigToToml:
         cfg_file.write_text(_config_to_toml(original), encoding="utf-8")
         reloaded = load_config(cfg_file)
         assert reloaded.pipelines == {"cleanup": ("trim", "dedupe", "lf")}
+
+
+# ---------------------------------------------------------------------------
+# binding_shadow_warnings
+# ---------------------------------------------------------------------------
+
+
+class TestBindingShadowWarnings:
+    def test_single_letter_binding_warns(self) -> None:
+        from press.config import HotkeysConfig, binding_shadow_warnings
+
+        config = PressConfig(hotkeys=HotkeysConfig(bindings={"k": "trim"}))
+        warnings = binding_shadow_warnings(config)
+        assert len(warnings) == 1
+        assert "'k'" in warnings[0]
+        assert "kata" in warnings[0]  # a hidden sequence is named
+
+    def test_default_config_has_no_warnings(self) -> None:
+        from press.config import binding_shadow_warnings
+
+        assert binding_shadow_warnings(PressConfig()) == []
+
+    def test_letter_with_no_candidates_is_silent(self) -> None:
+        from press.config import HotkeysConfig, binding_shadow_warnings
+
+        # No command or alias starts with "z" — the binding hides nothing
+        config = PressConfig(hotkeys=HotkeysConfig(bindings={"z": "clear"}))
+        assert binding_shadow_warnings(config) == []
+
+    def test_shift_chord_never_warns(self) -> None:
+        from press.config import HotkeysConfig, binding_shadow_warnings
+
+        config = PressConfig(hotkeys=HotkeysConfig(bindings={"shift+h": "hold"}))
+        assert binding_shadow_warnings(config) == []
 
     def test_empty_pipelines_emits_commented_example(self) -> None:
         toml_str = _config_to_toml(PressConfig())

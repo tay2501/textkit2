@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterable
 
     from press.config import PressConfig
 
@@ -479,6 +479,29 @@ def run_command(
     else:
         kwargs = {}
     return str(fn(text, **kwargs))
+
+
+def hotkey_sequence_candidates(pipeline_names: Iterable[str] = ()) -> dict[str, str]:
+    """Map every hotkey-typeable sequence to its dispatchable command.
+
+    After the prefix chord, the daemon lets the user type a command name or
+    alias — the same names the CLI accepts (``press tm`` ⇔ prefix + ``t m``).
+    Covers registry commands, the daemon special commands, the CLI-only
+    ``cl`` alias for clear, and ``[pipelines]`` names.  Pipeline names never
+    override a registry name (same precedence as ``CommandDispatcher``).
+    """
+    all_commands: tuple[SimpleCommand | ParametricCommand, ...] = (
+        *SIMPLE_COMMANDS,
+        *PARAMETRIC_COMMANDS,
+    )
+    candidates: dict[str, str] = {
+        name: cmd.name for cmd in all_commands for name in (cmd.name, *cmd.aliases)
+    }
+    candidates |= {special: special for special in DAEMON_SPECIAL_COMMANDS}
+    candidates["cl"] = "clear"
+    for name in pipeline_names:
+        candidates.setdefault(name, name)
+    return candidates
 
 
 def resolve_transform(command: str) -> Callable[[str], str] | None:
