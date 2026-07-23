@@ -5,7 +5,7 @@
 If the file does not exist, all defaults apply. No configuration is required to start using `press`.
 
 Use `press config validate` to check the file and `press config reset` to restore defaults
-(optionally per section with `--key hotkeys | sql_in | trim | dictionary | ui | hold`).
+(optionally per section with `--key hotkeys | sql_in | trim | dictionary | ui | hold | pipelines`).
 
 ## Full example
 
@@ -16,24 +16,8 @@ schema_version = 1
 prefix = "ctrl+shift+0"
 
 [hotkeys.bindings]
-w         = "halfwidth"
-f         = "fullwidth"
-n         = "normalize"
-c         = "crlf"
-l         = "lf"
-r         = "cr"
-u         = "hyphen"
-"shift+u" = "underscore"
-s         = "sql-in"
-d         = "dict"
 "shift+d" = "dict_reverse"
-e         = "unicode-decode"
-"shift+e" = "unicode-encode"
-h         = "hold"
-z         = "clear"
-k         = "trim"
-o         = "dedupe"
-p         = "sort"
+"shift+z" = "undo"
 
 [sql_in]
 quote_char = "'"
@@ -68,9 +52,24 @@ cleanup = ["trim", "dedupe", "lf"]
 
 ### `[hotkeys.bindings]`
 
-Map a key (after the prefix) to a transform name. Keys are case-insensitive.
-Use `"shift+x"` syntax for shifted keys. User-defined entries are **merged
-with** the defaults — only specify the keys you want to change.
+Map a **single keystroke** after the prefix to a command name. Keys are
+case-insensitive; use `"shift+x"` syntax for shifted keys. User-defined entries
+are **merged with** the defaults — only specify what you want to add or change.
+
+Bindings are optional. After the prefix you can always **type a command name or
+alias** instead (`Ctrl+Shift+0`, then `t`, `m` runs trim, exactly like
+`press tm`), so only two bindings ship by default: `shift+d` for `dict_reverse`
+(no CLI name to type) and `shift+z` for `undo` (a panic key).
+
+```{warning}
+A **single-character** binding fires on the first keypress and therefore hides
+every typed sequence starting with that letter — `k = "trim"` makes `kata`,
+`kb`, and every other `k…` name unreachable. `shift+<key>` chords never
+collide. `press config validate` reports the shadowing as a warning (the config
+is still valid, and validation still exits 0).
+```
+
+See {doc}`hotkeys` for how sequences resolve.
 
 ### `[sql_in]`
 

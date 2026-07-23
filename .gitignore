@@ -185,3 +185,6 @@ config.local.py
 # Work file
 SPEC.md
 CLAUDE.md
+
+# Internal working notes — never published to GitHub
+docs/dev/private/

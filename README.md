@@ -125,15 +125,16 @@ press daemon start         # start tray icon + hotkey listener
 
 # --- transform from any app via two-step hotkey ---
 # Step 1: press the prefix chord simultaneously  →  Ctrl+Shift+0
-# Step 2: release, then press a single key
+# Step 2: release, then type the command name — the same name the CLI takes
 # Copy "ＴＡＢＬＥ＿ＮＡＭＥ", then:
-#   Ctrl+Shift+0, then w  →  paste gives "TABLE_NAME"   (halfwidth)
-#   Ctrl+Shift+0, then n  →  paste gives normalized text (normalize)
-#   Ctrl+Shift+0, then p  →  paste gives sorted lines    (sort)
+#   Ctrl+Shift+0, then h,a,l    →  paste gives "TABLE_NAME"   (halfwidth)
+#   Ctrl+Shift+0, then n,o      →  paste gives normalized text (normalize)
+#   Ctrl+Shift+0, then s,o      →  paste gives sorted lines    (sort)
+# It fires as soon as the name can only mean one command — no table to memorise.
 
 # --- password + ClipboardGuard ---
 press genpass                    # generate password → clipboard
-#   Ctrl+Shift+0, then h         # ClipboardGuard ON  (tray turns red)
+#   Ctrl+Shift+0, then h,o       # ClipboardGuard ON  (tray turns red)
 #   <navigate to password field in any app>
 #   Ctrl+V                       # paste — guard auto-releases
 
@@ -352,15 +353,17 @@ echo "Hello World" | press chain snake upper   # composable with shell pipes
 press ch upper                      # `ch` alias
 ```
 
-Name a step list once in `%APPDATA%\press\config.toml` and reuse it — or bind
-it to a daemon hotkey exactly like a built-in command:
+Name a step list once in `%APPDATA%\press\config.toml` and reuse it. The name is
+typeable from the daemon hotkey exactly like a built-in command — no binding
+needed:
 
 ```toml
 [pipelines]
 cleanup = ["trim", "dedupe", "lf"]
+```
 
-[hotkeys.bindings]
-x = "cleanup"        # Ctrl+Shift+0, then x → runs the whole pipeline
+```text
+Ctrl+Shift+0   then   c l e a n    →  runs the whole pipeline
 ```
 
 ```bash
@@ -402,30 +405,30 @@ First call saves; second call restores. Survives process restarts because the te
 
 ### Daemon mode (real-time dual-layer protection)
 
-When the daemon is running, the hotkey sequence **Ctrl+Shift+0, then `h`** engages **ClipboardGuard** — a two-layer defence that makes the clipboard effectively read-only until you release it:
+When the daemon is running, the hotkey sequence **Ctrl+Shift+0, then `h`,`o`** engages **ClipboardGuard** — a two-layer defence that makes the clipboard effectively read-only until you release it:
 
-> **Key sequence:** Press **Ctrl+Shift+0** simultaneously (prefix chord), release all keys, then press **`h`** alone.
+> **Key sequence:** Press **Ctrl+Shift+0** simultaneously (prefix chord), release all keys, then type **`h`,`o`** — enough to identify `hold`.
 
 **Workflow — generate a password and protect it until pasted:**
 
 ```
 1. press daemon start               # start the daemon (once)
 2. press genpass                    # generate password → auto-written to clipboard
-3. Ctrl+Shift+0, then h             # engage ClipboardGuard (tray icon turns red)
+3. Ctrl+Shift+0, then h,o           # engage ClipboardGuard (tray icon turns red)
    ↳ now any app that tries to overwrite the clipboard is blocked
 4. Navigate to the password field in any app
 5. Ctrl+V                           # paste the password
    ↳ ClipboardGuard auto-releases after the paste (Layer 2)
 ```
 
-> Repeat **Ctrl+Shift+0, then h** at any time to manually release protection.
+> Repeat **Ctrl+Shift+0, then h,o** at any time to manually release protection.
 
 | Layer | Mechanism | Reaction time |
 |---|---|---|
 | **Layer 1** | Hidden Win32 window monitors `WM_CLIPBOARDUPDATE`. Any application that writes to the clipboard triggers an immediate restore. | < 1 ms |
 | **Layer 2** | `WH_KEYBOARD_LL` hook intercepts **Ctrl+V / Shift+Insert** *before* the OS dispatches the keystroke, so the protected text is in place before the receiving application reads the clipboard. | 0 ms gap |
 
-The tray icon turns **red** while protection is active. Repeat the sequence (**Ctrl+Shift+0, then h**) to release.
+The tray icon turns **red** while protection is active. Repeat the sequence (**Ctrl+Shift+0, then h,o**) to release.
 
 > **Note:** Windows does not allow a full exclusive clipboard lock (holding `OpenClipboard` open). Layer 1 restores within < 1 ms of any external write; Layer 2 covers the paste path with zero gap. Together they provide near-absolute protection for normal desktop workflows.
 
@@ -441,36 +444,39 @@ press daemon stop     # stop the daemon
 press daemon status   # show running / not running
 ```
 
-### Default key bindings
+### Type the command name
 
-Two-step sequence: **press Ctrl+Shift+0 simultaneously** (prefix chord) → **release → press a single key**
+Two-step sequence: **press Ctrl+Shift+0 simultaneously** (prefix chord) → **release, then type the command name or alias** — the same one the CLI accepts.
 
-| Key | Command | | Key | Command |
-|---|---|---|---|---|
-| `w` | halfwidth | | `e` | unicode-decode |
-| `f` | fullwidth | | `Shift+E` | unicode-encode |
-| `n` | normalize | | `s` | sql-in |
-| `c` | crlf | | `d` | dict |
-| `l` | lf | | `Shift+D` | dict (reverse) |
-| `r` | cr | | `h` | hold (toggle) |
-| `u` | hyphen | | `z` | clear clipboard |
-| `Shift+U` | underscore | | `Shift+Z` | undo (restore pre-transform) |
-| | | | `k` | trim |
-| | | | `o` | dedupe |
-| | | | `p` | sort |
+```text
+Ctrl+Shift+0   then   t m       →  trim        (press tm)
+Ctrl+Shift+0   then   u p       →  upper       (press up)
+Ctrl+Shift+0   then   h a l     →  halfwidth   (fires early — only one match)
+Ctrl+Shift+0   then   c l e a n →  runs the "cleanup" pipeline
+```
 
-### Custom bindings
+There is no key table to memorise: anything in `press --help`, plus any `[pipelines]` name, is typeable. Dispatch happens as soon as the keystrokes can only mean one command — usually after two or three keys. If what you typed is complete but a longer name extends it (`cr` vs `crlf`), press waits — `Enter` confirms the short one, or just pause. `Backspace` edits, `Esc` cancels.
 
-Create `%APPDATA%\press\config.toml` and add a `[hotkeys.bindings]` section. User-defined entries are **merged with** the defaults — you only need to specify the keys you want to change:
+> [!IMPORTANT]
+> **Stop typing once it fires.** Dispatch releases the keyboard, so characters typed after it reach the focused application — typing `h`,`o`,`l`,`d` runs hold at `ho` and types `ld` into your document.
+
+`genpass`, `uuid`, and `chain` are CLI-only — see [docs/user/hotkeys.md](docs/user/hotkeys.md) for why.
+
+### Single-key bindings
+
+Two ship by default, both `Shift+` chords: `Shift+D` → `dict_reverse` (no CLI name to type), `Shift+Z` → `undo` (a panic key). Add your own in `%APPDATA%\press\config.toml`; entries are **merged with** the defaults:
 
 ```toml
 [hotkeys]
 prefix = "ctrl+shift+0"   # optional — change the leader key
 
 [hotkeys.bindings]
-j = "sort"          # add new binding
-w = "nfc"           # override existing binding
+"shift+w" = "halfwidth"   # Ctrl+Shift+0, then Shift+W
+"shift+x" = "cleanup"     # a pipeline works too
 ```
+
+> [!WARNING]
+> A **single-character** binding fires on the first keypress and hides every typed sequence starting with that letter — `k = "trim"` makes `kata`, `kb`, and every other `k…` name unreachable. `shift+<key>` chords never collide. `press config validate` warns about it.
 
 ---
 
@@ -503,9 +509,10 @@ press config reset --key trim        # reset only [trim]
 press config reset --key dictionary  # reset only [dictionary]
 press config reset --key ui          # reset only [ui]
 press config reset --key hold        # reset only [hold]
+press config reset --key pipelines   # reset only [pipelines]
 ```
 
-Valid `--key` values: `hotkeys`, `sql_in`, `trim`, `dictionary`, `ui`, `hold`.
+Valid `--key` values: `hotkeys`, `sql_in`, `trim`, `dictionary`, `ui`, `hold`, `pipelines`.
 
 ### Config file format
 
@@ -518,8 +525,8 @@ schema_version = 1
 prefix = "ctrl+shift+0"
 
 [hotkeys.bindings]
-w = "halfwidth"
-# ... (see full list in Custom bindings above)
+"shift+d" = "dict_reverse"
+"shift+z" = "undo"
 
 [sql_in]
 quote_char = "'"

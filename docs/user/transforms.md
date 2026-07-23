@@ -393,6 +393,37 @@ Notes:
   undo slot for hotkey transforms (`Shift+Z` by default), separate from the
   CLI file — the same dual-layer design as `hold`.
 
+## Generators
+
+These write to the clipboard rather than transforming it, so they take `-C`
+but not `-c`. Both are **CLI-only** — they are not reachable from a daemon
+hotkey (see {doc}`hotkeys`).
+
+### `genpass` (`gp`)
+
+Generate a cryptographically secure random password (`secrets`-backed).
+
+```bash
+press genpass                  # 20 chars → stdout, and clipboard on a TTY
+press genpass -n 32 -s         # 32 chars including ASCII punctuation
+press genpass -N               # do NOT touch the clipboard
+press genpass --clear-after 12 # wipe the clipboard after 12s if unchanged
+```
+
+The clipboard write sets the Windows "sensitive content" formats, so the
+password stays out of Win+V history and Cloud Clipboard sync. That also means
+it is deliberately **excluded from `undo`** — see the note above.
+
+### `uuid`
+
+Generate random UUID v4 values, one per line.
+
+```bash
+press uuid              # a single UUID
+press uuid -n 5         # five, one per line
+press uuid -U -C        # uppercase, also written to the clipboard
+```
+
 ## Dictionary lookup
 
 ### `dict`

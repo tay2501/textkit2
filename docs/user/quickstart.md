@@ -30,9 +30,10 @@ press halfwidth -c -C     # transform clipboard in-place
 press daemon start
 ```
 
-Now press **Ctrl+Shift+0** simultaneously (prefix chord), release, then press **W** — your clipboard is transformed to half-width instantly, in any application.
+Now press **Ctrl+Shift+0** simultaneously (prefix chord), release, then type **`h`,`a`,`l`** — enough to identify `halfwidth`. Your clipboard is transformed instantly, in any application.
 
-See {doc}`hotkeys` for all default bindings.
+Any command name or alias the CLI takes works the same way, so there is no key
+table to learn. See {doc}`hotkeys` for how sequences resolve.
 
 ## 5. Set up your dictionary
 

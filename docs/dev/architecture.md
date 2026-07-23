@@ -66,7 +66,8 @@ pipe instead of importing the transform module — see
 |--------|----------------|
 | `_backends.py` | **The only importer of pystray and pynput**, behind `TrayIcon` / `KeyListener` Protocols |
 | `_tray.py` | Tray icon image generation (Pillow) |
-| `_hotkeys.py` | Prefix hotkey, leader-key state machine, `_WorkerThread` |
+| `_hotkeys.py` | Prefix hotkey, leader-key listener lifecycle, `_WorkerThread` |
+| `_sequence.py` | `SequenceResolver` — **pure** typed-sequence rules (stdlib only, no threads) |
 | `_dispatch.py` | `CommandDispatcher` — clipboard transforms and notifications |
 | `_lifecycle.py` | Singleton mutex, PID/status files, `stop_daemon`, `daemon_status` |
 | `_logs.py` | Rotating log setup, `daemon_logs` |
@@ -122,14 +123,29 @@ Adding either kind of command:
 [IDLE]
   │  prefix chord pressed simultaneously (default: Ctrl+Shift+0)
   ▼
-[WAITING]  ─── 2 s timeout ──→ [IDLE]
-  │  binding key pressed (e.g. "w" → halfwidth)
+[TYPING]  ─── 2 s inactivity, Esc, or 10 s hard limit ──→ [IDLE]
+  │  keys accumulate: a [hotkeys.bindings] entry on the first key,
+  │  otherwise a command name or alias ("t","m" → trim)
   ▼
 [EXECUTING] → transform clipboard in-place → [IDLE]
 ```
 
-The `LeaderKeyListener` runs in a separate thread; results are enqueued for the
-`_WorkerThread` so the OS hotkey callback returns immediately.
+Responsibilities are split so the rules can be tested without concurrency:
+
+- `_sequence.SequenceResolver` is **pure** — characters in, a queue item or
+  "keep listening" out. It owns the buffer, the ambiguity rule (an exact match
+  that a longer name extends is held pending), and binding precedence.
+- `_hotkeys.LeaderKeyListener` owns the machinery: the pynput listener, shift
+  tracking, the timeout watcher, and the once-only handoff to the queue.
+
+The listener runs with pynput's `suppress=True` so typed characters do not leak
+into the focused window — which also means they are consumed rather than
+delivered. Because every keystroke re-arms the inactivity timeout, a second,
+non-re-armable `_LEADER_HARD_LIMIT` bounds how long press can hold the keyboard
+at all; it is a safety valve, not part of the interaction.
+
+Results are enqueued for the `_WorkerThread` so the OS hotkey callback returns
+immediately.
 
 ## Daemon delegation (named pipe)
 
@@ -271,7 +287,8 @@ press/
 │   ├── __init__.py      Public API re-exports
 │   ├── _backends.py     pystray / pynput seam (Protocols)
 │   ├── _tray.py         Tray icon image (Pillow)
-│   ├── _hotkeys.py      Hotkeys, leader key, worker thread
+│   ├── _hotkeys.py      Hotkeys, leader listener, worker thread
+│   ├── _sequence.py     SequenceResolver (pure typed-sequence rules)
 │   ├── _dispatch.py     CommandDispatcher
 │   ├── _lifecycle.py    Mutex, PID/status, stop/status
 │   ├── _logs.py         Rotating log, daemon logs
