@@ -60,8 +60,10 @@ def _handle_config(args: argparse.Namespace) -> int:
 
     match action:
         case "validate":
-            ok, msg = config_validate(cfg_path)
+            ok, msg, warnings = config_validate(cfg_path)
             print(f"press config validate: {msg}", file=sys.stdout if ok else sys.stderr)
+            for warning in warnings:
+                print(f"press config validate: warning: {warning}", file=sys.stderr)
             return 0 if ok else 1
         case "reset":
             key: str | None = getattr(args, "key", None)

@@ -408,12 +408,73 @@ PARAMETRIC_ALIASES: dict[str, str] = {
     alias: cmd.name for cmd in PARAMETRIC_COMMANDS for alias in cmd.aliases
 }
 
-# Commands handled inside daemon.CommandDispatcher itself rather than via the
-# registries above.  Keep in sync with CommandDispatcher.dispatch() ("clear",
-# "hold", "undo") and CommandDispatcher._transform() ("dict", "dict_reverse").
-DAEMON_SPECIAL_COMMANDS: frozenset[str] = frozenset(
-    {"clear", "hold", "undo", "dict", "dict_reverse"}
+# ---------------------------------------------------------------------------
+# Non-transform commands
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class SpecialCommand:
+    """One command that is *not* a registry transform.
+
+    These do not fit ``fn(text, **kwargs) -> str``: they generate values, act
+    on the clipboard as a whole, or need their own subcommand tree.  The table
+    below is nonetheless the single source of truth for their **names and
+    aliases**, so the CLI parsers, the daemon's special-command set, and the
+    hotkey sequence candidates all derive from one place.
+
+    Args:
+        name: Canonical command name.
+        aliases: Alternative names accepted wherever ``name`` is.
+        hotkey: Whether the daemon may dispatch it — both as a
+            ``[hotkeys.bindings]`` value and as a typed sequence after the
+            prefix.  ``False`` keeps it CLI-only (see the table's comments for
+            why each one is excluded).
+    """
+
+    name: str
+    aliases: tuple[str, ...] = field(default_factory=tuple)
+    hotkey: bool = False
+
+
+SPECIAL_COMMANDS: tuple[SpecialCommand, ...] = (
+    # Handled inside CommandDispatcher.dispatch() / .transform().
+    SpecialCommand("clear", ("cl",), hotkey=True),
+    SpecialCommand("hold", (), hotkey=True),
+    SpecialCommand("undo", (), hotkey=True),
+    SpecialCommand("dict", (), hotkey=True),
+    SpecialCommand("dict_reverse", (), hotkey=True),  # daemon-only; no CLI parser
+    # CLI-only.  Each exclusion is deliberate:
+    # - genpass writes with sensitive=True, which suppresses the undo snapshot
+    #   by design — a mistyped sequence would destroy the clipboard with no way
+    #   back, and notify_level defaults to "off" so it would pass unnoticed.
+    # - uuid ignores its input (a generator, not a transform); making it
+    #   hotkey-reachable is a feature decision, not a refactoring one.
+    # - chain needs a pipeline name as an argument, which a hotkey cannot
+    #   supply — and pipeline names are already typeable directly
+    #   (see hotkey_sequence_candidates).
+    SpecialCommand("genpass", ("gp",)),
+    SpecialCommand("uuid", ()),
+    SpecialCommand("chain", ("ch",)),
 )
+
+SPECIAL_COMMAND_INDEX: dict[str, SpecialCommand] = {cmd.name: cmd for cmd in SPECIAL_COMMANDS}
+
+# Commands the daemon dispatches itself rather than via the transform
+# registries.  Derived — keep CommandDispatcher.dispatch() / .transform() in
+# sync with the ``hotkey=True`` rows above (test_daemon_helpers pins this).
+DAEMON_SPECIAL_COMMANDS: frozenset[str] = frozenset(
+    cmd.name for cmd in SPECIAL_COMMANDS if cmd.hotkey
+)
+
+
+def special_aliases(name: str) -> list[str]:
+    """Return argparse ``aliases=`` for a non-transform command.
+
+    Keeps ``add_parser`` calls in the ``_cli_*`` modules reading their aliases
+    from :data:`SPECIAL_COMMANDS` instead of repeating the literals.
+    """
+    return list(SPECIAL_COMMAND_INDEX[name].aliases)
 
 
 # ---------------------------------------------------------------------------
@@ -482,26 +543,59 @@ def run_command(
 
 
 def hotkey_sequence_candidates(pipeline_names: Iterable[str] = ()) -> dict[str, str]:
-    """Map every hotkey-typeable sequence to its dispatchable command.
+    """Map every hotkey-typeable sequence to the command it dispatches.
 
-    After the prefix chord, the daemon lets the user type a command name or
-    alias — the same names the CLI accepts (``press tm`` ⇔ prefix + ``t m``).
-    Covers registry commands, the daemon special commands, the CLI-only
-    ``cl`` alias for clear, and ``[pipelines]`` names.  Pipeline names never
-    override a registry name (same precedence as ``CommandDispatcher``).
+    After the prefix chord, the daemon lets the user type a transform's name or
+    alias — the same names the CLI accepts (``press tm`` ⇔ prefix + ``t m``) —
+    plus the ``hotkey=True`` entries of :data:`SPECIAL_COMMANDS` and any
+    ``[pipelines]`` name.  ``genpass``/``uuid``/``chain`` are excluded because
+    they are ``hotkey=False`` there.
+
+    Every name is derived from an existing index or table; nothing is spelled
+    out twice.  Pipeline names never override a registry name — the same
+    precedence ``CommandDispatcher.transform`` applies.
     """
-    all_commands: tuple[SimpleCommand | ParametricCommand, ...] = (
-        *SIMPLE_COMMANDS,
-        *PARAMETRIC_COMMANDS,
-    )
     candidates: dict[str, str] = {
-        name: cmd.name for cmd in all_commands for name in (cmd.name, *cmd.aliases)
+        name: spec.name
+        for index in (SIMPLE_COMMAND_INDEX, PARAMETRIC_COMMAND_INDEX)
+        for name, spec in index.items()
     }
-    candidates |= {special: special for special in DAEMON_SPECIAL_COMMANDS}
-    candidates["cl"] = "clear"
+    candidates |= {
+        name: cmd.name
+        for cmd in SPECIAL_COMMANDS
+        if cmd.hotkey
+        for name in (cmd.name, *cmd.aliases)
+    }
     for name in pipeline_names:
         candidates.setdefault(name, name)
     return candidates
+
+
+def hotkey_binding_shadow_warnings(
+    bindings: Iterable[str],
+    pipeline_names: Iterable[str] = (),
+) -> list[str]:
+    """Warn about single-character bindings that hide typed hotkey sequences.
+
+    A binding like ``"k" = "trim"`` fires on the first keypress, so every
+    sequence starting with ``k`` (``kata``, ``kb``, …) becomes untypeable.
+    Valid but worth surfacing — ``shift+<key>`` chords never collide, since a
+    typed sequence is made of plain characters.
+
+    Lives here rather than in :mod:`press.config` because the rule is a
+    property of how the leader key resolves sequences, not of the config file
+    format; ``config.binding_shadow_warnings`` is a thin wrapper.
+    """
+    candidates = hotkey_sequence_candidates(pipeline_names)
+    warnings: list[str] = []
+    for key in sorted(bindings):
+        if len(key) != 1:
+            continue
+        shadowed = sorted(name for name in candidates if name.startswith(key))
+        if shadowed:
+            preview = ", ".join(shadowed[:4]) + ("…" if len(shadowed) > 4 else "")
+            warnings.append(f"binding {key!r} hides typed sequences {preview}")
+    return warnings
 
 
 def resolve_transform(command: str) -> Callable[[str], str] | None:

@@ -13,6 +13,7 @@ from press.daemon._backends import (
     create_key_listener,
     is_shift_key,
 )
+from press.daemon._sequence import SequenceResolver
 
 if TYPE_CHECKING:
     import queue
@@ -20,7 +21,10 @@ if TYPE_CHECKING:
     from press.config import HotkeysConfig
     from press.daemon._dispatch import CommandDispatcher
 
-_LEADER_TIMEOUT = 2.0  # seconds to wait for a binding key after prefix
+_LEADER_TIMEOUT = 2.0  # seconds of inactivity before the sequence is committed
+# Absolute cap on how long the suppressing listener may hold the keyboard,
+# whatever the user types.  Unlike _LEADER_TIMEOUT this is never re-armed.
+_LEADER_HARD_LIMIT = 10.0
 
 # Token set for _to_pynput_hotkey: these need angle-bracket wrapping
 _MODIFIER_TOKENS = frozenset({"ctrl", "shift", "alt", "cmd", "win", "meta"})
@@ -52,28 +56,30 @@ def _to_pynput_hotkey(press_spec: str) -> str:
 
 
 class LeaderKeyListener:
-    """Capture keys after the prefix until a command resolves.
+    """Drive a :class:`SequenceResolver` from the OS keyboard listener.
 
-    Two-stage resolution:
+    This class owns only the machinery: the pynput listener, the shift-state
+    tracking, the timeout watcher, and the once-only handoff to the work
+    queue.  What a keystroke *means* lives in
+    :class:`press.daemon._sequence.SequenceResolver`.
 
-    1. **First key**: user ``[hotkeys.bindings]`` entries (``"w"``,
-       ``"shift+u"``) dispatch immediately — personal shortcuts keep working.
-    2. **Sequence**: otherwise printable keys accumulate into a buffer
-       matched against *candidates* — the same command names and aliases the
-       CLI accepts (``press tm`` ⇔ prefix + ``t m``).  The buffer dispatches
-       the moment every candidate it can still reach resolves to the same
-       command (``tm`` → trim, ``up`` → upper, ``html-e`` completes to
-       html-encode).  When different commands remain reachable from an exact
-       match (``cr`` vs ``crlf``), it is held *pending* — Enter or the
-       inactivity timeout confirms it, further typing continues toward the
-       longer name.
+    While the listener runs it is created with ``suppress=True``, so typed
+    sequence characters do not leak into the focused window.  That also means
+    they are **consumed** — a mistyped sequence swallows those keystrokes
+    instead of delivering them to the application.  Two independent bounds keep
+    the suppression from outliving its purpose:
 
-    Esc cancels, Backspace edits the buffer, and every keypress re-arms the
-    inactivity timeout.  Results are enqueued:
+    - *timeout* seconds of inactivity, re-armed on every keypress; and
+    - :data:`_LEADER_HARD_LIMIT` seconds in total, which cannot be re-armed.
 
-    - ``("dispatch", command)`` — resolved, run *command*
-    - ``("unknown_key", sequence)`` — the buffer matches nothing
-    - ``("timeout",)`` — cancelled (Esc) or nothing resolvable was typed
+    The hard limit is a safety valve rather than part of the interaction: it
+    exists because this is the only place in press that takes input away from
+    the whole desktop, so a bug in resolution must not be able to hold the
+    keyboard indefinitely.  It abandons any pending match — releasing the
+    keyboard matters more than running a command the user may have forgotten.
+
+    Results are enqueued: ``("dispatch", command)``, ``("unknown_key",
+    sequence)``, or ``("timeout",)``.
 
     Args:
         bindings: Mapping of first-key specs (e.g. ``"w"``, ``"shift+u"``)
@@ -92,15 +98,13 @@ class LeaderKeyListener:
         work_queue: queue.Queue[tuple[str, ...]],
         timeout: float = _LEADER_TIMEOUT,
     ) -> None:
-        self._bindings = bindings
-        self._candidates = candidates
+        self._resolver = SequenceResolver(candidates, bindings)
         self._queue = work_queue
         self._timeout = timeout
         self._listener: KeyListener | None = None
         self._shift_held = False
-        self._buffer = ""
-        self._pending: str | None = None
         self._deadline = 0.0
+        self._hard_deadline = 0.0
         self._done = threading.Event()
         self._finish_lock = threading.Lock()
 
@@ -108,12 +112,13 @@ class LeaderKeyListener:
         """Begin listening for the key sequence."""
         self._done.clear()
         self._shift_held = False
-        self._buffer = ""
-        self._pending = None
-        self._deadline = time.monotonic() + self._timeout
+        self._resolver.reset()
+        now = time.monotonic()
+        self._deadline = now + self._timeout
+        self._hard_deadline = now + _LEADER_HARD_LIMIT
 
         # suppress=True: sequence characters must not leak into the focused
-        # window.  Bounded by the inactivity watcher below.
+        # window.  Bounded by the watcher below.
         self._listener = create_key_listener(self._on_press, self._on_release, suppress=True)
         self._listener.start()
 
@@ -121,14 +126,22 @@ class LeaderKeyListener:
         watcher.start()
 
     def _timeout_watcher(self) -> None:
-        while not self._done.wait(timeout=0.05):
-            if time.monotonic() >= self._deadline:
-                pending = self._pending
-                if pending is not None:
-                    self._finish(("dispatch", self._candidates[pending]))
-                else:
-                    self._finish(("timeout",))
-                return
+        """Release the keyboard once either deadline passes.
+
+        Waits for the time actually remaining instead of polling, re-reading
+        ``_deadline`` each round because :meth:`_on_press` pushes it back from
+        the listener thread.
+        """
+        while True:
+            remaining = min(self._deadline, self._hard_deadline) - time.monotonic()
+            if remaining <= 0:
+                break
+            if self._done.wait(timeout=remaining):
+                return  # resolved by a keypress
+        if time.monotonic() >= self._hard_deadline:
+            self._finish(("timeout",))  # safety valve: drop any pending match
+        else:
+            self._finish(self._resolver.on_timeout() or ("timeout",))
 
     def _finish(self, item: tuple[str, ...]) -> None:
         """Enqueue *item* exactly once and stop listening (thread-safe)."""
@@ -151,59 +164,9 @@ class LeaderKeyListener:
             return
 
         self._deadline = time.monotonic() + self._timeout  # re-arm per key
-
-        match char:
-            case "esc":
-                self._finish(("timeout",))  # silent cancel
-                return
-            case "backspace":
-                self._buffer = self._buffer[:-1]
-                self._evaluate(dispatch_exact=False)
-                return
-            case "enter":
-                if self._pending is not None:
-                    self._finish(("dispatch", self._candidates[self._pending]))
-                elif self._buffer in self._candidates:
-                    self._finish(("dispatch", self._candidates[self._buffer]))
-                else:
-                    self._finish(("unknown_key", self._buffer))
-                return
-
-        # First key: user bindings win (personal shortcuts, shift+ chords)
-        if not self._buffer:
-            binding_key = f"shift+{char}" if self._shift_held else char
-            if binding_key in self._bindings:
-                self._finish(("dispatch", self._bindings[binding_key]))
-                return
-
-        if len(char) != 1:  # f10, tab, … — never part of a typed name
-            self._finish(("unknown_key", char))
-            return
-
-        self._buffer += char
-        self._evaluate(dispatch_exact=True)
-
-    def _evaluate(self, *, dispatch_exact: bool) -> None:
-        """Resolve the current buffer against the candidate names.
-
-        Fires as soon as every candidate still reachable from the buffer
-        resolves to the same command (``up`` → upper instantly, ``html-e``
-        completes to html-encode).  An exact match that different commands
-        extend (``cr`` vs ``crlf``) is held pending for Enter / timeout.
-        """
-        buf = self._buffer
-        self._pending = None
-        if not buf:
-            return
-        targets = {cmd for name, cmd in self._candidates.items() if name.startswith(buf)}
-        if not targets:
-            self._finish(("unknown_key", buf))
-            return
-        if len(targets) == 1 and dispatch_exact:
-            self._finish(("dispatch", next(iter(targets))))
-            return
-        if buf in self._candidates:
-            self._pending = buf
+        resolution = self._resolver.press(char, shift=self._shift_held)
+        if resolution is not None:
+            self._finish(resolution)
 
     def _on_release(self, key: object) -> None:
         if is_shift_key(key):

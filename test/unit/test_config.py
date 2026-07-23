@@ -303,30 +303,60 @@ class TestDefaultConfigPath:
 
 class TestConfigValidate:
     def test_missing_file_is_ok(self, tmp_path: Path) -> None:
-        ok, msg = config_validate(tmp_path / "missing.toml")
+        ok, msg, warnings = config_validate(tmp_path / "missing.toml")
         assert ok is True
         assert "defaults" in msg
+        assert warnings == []
 
     def test_valid_file_passes(self, tmp_path: Path) -> None:
         cfg_file = tmp_path / "config.toml"
         cfg_file.write_text("[sql_in]\nwrap = true\n", encoding="utf-8")
-        ok, msg = config_validate(cfg_file)
+        ok, msg, warnings = config_validate(cfg_file)
         assert ok is True
         assert "valid" in msg
+        assert warnings == []
 
     def test_invalid_toml_fails(self, tmp_path: Path) -> None:
         cfg_file = tmp_path / "config.toml"
         cfg_file.write_text("not valid ][", encoding="utf-8")
-        ok, msg = config_validate(cfg_file)
+        ok, msg, warnings = config_validate(cfg_file)
         assert ok is False
         assert "parse error" in msg.lower()
+        assert warnings == []
 
     def test_future_schema_version_fails(self, tmp_path: Path) -> None:
         cfg_file = tmp_path / "config.toml"
         cfg_file.write_text(f"schema_version = {CURRENT_SCHEMA_VERSION + 99}\n", encoding="utf-8")
-        ok, msg = config_validate(cfg_file)
+        ok, msg, warnings = config_validate(cfg_file)
         assert ok is False
         assert "schema_version" in msg
+        assert warnings == []
+
+    def test_warnings_are_separate_from_the_success_message(self, tmp_path: Path) -> None:
+        """Shadow warnings ride their own channel, not the success string.
+
+        Pins the R6 contract: a caller can act on ``warnings`` without parsing
+        *msg*, and a valid config stays "valid" in the message it prints.
+        """
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text('[hotkeys.bindings]\nk = "trim"\n', encoding="utf-8")
+        ok, msg, warnings = config_validate(cfg_file)
+        assert ok is True
+        assert "valid" in msg
+        assert "WARNING" not in msg
+        assert len(warnings) == 1
+        assert "'k'" in warnings[0]
+
+    def test_failed_validation_reports_no_warnings(self, tmp_path: Path) -> None:
+        """A config that fails is not additionally warned about."""
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(
+            '[hotkeys.bindings]\nk = "trim"\n\n[pipelines]\nbad = ["nosuchcommand"]\n',
+            encoding="utf-8",
+        )
+        ok, _msg, warnings = config_validate(cfg_file)
+        assert ok is False
+        assert warnings == []
 
 
 # ---------------------------------------------------------------------------
@@ -437,14 +467,14 @@ class TestPipelinesConfig:
     def test_validate_reports_unknown_step(self, tmp_path: Path) -> None:
         cfg_file = tmp_path / "config.toml"
         cfg_file.write_text('[pipelines]\nbad = ["nope"]\n', encoding="utf-8")
-        ok, msg = config_validate(cfg_file)
+        ok, msg, _warnings = config_validate(cfg_file)
         assert ok is False
         assert "unknown step 'nope'" in msg
 
     def test_validate_passes_valid_pipeline(self, tmp_path: Path) -> None:
         cfg_file = tmp_path / "config.toml"
         cfg_file.write_text('[pipelines]\ncleanup = ["trim", "lf"]\n', encoding="utf-8")
-        ok, _msg = config_validate(cfg_file)
+        ok, _msg, _warnings = config_validate(cfg_file)
         assert ok is True
 
     def test_reset_key_pipelines_clears_section(self, tmp_path: Path) -> None:
@@ -572,7 +602,8 @@ class TestConfigValidateEdgeCases:
             raise ValueError("simulated validation error")
 
         monkeypatch.setattr(cfg_mod, "load_config", _raise)
-        ok, msg = config_validate(cfg_file)
+        ok, msg, warnings = config_validate(cfg_file)
         assert ok is False
         assert "simulated validation error" in msg
+        assert warnings == []
         monkeypatch.setattr(cfg_mod, "load_config", original_load)

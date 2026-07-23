@@ -413,6 +413,38 @@ class TestLeaderKeyListenerTimeout:
             time.sleep(0.2)
         assert MockListener.call_args.kwargs.get("suppress") is True
 
+    def test_hard_limit_releases_the_keyboard_despite_continuous_typing(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The suppressing listener cannot be held open by re-arming keystrokes.
+
+        Every keypress pushes the inactivity deadline back, so only the hard
+        limit bounds the total time press takes input away from the desktop.
+        """
+        from pynput import keyboard as kb
+
+        import press.daemon._hotkeys as hk
+        from press.commands import hotkey_sequence_candidates
+        from press.daemon import LeaderKeyListener
+
+        monkeypatch.setattr(hk, "_LEADER_HARD_LIMIT", 0.3)
+        q: queue.Queue[tuple[str, ...]] = queue.Queue()
+        # timeout far longer than the hard limit: inactivity can never fire it
+        ll = LeaderKeyListener({}, hotkey_sequence_candidates(), q, timeout=30.0)
+
+        with patch("pynput.keyboard.Listener") as MockListener:
+            MockListener.return_value.start.return_value = None
+            ll.start()
+            deadline = time.monotonic() + 1.0
+            while time.monotonic() < deadline and q.empty():
+                # Backspace on an empty buffer resolves to nothing but still
+                # re-arms the inactivity deadline — the worst case for the cap.
+                ll._on_press(kb.Key.backspace)
+                time.sleep(0.02)
+
+        assert q.get_nowait() == ("timeout",)
+        assert ll._listener is None  # suppression actually released
+
 
 # ---------------------------------------------------------------------------
 # HotkeyManager

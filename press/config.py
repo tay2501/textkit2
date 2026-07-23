@@ -232,58 +232,55 @@ def load_config(path: Path | None = None) -> PressConfig:
     )
 
 
-def config_validate(path: Path) -> tuple[bool, str]:
+def config_validate(path: Path) -> tuple[bool, str, list[str]]:
     """Validate a config file without starting the daemon.
 
+    Warnings are returned separately from *message* rather than appended to it,
+    so a caller can render them differently or act on their presence (an
+    eventual ``--strict``) without parsing the success string.
+
     Returns:
-        ``(True, message)`` on success; ``(False, error)`` on failure.
+        ``(ok, message, warnings)``.  *warnings* is non-empty only when *ok* is
+        ``True`` — a config that failed validation is not warned about further.
         A missing file is *not* an error — defaults will be used.
     """
     if not path.exists():
-        return True, f"no config file at {path!r} — defaults will be used"
+        return True, f"no config file at {path!r} — defaults will be used", []
     try:
         with path.open("rb") as fh:
             raw: dict[str, Any] = tomllib.load(fh)
     except tomllib.TOMLDecodeError as exc:
-        return False, f"TOML parse error: {exc}"
+        return False, f"TOML parse error: {exc}", []
     schema = int(raw.get("schema_version", CURRENT_SCHEMA_VERSION))
     if schema > CURRENT_SCHEMA_VERSION:
-        return False, (
-            f"schema_version {schema} is newer than this press version supports "
-            f"(current: {CURRENT_SCHEMA_VERSION}) — upgrade press or reset the config"
+        return (
+            False,
+            (
+                f"schema_version {schema} is newer than this press version supports "
+                f"(current: {CURRENT_SCHEMA_VERSION}) — upgrade press or reset the config"
+            ),
+            [],
         )
     try:
         config = load_config(path)
     except ValueError as exc:
-        return False, str(exc)
+        return False, str(exc), []
     errors = pipeline_errors(config)
     if errors:
-        return False, "; ".join(errors)
-    warnings = binding_shadow_warnings(config)
-    if warnings:
-        return True, f"{path!r}: valid (schema_version={schema}); WARNING: " + "; ".join(warnings)
-    return True, f"{path!r}: valid (schema_version={schema})"
+        return False, "; ".join(errors), []
+    return True, f"{path!r}: valid (schema_version={schema})", binding_shadow_warnings(config)
 
 
 def binding_shadow_warnings(config: PressConfig) -> list[str]:
     """Warn about single-character bindings that hide typed hotkey sequences.
 
-    A binding like ``"k" = "trim"`` fires on the first keypress, so every
-    sequence starting with ``k`` (``kata``, ``kb``, …) becomes untypeable.
-    Valid but worth surfacing — shift+<key> chords never collide.
+    Thin wrapper over :func:`press.commands.hotkey_binding_shadow_warnings` —
+    the rule belongs to the leader-key resolver, not to the config format.  The
+    import is lazy so config loading stays cheap for the delegating CLI path.
     """
-    from press.commands import hotkey_sequence_candidates
+    from press.commands import hotkey_binding_shadow_warnings
 
-    candidates = hotkey_sequence_candidates(config.pipelines)
-    warnings: list[str] = []
-    for key in sorted(config.hotkeys.bindings):
-        if len(key) != 1:
-            continue
-        shadowed = sorted(name for name in candidates if name.startswith(key))
-        if shadowed:
-            preview = ", ".join(shadowed[:4]) + ("…" if len(shadowed) > 4 else "")
-            warnings.append(f"binding {key!r} hides typed sequences {preview}")
-    return warnings
+    return hotkey_binding_shadow_warnings(config.hotkeys.bindings, config.pipelines)
 
 
 def pipeline_errors(config: PressConfig) -> list[str]:

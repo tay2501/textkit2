@@ -81,9 +81,11 @@ def _list_pipelines() -> int:
 
 
 def _register_chain_commands(sub: _SubParsers) -> None:
+    from press.commands import special_aliases
+
     p = sub.add_parser(
         "chain",
-        aliases=["ch"],
+        aliases=special_aliases("chain"),
         help="Apply multiple transforms in sequence (one read, one write)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(

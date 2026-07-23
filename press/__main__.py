@@ -139,7 +139,13 @@ def _genpass_clear_after(seconds: int, *, quiet: bool) -> None:
 
 
 def _register_genpass_command(sub: _SubParsers) -> None:
-    p = sub.add_parser("genpass", aliases=["gp"], help="Generate a secure random password")
+    from press.commands import special_aliases
+
+    p = sub.add_parser(
+        "genpass",
+        aliases=special_aliases("genpass"),
+        help="Generate a secure random password",
+    )
     p.add_argument(
         "-n",
         "--length",
@@ -238,7 +244,9 @@ def _register_uuid_command(sub: _SubParsers) -> None:
 
 
 def _register_clipboard_util_commands(sub: _SubParsers) -> None:
-    p = sub.add_parser("clear", aliases=["cl"], help="Clear the clipboard")
+    from press.commands import special_aliases
+
+    p = sub.add_parser("clear", aliases=special_aliases("clear"), help="Clear the clipboard")
     p.add_argument("-q", "--quiet", action="store_true", help="Suppress all stderr output")
     p.add_argument(
         "--hold",

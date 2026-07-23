@@ -284,6 +284,98 @@ class TestDefaultBindingsDispatchable:
 
 
 # ---------------------------------------------------------------------------
+# SPECIAL_COMMANDS — single source of truth for non-transform command names
+# ---------------------------------------------------------------------------
+
+
+class TestSpecialCommandsRegistry:
+    """Everything that names a non-transform command must derive from the table.
+
+    ``SPECIAL_COMMANDS`` exists so that ``clear``/``cl``, the daemon's special
+    command set, and the hotkey sequence candidates cannot drift apart.  These
+    tests fail if a name or alias is spelled out somewhere else again.
+    """
+
+    def test_daemon_special_commands_are_the_hotkey_rows(self) -> None:
+        from press.commands import DAEMON_SPECIAL_COMMANDS, SPECIAL_COMMANDS
+
+        derived = frozenset(cmd.name for cmd in SPECIAL_COMMANDS if cmd.hotkey)
+        assert derived == DAEMON_SPECIAL_COMMANDS
+
+    def test_dispatcher_handles_every_hotkey_special_command(self) -> None:
+        """The daemon must actually implement what the table advertises."""
+        from press.commands import DAEMON_SPECIAL_COMMANDS
+
+        # dispatch() intercepts these before the transform path; transform()
+        # handles the dictionary pair.  Kept explicit so that adding a row with
+        # hotkey=True without wiring the dispatcher fails here, not at runtime.
+        wired = {"clear", "hold", "undo", "dict", "dict_reverse"}
+        assert wired == set(DAEMON_SPECIAL_COMMANDS)
+
+    def test_cli_only_commands_are_not_hotkey_dispatchable(self) -> None:
+        """genpass/uuid/chain stay CLI-only — see SPECIAL_COMMANDS for why."""
+        from press.commands import DAEMON_SPECIAL_COMMANDS, hotkey_sequence_candidates
+
+        candidates = hotkey_sequence_candidates()
+        for name in ("genpass", "gp", "uuid", "chain", "ch"):
+            assert name not in DAEMON_SPECIAL_COMMANDS
+            assert name not in candidates
+
+    def test_special_aliases_feed_the_cli_parsers(self) -> None:
+        """``press cl`` and the ``cl`` sequence come from the same row."""
+        from press.commands import hotkey_sequence_candidates, special_aliases
+
+        assert special_aliases("clear") == ["cl"]
+        assert special_aliases("genpass") == ["gp"]
+        assert special_aliases("chain") == ["ch"]
+        assert hotkey_sequence_candidates()["cl"] == "clear"
+
+    def test_parser_aliases_match_the_table(self) -> None:
+        """The registered argparse aliases are the table's, not a copy."""
+        from press.__main__ import make_parser
+        from press.commands import SPECIAL_COMMAND_INDEX
+
+        parser = make_parser()
+        (subparsers,) = [
+            action
+            for action in parser._subparsers._group_actions  # type: ignore[union-attr]
+            if action.choices is not None
+        ]
+        registered = set(subparsers.choices)
+        for name in ("clear", "genpass", "chain"):
+            for alias in SPECIAL_COMMAND_INDEX[name].aliases:
+                assert alias in registered, f"{name} alias {alias!r} is not registered"
+
+
+class TestHotkeySequenceCandidates:
+    """The candidate map is derived, never re-spelled."""
+
+    def test_every_registry_name_and_alias_is_typeable(self) -> None:
+        from press.commands import (
+            PARAMETRIC_COMMAND_INDEX,
+            SIMPLE_COMMAND_INDEX,
+            hotkey_sequence_candidates,
+        )
+
+        candidates = hotkey_sequence_candidates()
+        for index in (SIMPLE_COMMAND_INDEX, PARAMETRIC_COMMAND_INDEX):
+            for name, spec in index.items():
+                assert candidates[name] == spec.name
+
+    def test_every_candidate_resolves_to_a_dispatchable_command(self) -> None:
+        from press.commands import (
+            DAEMON_SPECIAL_COMMANDS,
+            hotkey_sequence_candidates,
+            is_registry_command,
+        )
+
+        for name, command in hotkey_sequence_candidates().items():
+            assert is_registry_command(command) or command in DAEMON_SPECIAL_COMMANDS, (
+                f"sequence {name!r} resolves to undispatchable {command!r}"
+            )
+
+
+# ---------------------------------------------------------------------------
 # _detect_monitoring_agents (daemon_status --json diagnostics)
 # ---------------------------------------------------------------------------
 
