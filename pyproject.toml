@@ -64,8 +64,8 @@ dev = [
     "pytest-cov>=7.1.0",
     "hypothesis>=6.155.7",
     "pip-audit>=2.10.1",
-    "ruff>=0.15.18",
-    "mypy>=2.1.0",
+    "ruff>=0.16.0",
+    "mypy>=2.3.0",
 ]
 
 [build-system]
@@ -78,6 +78,14 @@ packages = ["press"]
 [tool.ruff]
 line-length = 100
 # target-version is inferred from requires-python; keeping only one source of truth
+
+[tool.ruff.format]
+# ruff 0.16 formats fenced ```python blocks inside Markdown by default.
+# docs/dev/code-style.md teaches by contrast: its "Bad" examples are badly
+# formatted *on purpose*, and letting the formatter quietly fix them would
+# delete the very difference the document exists to show.  Excluded here rather
+# than sprinkling `fmt: off` through the prose.
+exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = [
@@ -98,8 +106,19 @@ select = [
     "ARG",
     "PIE",
     "C4",
+    # Added 2026-07-26.  Each was measured at *zero* violations across press/
+    # before being enabled, so they cost nothing today and only ever fire on a
+    # regression.  DTZ in particular pins transforms/timestamp.py to tz-aware
+    # datetimes, which is the whole correctness story of that module.
+    "DTZ",   # naive datetime usage
+    "RSE",   # raise X() with redundant parentheses
+    "SLOT",  # __slots__ on str/tuple/namedtuple subclasses
+    "ISC",   # implicit string concatenation
 ]
-ignore = ["TRY003", "ERA001"]
+# No `ignore` list: with an explicit `select`, ignoring an unselected rule is a
+# no-op.  TRY003/ERA001 sat here for a while implying TRY and ERA had been
+# considered and tuned, when neither was ever selected.  Rules we deliberately
+# do NOT select, and why, are recorded in docs/dev/refactoring-plan-2026-07-26.md.
 
 [tool.ruff.lint.per-file-ignores]
 "test/**/*.py" = ["S101", "RUF001", "ARG"]  # pytest fixtures and mock helpers often have unused args
