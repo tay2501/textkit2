@@ -52,13 +52,14 @@ pipe instead of importing the transform module — see
 | `commands.py` | Declarative registry of all simple transform commands (`SimpleCommand` + `SIMPLE_COMMANDS` + `SIMPLE_COMMAND_INDEX`); single source of truth shared by CLI and daemon |
 | `clipboard.py` | Win32 ctypes API — `get_clipboard_text`, `set_clipboard_text`, `clear_clipboard` (Windows only) |
 | `keystrokes.py` | Win32 `SendInput` synthesis for the `type` command — pure `plan_keystrokes()` plus a Windows-only sender |
-| `config.py` | TOML loader → frozen `PressConfig` dataclass hierarchy (`slots=True`) |
+| `config.py` | TOML loader → frozen `PressConfig` dataclass hierarchy (`slots=True`); the `_SECTIONS` registry drives loading, `config reset`, and serialization from one table |
 | `_paths.py` | Single source for `%APPDATA%\press` locations |
 | `_pipe.py` | Named-pipe protocol + CLI client (`try_delegate`); deliberately import-light |
 | `daemon/` | Windows daemon package (see below); public API is `run_daemon`, `stop_daemon`, `daemon_status`, `daemon_logs` |
 | `dictionary.py` | TSV file CRUD — `add_entry`, `remove_entry`, `list_entries` |
 | `transforms/` | Pure `str → str` functions, one module per domain; no I/O or side effects |
 | `transforms/lines.py` | Line-oriented operations: `trim_lines`, `dedupe_lines`, `sort_lines` |
+| `transforms/lineending.py` | CRLF/CR/LF conversion — and the **single definition of what counts as a line ending**; `lines.py`, `timestamp.py` and `keystrokes.py` all normalise through its `to_lf` |
 | `transforms/unicode_norm.py` | Unicode normalization: `to_nfc`, `to_nfd`, `to_nfkc`, `to_nfkd`, `check_norm` |
 
 ### The `daemon/` package
@@ -282,7 +283,7 @@ press/
 ├── commands.py          Central command registry (SimpleCommand)
 ├── clipboard.py         Win32 ctypes clipboard API
 ├── keystrokes.py        Win32 SendInput synthesis (the `type` command)
-├── config.py            TOML → PressConfig dataclass
+├── config.py            TOML → PressConfig dataclass (_SECTIONS registry)
 ├── _paths.py            %APPDATA%\press path helpers
 ├── _pipe.py             Named-pipe protocol + CLI client
 ├── daemon/              pystray + pynput daemon (Windows only)
