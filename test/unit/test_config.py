@@ -1,12 +1,15 @@
 """Tests for press/config.py — typed config loader with TOML support."""
 
 import textwrap
+import tomllib
+from dataclasses import fields
 from pathlib import Path
 
 import pytest
 
 from press.config import (
     CURRENT_SCHEMA_VERSION,
+    SECTION_NAMES,
     DictionaryConfig,
     HoldConfig,
     HotkeysConfig,
@@ -394,6 +397,78 @@ class TestConfigToToml:
         cfg_file.write_text(_config_to_toml(original), encoding="utf-8")
         reloaded = load_config(cfg_file)
         assert reloaded.pipelines == {"cleanup": ("trim", "dedupe", "lf")}
+
+    def test_quote_char_double_quote_survives_a_roundtrip(self, tmp_path: Path) -> None:
+        """A ``"`` quote_char used to be written raw, producing unreadable TOML."""
+        original = PressConfig(sql_in=SqlInConfig(quote_char='"'))
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(_config_to_toml(original), encoding="utf-8")
+        assert load_config(cfg_file).sql_in.quote_char == '"'
+
+    def test_backslash_paths_survive_a_roundtrip(self, tmp_path: Path) -> None:
+        r"""Windows dictionary paths carry ``\`` — a TOML escape character."""
+        original = PressConfig(dictionary=DictionaryConfig(files=(r"C:\Users\t\dict.tsv",)))
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(_config_to_toml(original), encoding="utf-8")
+        assert load_config(cfg_file).dictionary.files == (r"C:\Users\t\dict.tsv",)
+
+
+# ---------------------------------------------------------------------------
+# Section registry — the table load/reset/serialize all derive from
+# ---------------------------------------------------------------------------
+
+
+class TestSectionRegistry:
+    """The registry must stay in step with PressConfig and with the CLI."""
+
+    def test_covers_every_pressconfig_section_field(self) -> None:
+        """A section added to PressConfig but not to _SECTIONS would never load."""
+        config_fields = {f.name for f in fields(PressConfig)} - {"schema_version"}
+        assert set(SECTION_NAMES) == config_fields
+
+    def test_matches_the_reset_choices_offered_by_the_cli(self) -> None:
+        """``press config reset --key`` must offer exactly the resettable sections.
+
+        The CLI spells the list out literally instead of importing this module:
+        ``_register_config_commands`` runs on *every* press invocation, and
+        importing ``press.config`` there would put tomllib and pathlib on the
+        startup path.  This test is what keeps the two in step.
+        """
+        import argparse
+
+        from press._cli_config import _register_config_commands
+
+        def subparsers_of(parser: argparse.ArgumentParser) -> argparse._SubParsersAction:  # type: ignore[type-arg]
+            return next(a for a in parser._actions if isinstance(a, argparse._SubParsersAction))
+
+        root = argparse.ArgumentParser()
+        _register_config_commands(root.add_subparsers())
+        reset_parser = subparsers_of(subparsers_of(root).choices["config"]).choices["reset"]
+        key_option = next(a for a in reset_parser._actions if a.dest == "key")
+
+        assert key_option.choices is not None
+        assert tuple(key_option.choices) == SECTION_NAMES
+
+    def test_every_section_is_individually_resettable(self, tmp_path: Path) -> None:
+        """Each registry row must round-trip through config_reset(key=...)."""
+        cfg_file = tmp_path / "config.toml"
+        for name in SECTION_NAMES:
+            cfg_file.write_text(_config_to_toml(PressConfig()), encoding="utf-8")
+            config_reset(cfg_file, key=name)
+            reloaded = load_config(cfg_file)
+            assert getattr(reloaded, name) == getattr(PressConfig(), name)
+
+    def test_serialized_output_is_always_valid_toml(self) -> None:
+        """Every section must survive the writer → tomllib round trip."""
+        awkward = PressConfig(
+            hotkeys=HotkeysConfig(prefix="ctrl+alt+f9", bindings={"shift+z": "undo"}),
+            sql_in=SqlInConfig(quote_char='"', wrap=True),
+            dictionary=DictionaryConfig(files=(r"C:\dict\a.tsv", 'quote"d.tsv')),
+            pipelines={"we ird": ("trim", "lf")},
+        )
+        parsed = tomllib.loads(_config_to_toml(awkward))
+        assert parsed["sql_in"]["quote_char"] == '"'
+        assert parsed["pipelines"]["we ird"] == ["trim", "lf"]
 
 
 # ---------------------------------------------------------------------------

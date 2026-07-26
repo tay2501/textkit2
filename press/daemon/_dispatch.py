@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import sys
 from typing import TYPE_CHECKING, Any
 
@@ -47,32 +48,26 @@ class CommandDispatcher:
         writes the result back.  Notifications are emitted according to
         ``config.ui.notify_level``.
         """
-        import contextlib
-
-        from press.clipboard import clear_clipboard, get_clipboard_text, set_clipboard_text
+        from press.clipboard import get_clipboard_text, set_clipboard_text
 
         try:
-            if command == "clear":
-                # Empty/non-text clipboard — clear proceeds without a snapshot
-                with contextlib.suppress(OSError, RuntimeError):
-                    self._remember_for_undo(get_clipboard_text())
-                clear_clipboard()
-                self._notify_success(command, "")
-                return
-            if command == "hold":
-                self._toggle_hold()
-                return
-            if command == "undo":
-                self._undo_swap()
-                return
-            if command == "type":
-                self._type_clipboard()
-                return
-            text = get_clipboard_text()
-            result = self.transform(command, text)
-            self._remember_for_undo(text)
-            set_clipboard_text(result)
-            self._notify_success(command, result)
+            # The four cases below act on the clipboard as a whole rather than
+            # transforming its text, so each owns its own notification.
+            match command:
+                case "clear":
+                    self._clear_clipboard()
+                case "hold":
+                    self._toggle_hold()
+                case "undo":
+                    self._undo_swap()
+                case "type":
+                    self._type_clipboard()
+                case _:
+                    text = get_clipboard_text()
+                    result = self.transform(command, text)
+                    self._remember_for_undo(text)
+                    set_clipboard_text(result)
+                    self._notify_success(command, result)
         except Exception as exc:
             self._notify_error(command, str(exc))
 
@@ -154,10 +149,19 @@ class CommandDispatcher:
     def _notify(self, title: str, message: str) -> None:
         if self._icon is None:
             return
-        import contextlib
-
         with contextlib.suppress(Exception):
             self._icon.notify(message, title)
+
+    def _clear_clipboard(self) -> None:
+        """Empty the clipboard, snapshotting what it held for undo first."""
+        from press.clipboard import clear_clipboard, get_clipboard_text
+
+        # An empty or non-text clipboard has nothing to snapshot; the clear
+        # itself must still go ahead.
+        with contextlib.suppress(OSError, RuntimeError):
+            self._remember_for_undo(get_clipboard_text())
+        clear_clipboard()
+        self._notify_success("clear", "")
 
     def _toggle_hold(self) -> None:
         """Toggle dual-layer clipboard guard and update the tray icon."""
@@ -244,7 +248,5 @@ class CommandDispatcher:
         """Swap the tray icon to reflect hold state."""
         if self._icon is None or not self._config.ui.hold_icon:
             return
-        import contextlib
-
         with contextlib.suppress(Exception):
             self._icon.icon = _create_tray_image(holding=holding)

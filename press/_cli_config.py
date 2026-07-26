@@ -30,6 +30,10 @@ def _register_config_commands(sub: _SubParsers) -> None:
         "reset",
         help="Reset config to defaults and create a .toml.bak backup",
     )
+    # Spelled out rather than derived from press.config.SECTION_NAMES: this
+    # function runs on every press invocation, and importing press.config here
+    # would put tomllib and pathlib on the startup path.  The list is pinned to
+    # the registry by test_config.TestSectionRegistry instead.
     rst_p.add_argument(
         "--key",
         choices=["hotkeys", "sql_in", "trim", "dictionary", "ui", "hold", "type", "pipelines"],
