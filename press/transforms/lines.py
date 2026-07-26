@@ -9,9 +9,11 @@ from __future__ import annotations
 import locale
 import unicodedata
 
+from press.transforms.lineending import to_lf
+
 
 def _normalise(text: str) -> tuple[list[str], bool]:
-    s = text.replace("\r\n", "\n").replace("\r", "\n")
+    s = to_lf(text)
     trailing = s.endswith("\n")
     lines = s.split("\n")
     # Remove the empty sentinel that split() appends when text ends with "\n"

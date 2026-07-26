@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from press.transforms.lineending import to_lf
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -15,8 +17,7 @@ _MS_THRESHOLD = 100_000_000_000
 
 def _map_lines(text: str, fn: Callable[[str], str]) -> str:
     """Apply *fn* to each non-blank line; blank lines and trailing newline pass through."""
-    normalised = text.replace("\r\n", "\n").replace("\r", "\n")
-    return "\n".join(fn(line.strip()) if line.strip() else line for line in normalised.split("\n"))
+    return "\n".join(fn(line.strip()) if line.strip() else line for line in to_lf(text).split("\n"))
 
 
 def unix_to_date(text: str, *, utc: bool = False) -> str:
