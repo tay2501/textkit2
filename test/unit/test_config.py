@@ -412,6 +412,14 @@ class TestConfigToToml:
         cfg_file.write_text(_config_to_toml(original), encoding="utf-8")
         assert load_config(cfg_file).dictionary.files == (r"C:\Users\t\dict.tsv",)
 
+    def test_control_characters_survive_a_roundtrip(self, tmp_path: Path) -> None:
+        """Every character TOML 1.0 forbids unescaped, including U+007F (DEL)."""
+        raw = "".join(chr(c) for c in (*range(0x20), 0x7F))
+        original = PressConfig(dictionary=DictionaryConfig(files=(raw,)))
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(_config_to_toml(original), encoding="utf-8")
+        assert load_config(cfg_file).dictionary.files == (raw,)
+
 
 # ---------------------------------------------------------------------------
 # Section registry — the table load/reset/serialize all derive from

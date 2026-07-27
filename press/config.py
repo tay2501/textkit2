@@ -260,8 +260,10 @@ def _toml_string(value: str) -> str:
             0x5C: "\\\\",
         }
     )
-    # Remaining C0 controls have no short escape and must be \uXXXX.
-    escaped = "".join(c if c >= " " or c == "\\" else f"\\u{ord(c):04X}" for c in escaped)
+    # Remaining C0 controls have no short escape and must be \uXXXX.  U+007F
+    # (DEL) is on that list too: TOML 1.0 forbids it unescaped in a basic
+    # string even though it sorts above the space character.
+    escaped = "".join(c if c >= " " and c != "\x7f" else f"\\u{ord(c):04X}" for c in escaped)
     return f'"{escaped}"'
 
 
