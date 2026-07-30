@@ -85,6 +85,28 @@ cat file.txt | press lf     # → LF   (\n)
 cat file.txt | press cr     # → CR   (\r)
 ```
 
+### `strip-newlines` (`nn`)
+
+Remove every line ending so the text becomes a single line. `\r\n`, `\r` and
+`\n` are deleted and **nothing is inserted in their place** — useful for a URL
+your mail client wrapped, an Excel column, or Japanese text that should not
+gain spaces.
+
+```bash
+printf 'https://example.com/very\n/long/path' | press strip-newlines
+# → https://example.com/very/long/path
+
+printf '研究\n開発' | press nn
+# → 研究開発
+```
+
+```{note}
+Latin words run together (`hello\nworld` → `helloworld`): the command's whole
+contract is "no `\r`, no `\n`, nothing else changed". When you want a space
+instead, replace the breaks rather than removing them:
+`press replace -p '\r?\n' -r ' '`.
+```
+
 ## Separator conversion
 
 ### `hyphen` (`hy`)

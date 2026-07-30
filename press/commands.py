@@ -99,6 +99,7 @@ SIMPLE_COMMANDS: tuple[SimpleCommand, ...] = (
     SimpleCommand("crlf",           "press.transforms.lineending", "to_crlf",               (),        r"Convert line endings to CRLF (\r\n)"),
     SimpleCommand("lf",             "press.transforms.lineending", "to_lf",                 (),        r"Convert line endings to LF (\n)"),
     SimpleCommand("cr",             "press.transforms.lineending", "to_cr",                 (),        r"Convert line endings to CR (\r)"),
+    SimpleCommand("strip-newlines", "press.transforms.lineending", "strip_newlines",        ("nn",),   "Remove all line endings, leaving one line (inserts nothing)"),
     # --- separator ---
     SimpleCommand("underscore",     "press.transforms.separator",  "hyphen_to_underscore",  ("us", "underbar", "ub"), "Convert hyphens to underscores"),
     SimpleCommand("hyphen",         "press.transforms.separator",  "underscore_to_hyphen",  ("hy",),   "Convert underscores to hyphens"),

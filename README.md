@@ -179,6 +179,7 @@ press dedupe --ignore-case -c -C
 | `crlf` | | Unify all line endings to `\r\n` |
 | `lf` | | Unify all line endings to `\n` |
 | `cr` | | Unify all line endings to `\r` |
+| `strip-newlines` | `nn` | Remove all line endings — one line, nothing inserted (`研究\n開発` → `研究開発`) |
 
 ### Line Operations
 

@@ -33,3 +33,21 @@ def to_lf(text: str) -> str:
 def to_cr(text: str) -> str:
     r"""Convert all line endings to CR (\r)."""
     return _normalize_to_lf(text).replace("\n", "\r")
+
+
+def strip_newlines(text: str) -> str:
+    r"""Remove every line ending, leaving the text on a single line.
+
+    ``\r\n``, ``\r`` and ``\n`` are deleted; **nothing** is inserted in their
+    place, so ``"研究\n開発"`` becomes ``"研究開発"`` and ``"hello\nworld"``
+    becomes ``"helloworld"``.  Substituting a space between Latin words would
+    make the result depend on the script of the surrounding characters — see
+    ``docs/dev/design-strip-newlines-2026-07-31.md`` — so the guarantee is
+    kept narrow: the output contains no U+000A and no U+000D, and no other
+    character is added, removed or moved.  Chain it with ``trim`` or
+    ``replace`` when more than that is wanted.
+
+    The trailing newline goes too, unlike in the line-oriented transforms of
+    :mod:`press.transforms.lines`, which preserve it.
+    """
+    return _normalize_to_lf(text).replace("\n", "")

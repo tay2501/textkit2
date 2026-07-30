@@ -37,10 +37,20 @@ class TestSequenceResolution:
             ("hal", "halfwidth"),  # unique prefix fires before the name is complete
             ("html-e", "html-encode"),  # hyphenated names are typeable
             ("ty", "type"),  # keystroke paste — two strokes, ahead of trim/title/tt
+            ("nn", "strip-newlines"),  # newline removal — free two-key alias
         ],
     )
     def test_sequence_dispatches(self, typed: str, expected: str) -> None:
         assert _type(_resolver(), typed) == ("dispatch", expected)
+
+    def test_strip_newlines_alias_leaves_the_sn_sequences_alone(self) -> None:
+        """``nn`` was chosen over ``snl`` precisely to keep ``sn`` at two keys.
+
+        A second ``sn…`` candidate would turn the exact match ``sn`` into a
+        pending one, so ``snake`` would only fire after the inactivity timeout.
+        """
+        assert _type(_resolver(), "sn") == ("dispatch", "snake")
+        assert _type(_resolver(), "sl") == ("dispatch", "slug")
 
     def test_type_does_not_lengthen_the_other_t_sequences(self) -> None:
         """Adding ``type``/``ty`` must not push ``tm`` or ``tt`` out to 3 keys."""

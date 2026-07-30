@@ -177,6 +177,16 @@ class TestLineEndings:
         assert b"\r" in content
         assert b"\n" not in content
 
+    def test_strip_newlines(self) -> None:
+        result = _run_bytes("strip-newlines", input_bytes=b"a\r\nb\nc\r")
+        assert result.returncode == 0
+        assert result.stdout == b"abc"
+
+    def test_strip_newlines_alias_nn(self) -> None:
+        result = _run_bytes("nn", input_bytes=b"a\nb\n")
+        assert result.returncode == 0
+        assert result.stdout == b"ab"
+
 
 # ---------------------------------------------------------------------------
 # underscore / hyphen
