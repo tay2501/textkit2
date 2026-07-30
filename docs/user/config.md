@@ -5,7 +5,7 @@
 If the file does not exist, all defaults apply. No configuration is required to start using `press`.
 
 Use `press config validate` to check the file and `press config reset` to restore defaults
-(optionally per section with `--key hotkeys | sql_in | trim | dictionary | ui | hold | pipelines`).
+(optionally per section with `--key hotkeys | sql_in | trim | dictionary | ui | hold | type | pipelines`).
 
 ## Full example
 
@@ -37,6 +37,12 @@ notify_level         = "off"
 [hold]
 monitor_clipboard    = true
 intercept_paste_keys = true
+
+[type]
+max_chars      = 2000
+chunk_size     = 200
+chunk_delay_ms = 5
+newline        = "enter"
 
 [pipelines]
 cleanup = ["trim", "dedupe", "lf"]
@@ -108,6 +114,24 @@ Options applied when `trim` is dispatched via hotkey (the CLI uses `--both`).
 |---|---|---|---|
 | `monitor_clipboard` | bool | `true` | Layer 1: watch `WM_CLIPBOARDUPDATE` and restore held text |
 | `intercept_paste_keys` | bool | `true` | Layer 2: hook `Ctrl+V` / `Shift+Insert` while HOLD is active |
+
+### `[type]`
+
+Options for the `type` command, which pastes by synthesizing keystrokes
+instead of by `Ctrl+V` (hotkey-only — see {doc}`hotkeys`).
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `max_chars` | int | `2000` | Refuse longer clipboards. Typing is visible and interruptible, so this is a guard rail |
+| `chunk_size` | int | `200` | Key events per `SendInput` call. Lower it if a slow application drops characters |
+| `chunk_delay_ms` | int | `5` | Pause between chunks, giving the target's message queue time to drain |
+| `newline` | string | `"enter"` | What a line break becomes: `"enter"` an Enter press, `"unicode"` a literal `U+000A`, `"skip"` nothing |
+
+```{note}
+Set `newline = "unicode"` or `"skip"` if you mostly paste into a chat client —
+with `"enter"`, a multi-line clipboard **sends** each line. An unrecognised
+value falls back to `"enter"` rather than stopping the daemon.
+```
 
 ### `[pipelines]`
 

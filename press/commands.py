@@ -99,6 +99,7 @@ SIMPLE_COMMANDS: tuple[SimpleCommand, ...] = (
     SimpleCommand("crlf",           "press.transforms.lineending", "to_crlf",               (),        r"Convert line endings to CRLF (\r\n)"),
     SimpleCommand("lf",             "press.transforms.lineending", "to_lf",                 (),        r"Convert line endings to LF (\n)"),
     SimpleCommand("cr",             "press.transforms.lineending", "to_cr",                 (),        r"Convert line endings to CR (\r)"),
+    SimpleCommand("strip-newlines", "press.transforms.lineending", "strip_newlines",        ("nn",),   "Remove all line endings, leaving one line (inserts nothing)"),
     # --- separator ---
     SimpleCommand("underscore",     "press.transforms.separator",  "hyphen_to_underscore",  ("us", "underbar", "ub"), "Convert hyphens to underscores"),
     SimpleCommand("hyphen",         "press.transforms.separator",  "underscore_to_hyphen",  ("hy",),   "Convert underscores to hyphens"),
@@ -444,6 +445,10 @@ SPECIAL_COMMANDS: tuple[SpecialCommand, ...] = (
     SpecialCommand("undo", (), hotkey=True),
     SpecialCommand("dict", (), hotkey=True),
     SpecialCommand("dict_reverse", (), hotkey=True),  # daemon-only; no CLI parser
+    # Types the clipboard into the focused window instead of pasting it.
+    # Daemon-only by nature: run from a shell it would type into that shell.
+    # "ty" resolves in two keystrokes; "type" itself stays typeable.
+    SpecialCommand("type", ("ty",), hotkey=True),
     # CLI-only.  Each exclusion is deliberate:
     # - genpass writes with sensitive=True, which suppresses the undo snapshot
     #   by design — a mistyped sequence would destroy the clipboard with no way

@@ -5,21 +5,28 @@ and returns an immutable :class:`PressConfig` dataclass with typed defaults.
 Missing files yield defaults; partial files merge with defaults.
 """
 
+from __future__ import annotations
+
 import tomllib
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field, fields, replace
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from press._paths import appdata_dir, press_dir
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 __all__ = [
     "CURRENT_SCHEMA_VERSION",
+    "SECTION_NAMES",
     "DictionaryConfig",
     "HoldConfig",
     "HotkeysConfig",
     "PressConfig",
     "SqlInConfig",
     "TrimConfig",
+    "TypeConfig",
     "UiConfig",
     "binding_shadow_warnings",
     "config_reset",
@@ -107,6 +114,23 @@ class HoldConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class TypeConfig:
+    """Options for the ``type`` command (keystroke-by-keystroke pasting).
+
+    The defaults mirror :mod:`press.keystrokes`; they live here so a user whose
+    editor swallows fast input can slow it down, and so ``newline`` can be
+    switched away from Enter in applications where Enter means "send".
+    """
+
+    max_chars: int = 2000
+    chunk_size: int = 200
+    chunk_delay_ms: int = 5
+    # Spelled out rather than imported from press.keystrokes: config.py is on
+    # the CLI's import path and must not pull in the keystroke module.
+    newline: Literal["enter", "unicode", "skip"] = "enter"
+
+
+@dataclass(frozen=True, slots=True)
 class PressConfig:
     """Top-level configuration object for press."""
 
@@ -116,6 +140,7 @@ class PressConfig:
     dictionary: DictionaryConfig = field(default_factory=DictionaryConfig)
     ui: UiConfig = field(default_factory=UiConfig)
     hold: HoldConfig = field(default_factory=HoldConfig)
+    type: TypeConfig = field(default_factory=TypeConfig)
     # Named transform chains: name -> ordered registry command names.
     # Runnable via `press chain <name>` and bindable to daemon hotkeys.
     pipelines: dict[str, tuple[str, ...]] = field(default_factory=dict)
@@ -163,6 +188,20 @@ def _parse_hold(data: dict[str, Any]) -> HoldConfig:
     )
 
 
+def _parse_type(data: dict[str, Any]) -> TypeConfig:
+    default = TypeConfig()
+    raw_newline = data.get("newline", default.newline)
+    # Unknown values fall back rather than raise: an unrecognised newline mode
+    # would otherwise stop the daemon from starting over a cosmetic setting.
+    newline = raw_newline if raw_newline in ("enter", "unicode", "skip") else default.newline
+    return TypeConfig(
+        max_chars=int(data.get("max_chars", default.max_chars)),
+        chunk_size=max(1, int(data.get("chunk_size", default.chunk_size))),
+        chunk_delay_ms=int(data.get("chunk_delay_ms", default.chunk_delay_ms)),
+        newline=newline,
+    )
+
+
 def _parse_pipelines(data: dict[str, Any]) -> dict[str, tuple[str, ...]]:
     """Parse the ``[pipelines]`` table: each key maps to an array of strings.
 
@@ -189,6 +228,135 @@ def _parse_ui(data: dict[str, Any]) -> UiConfig:
 
 
 # ---------------------------------------------------------------------------
+# Section registry
+#
+# One row per ``config.toml`` table.  Loading, resetting and serializing all
+# iterate this tuple, so adding a section means writing its dataclass and its
+# parser and then adding one row here — not editing three control structures
+# that each spell the section name out again.
+#
+# The per-section *parsers* deliberately stay hand-written: each has real logic
+# (``_parse_ui``'s allow-list, ``_parse_type``'s fallback, ``_parse_hotkeys``'s
+# default merge).  What this table removes is the mechanical *dispatch* around
+# them, not the parsing itself.
+# ---------------------------------------------------------------------------
+
+
+def _toml_string(value: str) -> str:
+    """Return *value* as a TOML basic string, escaped per the TOML 1.0 spec.
+
+    Needed because config values are not all tame: ``quote_char = '"'`` and
+    Windows dictionary paths (``C:\\Users\\...``) both used to be written out
+    raw, producing a file that ``tomllib`` then refused to read back.
+    """
+    escaped = value.translate(
+        {
+            0x08: "\\b",
+            0x09: "\\t",
+            0x0A: "\\n",
+            0x0C: "\\f",
+            0x0D: "\\r",
+            0x22: '\\"',
+            0x5C: "\\\\",
+        }
+    )
+    # Remaining C0 controls have no short escape and must be \uXXXX.  U+007F
+    # (DEL) is on that list too: TOML 1.0 forbids it unescaped in a basic
+    # string even though it sorts above the space character.
+    escaped = "".join(c if c >= " " and c != "\x7f" else f"\\u{ord(c):04X}" for c in escaped)
+    return f'"{escaped}"'
+
+
+def _toml_value(value: object) -> str:
+    """Render a Python value as a TOML literal."""
+    match value:
+        case bool():  # before int(): bool is a subclass of int
+            return "true" if value else "false"
+        case int():
+            return str(value)
+        case str():
+            return _toml_string(value)
+        case tuple() | list():
+            return "[" + ", ".join(_toml_value(item) for item in value) + "]"
+        case _:
+            raise TypeError(f"cannot serialize {type(value).__name__} to TOML")
+
+
+def _emit_hotkeys(cfg: HotkeysConfig) -> list[str]:
+    """``[hotkeys]`` carries a nested ``[hotkeys.bindings]`` table of its own."""
+    return [
+        "[hotkeys]",
+        f"prefix = {_toml_string(cfg.prefix)}",
+        "",
+        "[hotkeys.bindings]",
+        *(f"{_toml_key(key)} = {_toml_string(cmd)}" for key, cmd in cfg.bindings.items()),
+    ]
+
+
+def _emit_pipelines(pipelines: dict[str, tuple[str, ...]]) -> list[str]:
+    """``[pipelines]`` is a bare table; an empty one keeps a worked example."""
+    if not pipelines:
+        return [
+            "[pipelines]",
+            '# cleanup = ["trim", "dedupe", "lf"]  # run via: press chain cleanup',
+        ]
+    return [
+        "[pipelines]",
+        *(f"{_toml_key(name)} = {_toml_value(steps)}" for name, steps in pipelines.items()),
+    ]
+
+
+@dataclass(frozen=True, slots=True)
+class _Section:
+    """One ``config.toml`` table and everything the three code paths need of it.
+
+    Args:
+        key: TOML table name; also the :class:`PressConfig` field name.
+        parse: Raw TOML table → the section's dataclass (the ``_parse_*``
+            function above).
+        default: Zero-argument factory for a pristine section.
+        emit: Custom serializer.  ``None`` uses the generic one, which writes
+            the dataclass fields in declaration order — correct for every
+            section that is a flat table of scalars.
+    """
+
+    key: str
+    parse: Callable[[dict[str, Any]], Any]
+    default: Callable[[], Any]
+    emit: Callable[[Any], list[str]] | None = None
+
+    def to_toml(self, value: Any) -> list[str]:
+        """Return the TOML lines for *value*, header included."""
+        if self.emit is not None:
+            return self.emit(value)
+        return [
+            f"[{self.key}]",
+            *(f"{f.name} = {_toml_value(getattr(value, f.name))}" for f in fields(value)),
+        ]
+
+
+# Order is the order sections appear in a written config.toml.
+_SECTIONS: tuple[_Section, ...] = (
+    _Section("hotkeys", _parse_hotkeys, HotkeysConfig, _emit_hotkeys),
+    _Section("sql_in", _parse_sql_in, SqlInConfig),
+    _Section("trim", _parse_trim, TrimConfig),
+    _Section("dictionary", _parse_dictionary, DictionaryConfig),
+    _Section("ui", _parse_ui, UiConfig),
+    _Section("hold", _parse_hold, HoldConfig),
+    _Section("type", _parse_type, TypeConfig),
+    _Section("pipelines", _parse_pipelines, dict, _emit_pipelines),
+)
+
+_SECTION_INDEX: dict[str, _Section] = {section.key: section for section in _SECTIONS}
+
+#: Resettable section names, in file order.  ``press config reset --key`` offers
+#: exactly these; ``test_config.py`` pins the argparse ``choices`` list against
+#: it rather than importing this module during parser construction, which would
+#: put ``tomllib``/``pathlib`` on every CLI startup's import path.
+SECTION_NAMES: tuple[str, ...] = tuple(section.key for section in _SECTIONS)
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -212,24 +380,8 @@ def load_config(path: Path | None = None) -> PressConfig:
         raise ValueError(f"Invalid TOML in {path}: {exc}") from exc
 
     schema_version = int(raw.get("schema_version", CURRENT_SCHEMA_VERSION))
-    hotkeys = _parse_hotkeys(raw.get("hotkeys", {}))
-    sql_in = _parse_sql_in(raw.get("sql_in", {}))
-    trim = _parse_trim(raw.get("trim", {}))
-    dictionary = _parse_dictionary(raw.get("dictionary", {}))
-    ui = _parse_ui(raw.get("ui", {}))
-    hold = _parse_hold(raw.get("hold", {}))
-    pipelines = _parse_pipelines(raw.get("pipelines", {}))
-
-    return PressConfig(
-        hotkeys=hotkeys,
-        sql_in=sql_in,
-        trim=trim,
-        dictionary=dictionary,
-        ui=ui,
-        hold=hold,
-        pipelines=pipelines,
-        schema_version=schema_version,
-    )
+    sections = {s.key: s.parse(raw.get(s.key, {})) for s in _SECTIONS}
+    return PressConfig(schema_version=schema_version, **sections)
 
 
 def config_validate(path: Path) -> tuple[bool, str, list[str]]:
@@ -303,45 +455,15 @@ def _toml_key(key: str) -> str:
 
 
 def _config_to_toml(config: PressConfig) -> str:
-    """Serialize *config* to a TOML-formatted string."""
-    lines: list[str] = [
-        f"schema_version = {config.schema_version}",
-        "",
-        "[hotkeys]",
-        f'prefix = "{config.hotkeys.prefix}"',
-        "",
-        "[hotkeys.bindings]",
-    ]
-    for k, cmd in config.hotkeys.bindings.items():
-        lines.append(f'{_toml_key(k)} = "{cmd}"')
-    lines += [
-        "",
-        "[sql_in]",
-        f'quote_char = "{config.sql_in.quote_char}"',
-        f"wrap = {str(config.sql_in.wrap).lower()}",
-        "",
-        "[trim]",
-        f"both = {str(config.trim.both).lower()}",
-        "",
-        "[dictionary]",
-        "files = [" + ", ".join(f'"{f}"' for f in config.dictionary.files) + "]",
-        "",
-        "[ui]",
-        f"startup_notification = {str(config.ui.startup_notification).lower()}",
-        f"hold_icon = {str(config.ui.hold_icon).lower()}",
-        f'notify_level = "{config.ui.notify_level}"',
-        "",
-        "[hold]",
-        f"monitor_clipboard = {str(config.hold.monitor_clipboard).lower()}",
-        f"intercept_paste_keys = {str(config.hold.intercept_paste_keys).lower()}",
-        "",
-        "[pipelines]",
-    ]
-    if config.pipelines:
-        for name, steps in config.pipelines.items():
-            lines.append(f"{_toml_key(name)} = [" + ", ".join(f'"{s}"' for s in steps) + "]")
-    else:
-        lines.append('# cleanup = ["trim", "dedupe", "lf"]  # run via: press chain cleanup')
+    """Serialize *config* to a TOML-formatted string.
+
+    Sections are written in :data:`_SECTIONS` order, each preceded by a blank
+    line, so the layout stays stable as sections are added.
+    """
+    lines: list[str] = [f"schema_version = {config.schema_version}"]
+    for section in _SECTIONS:
+        lines.append("")
+        lines.extend(section.to_toml(getattr(config, section.key)))
     lines.append("")
     return "\n".join(lines)
 
@@ -351,9 +473,9 @@ def config_reset(path: Path, *, key: str | None = None) -> bool:
 
     Args:
         path: Path to ``config.toml``.
-        key: Section name to reset (``hotkeys``, ``sql_in``, ``trim``,
-            ``dictionary``, ``ui``, ``hold``, ``pipelines``).  ``None`` resets
-            the entire file.
+        key: Section to reset — one of :data:`SECTION_NAMES`.  ``None`` resets
+            the entire file; an unrecognised name leaves the config unchanged
+            (it is still rewritten, normalising formatting).
 
     Returns:
         ``True`` if a backup was created, ``False`` if no previous file existed.
@@ -370,23 +492,8 @@ def config_reset(path: Path, *, key: str | None = None) -> bool:
             existing = load_config(path)
         except (FileNotFoundError, ValueError):
             existing = PressConfig()
-        match key:
-            case "hotkeys":
-                config = replace(existing, hotkeys=HotkeysConfig())
-            case "sql_in":
-                config = replace(existing, sql_in=SqlInConfig())
-            case "trim":
-                config = replace(existing, trim=TrimConfig())
-            case "dictionary":
-                config = replace(existing, dictionary=DictionaryConfig())
-            case "ui":
-                config = replace(existing, ui=UiConfig())
-            case "hold":
-                config = replace(existing, hold=HoldConfig())
-            case "pipelines":
-                config = replace(existing, pipelines={})
-            case _:
-                config = existing
+        section = _SECTION_INDEX.get(key)
+        config = existing if section is None else replace(existing, **{key: section.default()})
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(_config_to_toml(config), encoding="utf-8")

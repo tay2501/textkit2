@@ -135,3 +135,10 @@ Auto-generated from source docstrings.
 .. automodule:: press.config
    :members:
 ```
+
+## press.keystrokes
+
+```{eval-rst}
+.. automodule:: press.keystrokes
+   :members:
+```

@@ -1,12 +1,15 @@
 """Tests for press/config.py — typed config loader with TOML support."""
 
 import textwrap
+import tomllib
+from dataclasses import fields
 from pathlib import Path
 
 import pytest
 
 from press.config import (
     CURRENT_SCHEMA_VERSION,
+    SECTION_NAMES,
     DictionaryConfig,
     HoldConfig,
     HotkeysConfig,
@@ -378,6 +381,7 @@ class TestConfigToToml:
         assert reloaded.trim == original.trim
         assert reloaded.ui == original.ui
         assert reloaded.hold == original.hold
+        assert reloaded.type == original.type
 
     def test_schema_version_in_output(self) -> None:
         toml_str = _config_to_toml(PressConfig())
@@ -393,6 +397,141 @@ class TestConfigToToml:
         cfg_file.write_text(_config_to_toml(original), encoding="utf-8")
         reloaded = load_config(cfg_file)
         assert reloaded.pipelines == {"cleanup": ("trim", "dedupe", "lf")}
+
+    def test_quote_char_double_quote_survives_a_roundtrip(self, tmp_path: Path) -> None:
+        """A ``"`` quote_char used to be written raw, producing unreadable TOML."""
+        original = PressConfig(sql_in=SqlInConfig(quote_char='"'))
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(_config_to_toml(original), encoding="utf-8")
+        assert load_config(cfg_file).sql_in.quote_char == '"'
+
+    def test_backslash_paths_survive_a_roundtrip(self, tmp_path: Path) -> None:
+        r"""Windows dictionary paths carry ``\`` — a TOML escape character."""
+        original = PressConfig(dictionary=DictionaryConfig(files=(r"C:\Users\t\dict.tsv",)))
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(_config_to_toml(original), encoding="utf-8")
+        assert load_config(cfg_file).dictionary.files == (r"C:\Users\t\dict.tsv",)
+
+    def test_control_characters_survive_a_roundtrip(self, tmp_path: Path) -> None:
+        """Every character TOML 1.0 forbids unescaped, including U+007F (DEL)."""
+        raw = "".join(chr(c) for c in (*range(0x20), 0x7F))
+        original = PressConfig(dictionary=DictionaryConfig(files=(raw,)))
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(_config_to_toml(original), encoding="utf-8")
+        assert load_config(cfg_file).dictionary.files == (raw,)
+
+
+# ---------------------------------------------------------------------------
+# Section registry — the table load/reset/serialize all derive from
+# ---------------------------------------------------------------------------
+
+
+class TestSectionRegistry:
+    """The registry must stay in step with PressConfig and with the CLI."""
+
+    def test_covers_every_pressconfig_section_field(self) -> None:
+        """A section added to PressConfig but not to _SECTIONS would never load."""
+        config_fields = {f.name for f in fields(PressConfig)} - {"schema_version"}
+        assert set(SECTION_NAMES) == config_fields
+
+    def test_matches_the_reset_choices_offered_by_the_cli(self) -> None:
+        """``press config reset --key`` must offer exactly the resettable sections.
+
+        The CLI spells the list out literally instead of importing this module:
+        ``_register_config_commands`` runs on *every* press invocation, and
+        importing ``press.config`` there would put tomllib and pathlib on the
+        startup path.  This test is what keeps the two in step.
+        """
+        import argparse
+
+        from press._cli_config import _register_config_commands
+
+        def subparsers_of(parser: argparse.ArgumentParser) -> argparse._SubParsersAction:  # type: ignore[type-arg]
+            return next(a for a in parser._actions if isinstance(a, argparse._SubParsersAction))
+
+        root = argparse.ArgumentParser()
+        _register_config_commands(root.add_subparsers())
+        reset_parser = subparsers_of(subparsers_of(root).choices["config"]).choices["reset"]
+        key_option = next(a for a in reset_parser._actions if a.dest == "key")
+
+        assert key_option.choices is not None
+        assert tuple(key_option.choices) == SECTION_NAMES
+
+    def test_every_section_is_individually_resettable(self, tmp_path: Path) -> None:
+        """Each registry row must round-trip through config_reset(key=...)."""
+        cfg_file = tmp_path / "config.toml"
+        for name in SECTION_NAMES:
+            cfg_file.write_text(_config_to_toml(PressConfig()), encoding="utf-8")
+            config_reset(cfg_file, key=name)
+            reloaded = load_config(cfg_file)
+            assert getattr(reloaded, name) == getattr(PressConfig(), name)
+
+    def test_serialized_output_is_always_valid_toml(self) -> None:
+        """Every section must survive the writer → tomllib round trip."""
+        awkward = PressConfig(
+            hotkeys=HotkeysConfig(prefix="ctrl+alt+f9", bindings={"shift+z": "undo"}),
+            sql_in=SqlInConfig(quote_char='"', wrap=True),
+            dictionary=DictionaryConfig(files=(r"C:\dict\a.tsv", 'quote"d.tsv')),
+            pipelines={"we ird": ("trim", "lf")},
+        )
+        parsed = tomllib.loads(_config_to_toml(awkward))
+        assert parsed["sql_in"]["quote_char"] == '"'
+        assert parsed["pipelines"]["we ird"] == ["trim", "lf"]
+
+
+# ---------------------------------------------------------------------------
+# [type]
+# ---------------------------------------------------------------------------
+
+
+class TestTypeConfig:
+    def test_defaults_match_the_keystrokes_module(self) -> None:
+        """One set of defaults, so tuning config.toml is the only knob."""
+        from press.config import TypeConfig
+        from press.keystrokes import (
+            DEFAULT_CHUNK_DELAY,
+            DEFAULT_CHUNK_SIZE,
+            DEFAULT_MAX_CHARS,
+        )
+
+        cfg = TypeConfig()
+        assert cfg.max_chars == DEFAULT_MAX_CHARS
+        assert cfg.chunk_size == DEFAULT_CHUNK_SIZE
+        assert cfg.chunk_delay_ms / 1000 == DEFAULT_CHUNK_DELAY
+
+    def test_values_are_read_from_the_file(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(
+            "[type]\nmax_chars = 50\nchunk_size = 8\nchunk_delay_ms = 20\nnewline = 'skip'\n",
+            encoding="utf-8",
+        )
+        cfg = load_config(cfg_file).type
+        assert (cfg.max_chars, cfg.chunk_size, cfg.chunk_delay_ms, cfg.newline) == (
+            50,
+            8,
+            20,
+            "skip",
+        )
+
+    def test_unknown_newline_mode_falls_back(self, tmp_path: Path) -> None:
+        """A cosmetic typo must not stop the daemon from starting."""
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text('[type]\nnewline = "paste"\n', encoding="utf-8")
+        assert load_config(cfg_file).type.newline == "enter"
+
+    def test_chunk_size_is_never_zero(self, tmp_path: Path) -> None:
+        """chunk_size = 0 would make range() step by zero and never send."""
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("[type]\nchunk_size = 0\n", encoding="utf-8")
+        assert load_config(cfg_file).type.chunk_size == 1
+
+    def test_partial_reset(self, tmp_path: Path) -> None:
+        from press.config import config_reset
+
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("[type]\nmax_chars = 5\n", encoding="utf-8")
+        config_reset(cfg_file, key="type")
+        assert load_config(cfg_file).type == PressConfig().type
 
 
 # ---------------------------------------------------------------------------
