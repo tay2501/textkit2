@@ -2,7 +2,8 @@
 
 :func:`to_lf` is the single definition of "what counts as a line ending" for
 the whole package — :mod:`press.transforms.lines`,
-:mod:`press.transforms.timestamp` and :mod:`press.keystrokes` all route their
+:mod:`press.transforms.timestamp`, :mod:`press.transforms.sql`,
+:mod:`press.transforms.whitespace` and :mod:`press.keystrokes` all route their
 normalisation through it rather than spelling the rule out again.
 """
 
