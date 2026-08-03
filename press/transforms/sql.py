@@ -1,5 +1,7 @@
 """SQL IN-clause conversion (F-10)."""
 
+from press.transforms.lineending import to_lf
+
 
 def to_sql_in(text: str, *, quote_char: str = "'", wrap: bool = False) -> str:
     """Convert newline-separated values to a SQL IN-clause value list.
@@ -20,7 +22,7 @@ def to_sql_in(text: str, *, quote_char: str = "'", wrap: bool = False) -> str:
     Raises:
         ValueError: If the input contains no non-blank lines.
     """
-    lines = [line.strip() for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+    lines = [line.strip() for line in to_lf(text).split("\n")]
     values = sorted({line for line in lines if line})
 
     if not values:

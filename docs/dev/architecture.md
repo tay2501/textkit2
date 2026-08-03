@@ -59,7 +59,7 @@ pipe instead of importing the transform module — see
 | `dictionary.py` | TSV file CRUD — `add_entry`, `remove_entry`, `list_entries` |
 | `transforms/` | Pure `str → str` functions, one module per domain; no I/O or side effects |
 | `transforms/lines.py` | Line-oriented operations: `trim_lines`, `dedupe_lines`, `sort_lines` |
-| `transforms/lineending.py` | CRLF/CR/LF conversion — and the **single definition of what counts as a line ending**; `lines.py`, `timestamp.py` and `keystrokes.py` all normalise through its `to_lf` |
+| `transforms/lineending.py` | CRLF/CR/LF conversion — and the **single definition of what counts as a line ending**; `lines.py`, `timestamp.py`, `sql.py`, `whitespace.py` and `keystrokes.py` all normalise through its `to_lf` |
 | `transforms/unicode_norm.py` | Unicode normalization: `to_nfc`, `to_nfd`, `to_nfkc`, `to_nfkd`, `check_norm` |
 
 ### The `daemon/` package

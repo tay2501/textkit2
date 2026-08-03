@@ -2,6 +2,8 @@
 
 import re
 
+from press.transforms.lineending import to_lf
+
 _WHITESPACE_RE = re.compile(r"[ \t]+")
 
 
@@ -13,5 +15,5 @@ def _clean_line(line: str) -> str:
 
 def normalize_whitespace(text: str) -> str:
     """Normalize whitespace: collapse runs, strip leading/trailing, remove blank lines."""
-    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    normalized = to_lf(text)
     return "\n".join(cleaned for line in normalized.split("\n") if (cleaned := _clean_line(line)))
