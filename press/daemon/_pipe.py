@@ -11,7 +11,7 @@ import threading
 from typing import TYPE_CHECKING
 
 from press._pipe import PROTOCOL_VERSION, encode_response, pipe_name
-from press.daemon._logs import _log
+from press.daemon._logs import _log, timed
 
 if TYPE_CHECKING:
     from press.daemon._dispatch import CommandDispatcher
@@ -63,7 +63,8 @@ def handle_request(dispatcher: CommandDispatcher, raw: bytes) -> bytes:
         return encode_response(ok=False, error=f"unexpected options: {sorted(unexpected)}")
 
     try:
-        result = dispatcher.transform(command, text, kwargs=kwargs)
+        with timed("pipe.transform"):
+            result = dispatcher.transform(command, text, kwargs=kwargs)
     except Exception as exc:
         return encode_response(ok=False, error=str(exc))
     return encode_response(ok=True, text=result)
@@ -222,18 +223,19 @@ if sys.platform == "win32":
                 worker.start()
 
         def _serve(self, handle: int) -> None:
-            try:
-                raw = _read_message(_kernel32, handle)
-                if raw:
-                    reply = handle_request(self._dispatcher, raw)
-                    written = ctypes.c_ulong(0)
-                    _kernel32.WriteFile(handle, reply, len(reply), ctypes.byref(written), None)
-                    _kernel32.FlushFileBuffers(handle)
-            except Exception as exc:  # a bad client must never kill the daemon
-                _log.warning("pipe: request failed: %s", exc)
-            finally:
-                _kernel32.DisconnectNamedPipe(handle)
-                _kernel32.CloseHandle(handle)
+            with timed("pipe.serve"):
+                try:
+                    raw = _read_message(_kernel32, handle)
+                    if raw:
+                        reply = handle_request(self._dispatcher, raw)
+                        written = ctypes.c_ulong(0)
+                        _kernel32.WriteFile(handle, reply, len(reply), ctypes.byref(written), None)
+                        _kernel32.FlushFileBuffers(handle)
+                except Exception as exc:  # a bad client must never kill the daemon
+                    _log.warning("pipe: request failed: %s", exc)
+                finally:
+                    _kernel32.DisconnectNamedPipe(handle)
+                    _kernel32.CloseHandle(handle)
 
 else:  # pragma: no cover — the daemon only runs on Windows
 

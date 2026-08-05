@@ -255,7 +255,10 @@ class HotkeyManager:
         have its own keystrokes swallowed by press itself.
         """
         if self._leader is not None:
-            self._leader.wait_stopped()
+            from press.daemon._logs import timed
+
+            with timed("hotkey.wait_stopped"):
+                self._leader.wait_stopped()
         with self._lock:
             self._leader_active = False
 

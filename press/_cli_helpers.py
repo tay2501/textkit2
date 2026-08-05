@@ -101,17 +101,30 @@ def _snapshot_clipboard_for_undo() -> None:
 def _run_transform(
     fn: Callable[..., str],
     args: argparse.Namespace,
+    *,
+    trace: dict[str, float] | None = None,
     **kwargs: Any,
 ) -> int:
-    """Read → transform → write.  Returns an exit code (0 = success, 1 = error)."""
+    """Read → transform → write.  Returns an exit code (0 = success, 1 = error).
+
+    ``trace``, when not ``None``, is filled in with ``"read"``/``"write"``
+    elapsed seconds (``press trace on`` diagnostics — see
+    :mod:`press.__main__`'s ``_register_transform_command``).  ``None`` (the
+    default) costs nothing beyond the extra keyword-only parameter.
+    """
+    import time
+
     cmd = getattr(args, "command", "press")
     quiet = getattr(args, "quiet", False)
+    read_start = time.perf_counter() if trace is not None else None
     try:
         text = _read_input(args)
     except Exception as exc:
         if not quiet:
             print(f"press {cmd}: error: failed to read input: {exc}", file=sys.stderr)
         return 1
+    if trace is not None and read_start is not None:
+        trace["read"] = time.perf_counter() - read_start
 
     try:
         result = fn(text, **kwargs)
@@ -127,7 +140,10 @@ def _run_transform(
         print(f"before: {text!r}", file=sys.stderr)
         print(f"after:  {result!r}", file=sys.stderr)
 
+    write_start = time.perf_counter() if trace is not None else None
     _write_output(result, args)
+    if trace is not None and write_start is not None:
+        trace["write"] = time.perf_counter() - write_start
     return 0
 
 

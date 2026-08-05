@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
 import sys
+import time
 from typing import TYPE_CHECKING
 
-from press._paths import press_dir
+from press._paths import press_dir, trace_path
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
 _LOG_PATH: Path = press_dir() / "daemon.log"
@@ -32,13 +35,52 @@ _LEVEL_MIN: dict[str, int] = {
 }
 
 
+def refresh_level() -> None:
+    """Set the daemon logger's level from the ``press trace`` marker file.
+
+    DEBUG when ``%APPDATA%\\press\\trace`` exists (``press trace on``), INFO
+    otherwise.  A single ``os.path.exists()`` stat, cheap enough to call once
+    per dispatched action (see ``CommandDispatcher``) so toggling the marker
+    takes effect on the very next action without a daemon restart.
+    """
+    _log.setLevel(logging.DEBUG if trace_path().exists() else logging.INFO)
+
+
+@contextlib.contextmanager
+def timed(label: str, **fields: object) -> Iterator[None]:
+    """Log *label*'s elapsed time at DEBUG, or do nothing when DEBUG is off.
+
+    Standard "check isEnabledFor before doing the work" idiom from the
+    CPython logging HOWTO's Optimization section — skips the
+    ``time.perf_counter()`` calls entirely on the hot path when tracing is
+    off (the default).
+
+    Security: *fields* must only ever carry counts, command names, or byte
+    counts (e.g. ``chars=N``, ``cmd="upper"``) — never clipboard body text or
+    dictionary entry contents.
+    """
+    if not _log.isEnabledFor(logging.DEBUG):
+        yield
+        return
+    start = time.perf_counter()
+    try:
+        yield
+    finally:
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        extra = " ".join(f"{key}={value}" for key, value in fields.items())
+        message = f"{label} elapsed_ms={elapsed_ms:.2f}"
+        if extra:
+            message = f"{message} {extra}"
+        _log.debug(message)
+
+
 def _setup_logging() -> None:
     """Configure rotating file logging for the daemon (idempotent)."""
     import logging.handlers
 
     if _log.handlers:
         return
-    _log.setLevel(logging.DEBUG)
+    refresh_level()
     _LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     handler = logging.handlers.RotatingFileHandler(
         _LOG_PATH,

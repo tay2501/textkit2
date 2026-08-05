@@ -86,6 +86,54 @@ virtual environments on a [Dev Drive](https://learn.microsoft.com/en-us/defender
 switches Defender to asynchronous scanning for those volumes — safer than
 folder exclusions and noticeably faster for interpreter startup.
 
+## Step 4 — Still slow? Get a detailed trace
+
+If Step 3's recommendations don't fully resolve the slowdown, turn on
+diagnostic tracing to see exactly which stage is costing time on this
+specific machine:
+
+```console
+$ press trace on
+trace ON — logs: C:\Users\you\AppData\Roaming\press\daemon.log
+
+# reproduce the slow operation, e.g. via a hotkey or `press <command>`
+
+$ press daemon logs --level debug
+2026-08-05T10:15:03 DEBUG    hotkey.wait_stopped elapsed_ms=812.40
+2026-08-05T10:15:03 DEBUG    pipe.transform elapsed_ms=4.12
+2026-08-05T10:15:03 DEBUG    transform.run elapsed_ms=0.85 cmd=upper chars=340
+2026-08-05T10:15:03 DEBUG    clipboard.set elapsed_ms=2.01
+
+$ press trace off
+```
+
+Each line's `elapsed_ms=` value is the time spent in that stage — compare
+them to see where the delay actually is (e.g. `hotkey.wait_stopped` well
+above a few milliseconds usually means the leader-key listener is being
+held up, which is consistent with an EDR hook on keyboard input).
+
+When the daemon is not running, `press <command>` prints its own
+breakdown straight to the console instead of the log file:
+
+```console
+$ press trace on
+$ press upper
+PRESSED
+press: trace read=1.2ms delegate=3.4ms transform=0.8ms write=0.5ms
+```
+
+Turn tracing off (`press trace off`) once you're done — it adds a
+negligible per-action file check while on, but there's no reason to leave
+it running. No clipboard contents are ever written to these logs, only
+character counts and command names.
+
+If you need to see *import*-level detail (which specific file opens are
+slow), the official CPython diagnostic is:
+
+```console
+$ python -X importtime -m press upper
+```
+
 ## Why press is built this way
 
 press keeps its CLI dependency-free and imports transform modules lazily —

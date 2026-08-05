@@ -70,6 +70,18 @@ def daemon_pid_path() -> str:
     return os.path.join(base, "press", "press.pid")  # noqa: PTH118
 
 
+def trace_marker_path() -> str:
+    """Return the diagnostic trace marker file path, without importing ``pathlib``.
+
+    Mirrors ``press._paths.trace_path()`` (``press_dir() / "trace"``).  The
+    duplication follows :func:`daemon_pid_path` for the same reason: importing
+    ``pathlib`` here would cost 20 file opens on every transform.
+    ``test_pipe.py`` asserts the two derivations agree.
+    """
+    base = os.environ.get("APPDATA") or os.path.expanduser("~")  # noqa: PTH111
+    return os.path.join(base, "press", "trace")  # noqa: PTH118
+
+
 def _daemon_may_be_running() -> bool:
     """Cheap liveness gate: does the daemon's PID file exist?
 
