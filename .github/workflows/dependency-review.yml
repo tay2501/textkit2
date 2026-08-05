@@ -20,9 +20,12 @@ jobs:
        with:
          # Fail on critical and high severity vulnerabilities
          fail-on-severity: high
-         # Deny licenses that are not OSI approved or permissive
-         deny-licenses: GPL-2.0, LGPL-2.0, LGPL-2.1, AGPL-3.0
-         # Allow specific licenses commonly used in Python ecosystem
+         # Allow specific licenses commonly used in Python ecosystem.
+         # NOTE: allow-licenses and deny-licenses are mutually exclusive — the
+         # action errors out if both are set, which silently broke this whole
+         # job from the day it was added.  The allowlist already denies the
+         # copyleft licenses the old deny-licenses line listed (GPL-2.0,
+         # LGPL-2.0, LGPL-2.1, AGPL-3.0), so keep only this one.
          allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, PSF-2.0
          # Comment on PR with summary
          comment-summary-in-pr: always
