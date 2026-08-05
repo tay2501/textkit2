@@ -1,10 +1,16 @@
 """Tests confirming the `timed()`/`refresh_level()` instrumentation added for
 the diagnostic trace feature wraps the intended call sites, without changing
-observable dispatch behaviour."""
+observable dispatch behaviour.
+
+`TestTimedFieldsWhitelist` at the bottom is the source-level counterpart: it
+scans every `timed()` call in `press/` so a *future* call site cannot leak
+clipboard body text into the plaintext daemon log."""
 
 from __future__ import annotations
 
+import ast
 import contextlib
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import MagicMock, patch
 
@@ -205,3 +211,88 @@ class TestResetLeaderTimed:
         hm = HotkeyManager(HotkeysConfig(), queue.Queue())
         hm.reset_leader()  # must not raise
         assert calls == []
+
+
+# ---------------------------------------------------------------------------
+# Source-level guard: timed() fields must never carry body text
+# ---------------------------------------------------------------------------
+
+#: Identifiers allowed as a ``timed()`` field value.  Deliberately tiny —
+#: adding a name here is a reviewable act, which is the point.
+_SAFE_IDENTIFIERS = frozenset({"cmd", "command"})
+
+
+def _is_timed_call(node: ast.AST) -> bool:
+    """Is *node* a call to ``timed(...)`` or ``_logs.timed(...)``?"""
+    match node:
+        case ast.Call(func=ast.Name(id="timed") | ast.Attribute(attr="timed")):
+            return True
+        case _:
+            return False
+
+
+def _is_safe_field(node: ast.expr) -> bool:
+    """Is *node* an expression that provably cannot be clipboard body text?"""
+    match node:
+        case ast.Call(func=ast.Name(id="len")):  # chars=len(text)
+            return True
+        case ast.Constant(value=str() | int() | float()):  # mode="hotkey", count=0
+            return True
+        case ast.Name(id=name) if name in _SAFE_IDENTIFIERS:  # cmd=command
+            return True
+        case ast.Attribute(attr=attr) if attr in _SAFE_IDENTIFIERS:  # cmd=self.command
+            return True
+        case _:
+            return False
+
+
+class TestTimedFieldsWhitelist:
+    """``daemon.log`` is plaintext, so a single ``timed("x", text=text)`` would
+    persist clipboard bodies across 4 rotated files.  The classes above check
+    the call sites that exist today; this one checks the ones nobody has
+    written yet, the way ``TestImportBudget`` guards the import budget.
+
+    See ``press.daemon._logs.timed``'s Security note and
+    ``docs/dev/security-review-2026-08-06.md`` §4.
+    """
+
+    def test_all_timed_call_sites_pass_only_counts(self) -> None:
+        import press
+
+        checked: list[str] = []
+        with_fields = 0
+        for py in sorted(Path(press.__file__).parent.rglob("*.py")):
+            tree = ast.parse(py.read_text(encoding="utf-8"), filename=str(py))
+            for node in ast.walk(tree):
+                if not _is_timed_call(node):
+                    continue
+                assert isinstance(node, ast.Call)  # narrowed by _is_timed_call
+                checked.append(f"{py.name}:{node.lineno}")
+                with_fields += bool(node.keywords)
+                for kw in node.keywords:
+                    assert _is_safe_field(kw.value), (
+                        f"{py.name}:{node.lineno}: timed({kw.arg or '**'}=...) passes "
+                        f"{ast.unparse(kw.value)!r}, which may be clipboard body text. "
+                        "Only len(...), literals, and command names are allowed — "
+                        "see press.daemon._logs.timed's Security note."
+                    )
+
+        # Fail loudly if the scan itself breaks rather than passing vacuously.
+        assert len(checked) >= 10, f"expected the daemon's timed() call sites, found {checked}"
+        assert with_fields >= 2, "transform.run and keystrokes.type carry fields"
+
+    def test_guard_rejects_a_raw_text_field(self) -> None:
+        """The guard must actually reject the mistake it exists to catch."""
+        call = ast.parse('timed("clipboard.get", text=text)', mode="eval").body
+
+        assert _is_timed_call(call)
+        assert isinstance(call, ast.Call)
+        assert not _is_safe_field(call.keywords[0].value)
+
+    def test_guard_rejects_kwargs_splat(self) -> None:
+        """``timed(label, **payload)`` hides its contents — must not pass."""
+        call = ast.parse('timed("x", **payload)', mode="eval").body
+
+        assert isinstance(call, ast.Call)
+        assert call.keywords[0].arg is None  # a ** splat
+        assert not _is_safe_field(call.keywords[0].value)
