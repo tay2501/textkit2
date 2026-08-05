@@ -90,23 +90,64 @@ def _register_transform_command(sub: _SubParsers, cmd: SimpleCommand | Parametri
         _cmd: SimpleCommand | ParametricCommand = cmd,
         _cli_args: tuple[CliArg, ...] = cli_args,
     ) -> int:
+        # A stat, not an import: press._pipe's import budget forbids pathlib,
+        # so this checks the marker the same way daemon_pid_path() does.
+        from press._pipe import trace_marker_path
+
+        tracing = os.path.exists(trace_marker_path())  # noqa: PTH110
+        phases: dict[str, float] = {}
+
         def _apply(text: str, **kw: Any) -> str:
             # A running daemon already has the transform module in memory.
             # Delegating skips importing it here — the file opens that
             # endpoint security agents make expensive.
             from press._pipe import try_delegate
 
-            delegated = try_delegate(_cmd.name, text, kw)
+            if tracing:
+                import time
+
+                t0 = time.perf_counter()
+                delegated = try_delegate(_cmd.name, text, kw)
+                phases["delegate"] = time.perf_counter() - t0
+            else:
+                delegated = try_delegate(_cmd.name, text, kw)
             if delegated is not None:
                 return delegated
             from press.commands import run_command
 
+            if tracing:
+                import time
+
+                t1 = time.perf_counter()
+                result = run_command(_cmd.name, text, cli_kwargs=kw)
+                phases["transform"] = time.perf_counter() - t1
+                return result
             return run_command(_cmd.name, text, cli_kwargs=kw)
 
         extras = {arg.kwarg: getattr(a, arg.kwarg) for arg in _cli_args}
-        return _run_transform(_apply, a, **extras)
+        if not tracing:
+            return _run_transform(_apply, a, **extras)
+
+        code = _run_transform(_apply, a, trace=phases, **extras)
+        _print_trace(phases)
+        return code
 
     p.set_defaults(func=_handler)
+
+
+def _print_trace(phases: dict[str, float]) -> None:
+    """Print a ``press trace on`` diagnostic line: one phase per stderr word.
+
+    Only phases the handler actually ran appear — e.g. ``transform=`` is
+    absent when delegation to a running daemon succeeded, since the daemon
+    already logged that timing itself (see ``press.daemon._logs.timed``).
+    """
+    parts = [
+        f"{name}={phases[name] * 1000:.1f}ms"
+        for name in ("read", "delegate", "transform", "write")
+        if name in phases
+    ]
+    print("press: trace " + " ".join(parts), file=sys.stderr)
 
 
 def _genpass_clear_after(seconds: int, *, quiet: bool) -> None:
@@ -356,6 +397,7 @@ def make_parser() -> argparse.ArgumentParser:
     from press._cli_config import _register_config_commands
     from press._cli_daemon import _register_daemon_commands
     from press._cli_dict import _register_dict_commands
+    from press._cli_trace import _register_trace_commands
     from press.commands import PARAMETRIC_COMMANDS, SIMPLE_COMMANDS
 
     parser = argparse.ArgumentParser(
@@ -386,6 +428,7 @@ def make_parser() -> argparse.ArgumentParser:
     _register_clipboard_util_commands(sub)
     _register_config_commands(sub)
     _register_daemon_commands(sub)
+    _register_trace_commands(sub)
 
     return parser
 

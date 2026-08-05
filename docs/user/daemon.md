@@ -32,6 +32,21 @@ Any clipboard change is detected and immediately restored to the held content.
 press hold    # toggle from terminal too
 ```
 
+## Diagnostic tracing
+
+If the daemon feels slower on one machine than another, turn on tracing to
+see which stage is slow:
+
+```bash
+press trace on
+# reproduce the slow operation
+press daemon logs --level debug
+press trace off
+```
+
+See [Running press under endpoint security agents](edr-environments.md#step-4-still-slow-get-a-detailed-trace)
+for how to read the output.
+
 ## Auto-start on login (optional)
 
 To start the daemon automatically when you log in to Windows,

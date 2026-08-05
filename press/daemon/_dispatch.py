@@ -49,6 +49,11 @@ class CommandDispatcher:
         ``config.ui.notify_level``.
         """
         from press.clipboard import get_clipboard_text, set_clipboard_text
+        from press.daemon._logs import refresh_level, timed
+
+        # Cheap stat (see refresh_level docstring) so a `press trace on/off`
+        # toggle takes effect on the very next dispatched action.
+        refresh_level()
 
         try:
             # The four cases below act on the clipboard as a whole rather than
@@ -63,10 +68,12 @@ class CommandDispatcher:
                 case "type":
                     self._type_clipboard()
                 case _:
-                    text = get_clipboard_text()
+                    with timed("clipboard.get"):
+                        text = get_clipboard_text()
                     result = self.transform(command, text)
                     self._remember_for_undo(text)
-                    set_clipboard_text(result)
+                    with timed("clipboard.set"):
+                        set_clipboard_text(result)
                     self._notify_success(command, result)
         except Exception as exc:
             self._notify_error(command, str(exc))
@@ -88,12 +95,15 @@ class CommandDispatcher:
             ValueError: When *command* is not a known transform.
         """
         from press.commands import is_registry_command, run_command
+        from press.daemon._logs import timed
 
         # Registry (simple or parametric) commands share the CLI's execution
         # path.  ``kwargs`` from a delegating pipe client win; the hotkey path
         # passes ``None`` and parametric options come from config instead.
         if is_registry_command(command):
-            return run_command(command, text, cli_kwargs=kwargs, config=self._config)
+            # cmd/chars only — never the text itself (see timed()'s docstring).
+            with timed("transform.run", cmd=command, chars=len(text)):
+                return run_command(command, text, cli_kwargs=kwargs, config=self._config)
 
         # Special commands that require internal helpers
         match command:
@@ -188,16 +198,20 @@ class CommandDispatcher:
         application has received the keystrokes.
         """
         from press.clipboard import get_clipboard_text
+        from press.daemon._logs import timed
         from press.keystrokes import type_text
 
         cfg = self._config.type
-        type_text(
-            get_clipboard_text(),
-            newline=cfg.newline,
-            max_chars=cfg.max_chars,
-            chunk_size=cfg.chunk_size,
-            chunk_delay=cfg.chunk_delay_ms / 1000,
-        )
+        text = get_clipboard_text()
+        # chars only — never the text itself (see timed()'s docstring).
+        with timed("keystrokes.type", chars=len(text)):
+            type_text(
+                text,
+                newline=cfg.newline,
+                max_chars=cfg.max_chars,
+                chunk_size=cfg.chunk_size,
+                chunk_delay=cfg.chunk_delay_ms / 1000,
+            )
         self._notify_success("type", "")
 
     def _remember_for_undo(self, text: str) -> None:

@@ -40,7 +40,8 @@ def run_daemon(config_path: Path | None = None) -> None:
 
     _logs._setup_logging()
 
-    config = load_config(config_path)
+    with _logs.timed("startup.config_load"):
+        config = load_config(config_path)
 
     mutex_handle = _lifecycle._acquire_mutex()
     if mutex_handle is None:
@@ -78,13 +79,15 @@ def run_daemon(config_path: Path | None = None) -> None:
     dispatcher = CommandDispatcher(config)
     from press.commands import hotkey_sequence_candidates
 
-    hm = HotkeyManager(
-        config.hotkeys,
-        work_queue,
-        candidates=hotkey_sequence_candidates(config.pipelines),
-    )
+    with _logs.timed("startup.hotkeys_init"):
+        hm = HotkeyManager(
+            config.hotkeys,
+            work_queue,
+            candidates=hotkey_sequence_candidates(config.pipelines),
+        )
     worker = _WorkerThread(work_queue, dispatcher, hm)
-    pipe_server = _start_pipe_server(dispatcher)
+    with _logs.timed("startup.pipe_server_start"):
+        pipe_server = _start_pipe_server(dispatcher)
 
     def _setup(icon: TrayIcon) -> None:
         dispatcher.set_icon(icon)
@@ -98,11 +101,14 @@ def run_daemon(config_path: Path | None = None) -> None:
         work_queue.put(("stop",))
         pid_path.unlink(missing_ok=True)
 
+    with _logs.timed("startup.tray_init"):
+        tray_image = _create_tray_image()
+
     try:
         run_tray_icon(
             name="press",
             title="press",
-            image=_create_tray_image(),
+            image=tray_image,
             setup=_setup,
             on_quit=_on_quit,
         )

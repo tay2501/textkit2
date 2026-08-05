@@ -19,7 +19,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-__all__ = ["appdata_dir", "press_dir"]
+__all__ = ["appdata_dir", "press_dir", "trace_path"]
 
 
 def appdata_dir() -> Path:
@@ -30,3 +30,14 @@ def appdata_dir() -> Path:
 def press_dir() -> Path:
     """Return the press data directory (``%APPDATA%\\press``)."""
     return appdata_dir() / "press"
+
+
+def trace_path() -> Path:
+    """Return the diagnostic trace marker file path (``%APPDATA%\\press\\trace``).
+
+    An empty marker file — existence means tracing is ON, absence means OFF.
+    Toggled by ``press trace on|off`` (see :mod:`press._cli_trace`) and read
+    by the daemon (:func:`press.daemon._logs.refresh_level`) and the CLI's
+    standalone trace output (:mod:`press.__main__`).
+    """
+    return press_dir() / "trace"

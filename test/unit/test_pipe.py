@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from typing import Any
 from unittest.mock import patch
@@ -68,6 +69,18 @@ class TestPidPathDuplication:
         from press.daemon import _lifecycle
 
         assert Path(daemon_pid_path()) == _lifecycle._PID_PATH
+
+
+class TestTraceMarkerPathDuplication:
+    """_pipe re-derives the trace marker path without pathlib; must not drift."""
+
+    def test_matches_paths_module(self) -> None:
+        from pathlib import Path
+
+        from press._paths import trace_path
+        from press._pipe import trace_marker_path
+
+        assert Path(trace_marker_path()) == trace_path()
 
 
 class TestPerUserScoping:
@@ -301,6 +314,76 @@ class TestHandleRequest:
         assert reply["ok"] is False
 
 
+class TestHandleRequestTimed:
+    """handle_request wraps the dispatcher.transform() call with timed()."""
+
+    def test_wraps_dispatcher_transform(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import contextlib
+
+        from press.daemon import _pipe as dpipe
+
+        calls: list[tuple[str, dict[str, Any]]] = []
+
+        @contextlib.contextmanager
+        def fake_timed(label: str, **fields: Any) -> Any:
+            calls.append((label, fields))
+            yield
+
+        monkeypatch.setattr(dpipe, "timed", fake_timed)
+
+        d = _FakeDispatcher(result="ABC")
+        raw = json.dumps({"v": 1, "cmd": "halfwidth", "text": "x", "kwargs": {}}).encode()
+        dpipe.handle_request(d, raw)
+
+        assert calls == [("pipe.transform", {})]
+
+    def test_not_called_for_unknown_command(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import contextlib
+
+        from press.daemon import _pipe as dpipe
+
+        calls: list[tuple[str, dict[str, Any]]] = []
+
+        @contextlib.contextmanager
+        def fake_timed(label: str, **fields: Any) -> Any:
+            calls.append((label, fields))
+            yield
+
+        monkeypatch.setattr(dpipe, "timed", fake_timed)
+
+        raw = json.dumps({"v": 1, "cmd": "rm-rf", "text": "x", "kwargs": {}}).encode()
+        dpipe.handle_request(_FakeDispatcher(), raw)
+
+        assert calls == []
+
+
+@pytest.mark.windows_only
+class TestPipeServeTimed:
+    """PipeServer._serve() wraps the per-request handling with timed()."""
+
+    def test_wraps_serve_body(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import contextlib
+
+        from press.daemon import _pipe as dpipe
+
+        calls: list[tuple[str, dict[str, Any]]] = []
+
+        @contextlib.contextmanager
+        def fake_timed(label: str, **fields: Any) -> Any:
+            calls.append((label, fields))
+            yield
+
+        monkeypatch.setattr(dpipe, "timed", fake_timed)
+        monkeypatch.setattr(dpipe, "_read_message", lambda k32, handle: b"")
+        monkeypatch.setattr(dpipe._kernel32, "DisconnectNamedPipe", lambda handle: True)
+        monkeypatch.setattr(dpipe._kernel32, "CloseHandle", lambda handle: True)
+
+        server = dpipe.PipeServer(dispatcher=_FakeDispatcher())
+        server._serve(handle=1)
+
+        assert any(label == "pipe.serve" for label, _ in calls)
+
+
 @pytest.fixture
 def daemon_present(monkeypatch: pytest.MonkeyPatch) -> None:
     """Pretend a daemon is running (PID file present) and force the win32 path."""
@@ -441,3 +524,50 @@ class TestCliDelegation:
         with patch("press._pipe.try_delegate", return_value=None):
             assert _run_cli(["halfwidth", "ＴＡＢＬＥ１"]) == 0
         assert capsys.readouterr().out == "TABLE1"
+
+
+class TestCliTraceOutput:
+    """`press trace on` marker present -> the CLI prints per-phase timing to stderr."""
+
+    def test_no_trace_output_when_marker_absent(
+        self, tmp_path: Any, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        marker = tmp_path / "trace"  # never created
+        with patch("press._pipe.trace_marker_path", return_value=str(marker)):
+            assert _run_cli(["halfwidth", "ＴＡＢＬＥ１"]) == 0
+        out = capsys.readouterr()
+        assert out.out == "TABLE1"
+        assert "press: trace" not in out.err
+
+    def test_trace_output_when_marker_present(
+        self, tmp_path: Any, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        marker = tmp_path / "trace"
+        marker.touch()
+        with (
+            patch("press._pipe.trace_marker_path", return_value=str(marker)),
+            patch("press._pipe.try_delegate", return_value=None),
+        ):
+            assert _run_cli(["halfwidth", "ＴＡＢＬＥ１"]) == 0
+        out = capsys.readouterr()
+        assert out.out == "TABLE1"
+        assert re.search(
+            r"press: trace read=\d+\.\d+ms delegate=\d+\.\d+ms "
+            r"transform=\d+\.\d+ms write=\d+\.\d+ms",
+            out.err,
+        )
+
+    def test_trace_output_omits_transform_when_delegated(
+        self, tmp_path: Any, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        marker = tmp_path / "trace"
+        marker.touch()
+        with (
+            patch("press._pipe.trace_marker_path", return_value=str(marker)),
+            patch("press._pipe.try_delegate", return_value="FROM-DAEMON"),
+        ):
+            assert _run_cli(["halfwidth", "ＴＡＢＬＥ１"]) == 0
+        out = capsys.readouterr()
+        assert out.out == "FROM-DAEMON"
+        assert "delegate=" in out.err
+        assert "transform=" not in out.err
