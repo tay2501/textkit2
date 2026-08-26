@@ -27,6 +27,22 @@ jobs:
          # copyleft licenses the old deny-licenses line listed (GPL-2.0,
          # LGPL-2.0, LGPL-2.1, AGPL-3.0), so keep only this one.
          allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, PSF-2.0
+         # Two packages are excluded from the license check (purl format, and
+         # only ever by exception — both are classification artefacts, not real
+         # copyleft dependencies):
+         #   pyinstaller       — PyPI metadata reads "GPLv2-or-later with a
+         #                       special exception which allows to use
+         #                       PyInstaller to build and distribute non-free
+         #                       programs (including commercial ones)".  SPDX
+         #                       cannot express that exception, so the graph
+         #                       reports plain GPL-2.0.  It is also a
+         #                       `build`-group tool, never a runtime import.
+         #   typing-extensions — its own PyPI `license_expression` is PSF-2.0,
+         #                       which is already allowed above; the graph
+         #                       derives a composite expression from the bundled
+         #                       CPython LICENSE text and reports a stray
+         #                       GPL-1.0-or-later term from it.
+         allow-dependencies-licenses: pkg:pypi/pyinstaller, pkg:pypi/typing-extensions
          # Comment on PR with summary
          comment-summary-in-pr: always
          # Warn on dependencies without licenses

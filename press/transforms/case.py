@@ -33,17 +33,19 @@ def _split_words(text: str) -> list[str]:
 
 
 def _convert_line(text: str, joiner: str, capitalize_first: bool, capitalize_rest: bool) -> str:
-    """Join words from a single line using the given strategy; returns original if no words."""
-    words = _split_words(text)
+    """Join words from a single line; returns original if no words.
+
+    A trailing CR (from CRLF input split only on "\\n") is preserved, matching
+    to_upper/to_lower/to_swapcase, which never strip it.
+    """
+    ending = "\r" if text.endswith("\r") else ""
+    body = text[:-1] if ending else text
+    words = _split_words(body)
     if not words:
         return text
-    result: list[str] = []
-    for i, word in enumerate(words):
-        if i == 0:
-            result.append(word.capitalize() if capitalize_first else word)
-        else:
-            result.append(word.capitalize() if capitalize_rest else word)
-    return joiner.join(result)
+    first = words[0].capitalize() if capitalize_first else words[0]
+    rest = (word.capitalize() if capitalize_rest else word for word in words[1:])
+    return joiner.join([first, *rest]) + ending
 
 
 def _transform_lines(
@@ -90,8 +92,18 @@ def to_lower(text: str) -> str:
 
 
 def to_title(text: str) -> str:
-    """Convert each line to Title Case using capwords() (handles apostrophes correctly)."""
-    return "\n".join(string.capwords(line) if line else "" for line in text.split("\n"))
+    """Convert each line to Title Case using capwords() (handles apostrophes correctly).
+
+    A trailing CR is preserved, matching the other case transforms; capwords()
+    would otherwise silently drop it (it treats \\r as whitespace).
+    """
+
+    def _convert(line: str) -> str:
+        ending = "\r" if line.endswith("\r") else ""
+        body = line[:-1] if ending else line
+        return string.capwords(body) + ending
+
+    return "\n".join(_convert(line) for line in text.split("\n"))
 
 
 def to_capitalize(text: str) -> str:

@@ -14,23 +14,17 @@ def load_tsv(path: Path | str) -> dict[str, str]:
 
     Lines beginning with ``#`` and blank lines are ignored. Only the first
     two tab-separated columns are used; additional columns are ignored.
-
-    Args:
-        path: Path to the TSV file.
-
-    Returns:
-        Dictionary mapping keys to values.
-
-    Raises:
-        FileNotFoundError: If the file does not exist.
+    Raises FileNotFoundError if *path* does not exist.
     """
     resolved = Path(path)
-    if not resolved.exists():
-        raise FileNotFoundError(f"Dictionary file not found: {resolved}")
+    try:
+        # utf-8-sig strips a leading BOM if present and reads BOM-less files as-is
+        raw = resolved.read_text(encoding="utf-8-sig")
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"Dictionary file not found: {resolved}") from exc
 
     table: dict[str, str] = {}
-    # utf-8-sig strips a leading BOM if present and reads BOM-less files as-is
-    for line in resolved.read_text(encoding="utf-8-sig").splitlines():
+    for line in raw.splitlines():
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
@@ -49,13 +43,6 @@ def dict_forward(text: str, table: dict[str, str]) -> str:
 
     When *text* contains no newlines the whole string is stripped, looked up,
     and the value (or original stripped text) is returned directly.
-
-    Args:
-        text: Input text to transform.
-        table: Mapping of keys to replacement values.
-
-    Returns:
-        Transformed text with matched lines replaced.
     """
     if not text:
         return text
@@ -89,13 +76,6 @@ def dict_reverse(text: str, table: dict[str, str]) -> str:
 
     Builds a reverse mapping ``{value: key}`` from *table* and delegates to
     :func:`dict_forward`.
-
-    Args:
-        text: Input text to transform.
-        table: Original key→value mapping (values become lookup keys).
-
-    Returns:
-        Transformed text with matched lines replaced by their original keys.
     """
     reverse_table = {v: k for k, v in table.items()}
     return dict_forward(text, reverse_table)
