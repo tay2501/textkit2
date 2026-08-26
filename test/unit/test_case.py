@@ -245,6 +245,29 @@ class TestToCapitalize:
         assert to_capitalize("hello") == "Hello"
 
 
+class TestCRLFPreserved:
+    """A trailing CR (CRLF input) must survive word-splitting case conversions,
+    matching to_upper/to_lower/to_swapcase/to_capitalize which never strip it."""
+
+    def test_snake_case_crlf(self) -> None:
+        assert to_snake_case("helloWorld\r\nfooBar\r\n") == "hello_world\r\nfoo_bar\r\n"
+
+    def test_camel_case_crlf(self) -> None:
+        assert to_camel_case("hello_world\r\n") == "helloWorld\r\n"
+
+    def test_pascal_case_crlf(self) -> None:
+        assert to_pascal_case("hello_world\r\n") == "HelloWorld\r\n"
+
+    def test_kebab_case_crlf(self) -> None:
+        assert to_kebab_case("helloWorld\r\n") == "hello-world\r\n"
+
+    def test_title_crlf(self) -> None:
+        assert to_title("hello world\r\nfoo bar\r\n") == "Hello World\r\nFoo Bar\r\n"
+
+    def test_separator_only_line_with_cr_preserved(self) -> None:
+        assert to_snake_case("___\r\n") == "___\r\n"
+
+
 class TestToSwapcase:
     def test_basic(self) -> None:
         assert to_swapcase("Hello World") == "hELLO wORLD"
