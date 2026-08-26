@@ -4,7 +4,8 @@ import html
 
 
 def encode_unicode_escape(text: str) -> str:
-    r"""Encode non-ASCII characters to \uXXXX sequences (ASCII chars preserved)."""
+    r"""Encode via the unicode_escape codec (control chars like \n are also escaped;
+    non-ASCII below U+0100 becomes \xXX, not \uXXXX)."""
     return text.encode("unicode_escape").decode("ascii")
 
 
