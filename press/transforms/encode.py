@@ -21,9 +21,15 @@ def base64_encode(text: str) -> str:
 
 
 def base64_decode(text: str) -> str:
-    """Decode Base64 string to UTF-8 text; raises ValueError on invalid input."""
+    """Decode Base64 string to UTF-8 text; raises ValueError on invalid input.
+
+    Whitespace is stripped first (clipboard/pipe input commonly carries a
+    trailing newline, and wrapped Base64 carries embedded ones) since
+    validate=True otherwise rejects it outright.
+    """
+    cleaned = "".join(text.split())
     try:
-        decoded_bytes = base64.b64decode(text, validate=True)
+        decoded_bytes = base64.b64decode(cleaned, validate=True)
     except binascii.Error as exc:
         raise ValueError(f"Invalid Base64 input: {exc}") from exc
     try:

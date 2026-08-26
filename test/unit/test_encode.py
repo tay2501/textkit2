@@ -52,6 +52,13 @@ class TestBase64Decode:
         with pytest.raises(ValueError):
             base64_decode(bad_bytes.decode("ascii"))
 
+    def test_trailing_newline_stripped(self) -> None:
+        # Piped/clipboard input commonly carries a trailing newline
+        assert base64_decode("aGVsbG8=\n") == "hello"
+
+    def test_wrapped_with_embedded_newline(self) -> None:
+        assert base64_decode("aGVsbG8g\nd29ybGQ=") == "hello world"
+
 
 class TestUrlEncode:
     def test_space(self) -> None:
