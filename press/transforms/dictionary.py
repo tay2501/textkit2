@@ -17,12 +17,14 @@ def load_tsv(path: Path | str) -> dict[str, str]:
     Raises FileNotFoundError if *path* does not exist.
     """
     resolved = Path(path)
-    if not resolved.exists():
-        raise FileNotFoundError(f"Dictionary file not found: {resolved}")
+    try:
+        # utf-8-sig strips a leading BOM if present and reads BOM-less files as-is
+        raw = resolved.read_text(encoding="utf-8-sig")
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"Dictionary file not found: {resolved}") from exc
 
     table: dict[str, str] = {}
-    # utf-8-sig strips a leading BOM if present and reads BOM-less files as-is
-    for line in resolved.read_text(encoding="utf-8-sig").splitlines():
+    for line in raw.splitlines():
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
