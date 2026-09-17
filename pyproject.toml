@@ -26,7 +26,7 @@ dependencies = [
     "argcomplete>=3.7.2",
     # 3.5.0 also removes the cascade codec imports 3.4.7 paid at import time,
     # which lands directly on the CLI startup budget.
-    "charset-normalizer>=3.5.0",
+    "charset-normalizer>=3.5.1",
 ]
 
 [project.optional-dependencies]
