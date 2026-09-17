@@ -123,11 +123,11 @@ class CommandDispatcher:
         Steps are restricted to registry commands — the same rule as the CLI
         ``chain`` command, and a structural guarantee against recursion.
         """
-        from press.commands import is_registry_command
+        from press.commands import is_registry_command, unknown_step_error
 
         for step in steps:
             if not is_registry_command(step):
-                raise ValueError(f"pipeline {name!r}: step {step!r} is not a transform command")
+                raise ValueError(unknown_step_error(name, step))
             text = self.transform(step, text)
         return text
 
@@ -220,18 +220,10 @@ class CommandDispatcher:
         Skipped for content carrying the sensitive-exclusion formats (press
         honours its own genpass marks) and under ``PRESS_NO_UNDO=1``.
         """
-        from press.transforms.undo import undo_disabled
+        from press.transforms.undo import snapshot_allowed
 
-        if undo_disabled():
-            return
-        try:
-            from press.clipboard import clipboard_has_sensitive_marks
-
-            if clipboard_has_sensitive_marks():
-                return
-        except (OSError, RuntimeError):
-            return  # cannot verify the marks — err on the side of not keeping it
-        self._undo_text = text
+        if snapshot_allowed():
+            self._undo_text = text
 
     def _undo_swap(self) -> None:
         """Swap the clipboard with the undo slot (undo twice = redo)."""

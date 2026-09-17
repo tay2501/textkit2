@@ -86,12 +86,22 @@ def _read_hold_file(path: Path) -> str:
     Current files carry the DPAPI magic prefix; anything else is treated as
     legacy plaintext (pre-encryption releases).  Drop the plaintext fallback
     after one release.
+
+    Raises:
+        RuntimeError: When the file cannot be decrypted, or holds bytes that
+            are not valid UTF-8.
     """
     raw = path.read_bytes()
-    if raw.startswith(_DPAPI_MAGIC):
-        from press._dpapi import unprotect
+    try:
+        if raw.startswith(_DPAPI_MAGIC):
+            from press._dpapi import unprotect
 
-        return unprotect(raw[len(_DPAPI_MAGIC) :]).decode("utf-8")
-    # Legacy plaintext — re-read in text mode so newline translation matches
-    # how write_text() stored it.
-    return path.read_text(encoding="utf-8")
+            return unprotect(raw[len(_DPAPI_MAGIC) :]).decode("utf-8")
+        # Legacy plaintext — re-read in text mode so newline translation
+        # matches how write_text() stored it.
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        # `press hold` and `press undo` report OSError and RuntimeError; a
+        # hold file that is not UTF-8 is a corrupt file, not a bug, so it
+        # joins them instead of escaping the handler as a traceback.
+        raise RuntimeError(f"hold file is not valid UTF-8: {path}") from exc

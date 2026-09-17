@@ -14,6 +14,7 @@ from press._cli_helpers import (
     _run_transform,
     _SubParsers,
     bounded_int,
+    report_error,
     write_clipboard_or_warn,
 )
 
@@ -21,15 +22,6 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from press.commands import CliArg, ParametricCommand, SimpleCommand
-
-
-def _version() -> str:
-    from importlib.metadata import PackageNotFoundError, version
-
-    try:
-        return version("press")
-    except PackageNotFoundError:
-        return "unknown"
 
 
 class _LazyVersionAction(argparse.Action):
@@ -50,7 +42,9 @@ class _LazyVersionAction(argparse.Action):
         values: str | Sequence[Any] | None,
         option_string: str | None = None,
     ) -> None:
-        print(f"press {_version()}")
+        from press._version import press_version
+
+        print(f"press {press_version()}")
         parser.exit()
 
 
@@ -303,10 +297,10 @@ def _register_clipboard_util_commands(sub: _SubParsers) -> None:
         _snapshot_clipboard_for_undo()  # an accidental clear is undoable
         try:
             clear_clipboard()
-        except Exception as exc:
-            if not getattr(a, "quiet", False):
-                print(f"press clear: error: {exc}", file=sys.stderr)
-            return 1
+        # Everything clipboard.py raises: OSError off Windows, RuntimeError
+        # for a failed Win32 call.  Anything else is a bug, not a user error.
+        except (OSError, RuntimeError) as exc:
+            return report_error("clear", exc, quiet=a.quiet)
         if a.discard_hold:
             from press.transforms.hold import hold_path
 
@@ -337,9 +331,7 @@ def _register_clipboard_util_commands(sub: _SubParsers) -> None:
                 print("press undo: nothing to undo", file=sys.stderr)
             return 1
         except (OSError, RuntimeError) as exc:
-            if not a.quiet:
-                print(f"press undo: error: {exc}", file=sys.stderr)
-            return 1
+            return report_error("undo", exc, quiet=a.quiet)
         return 0
 
     p.set_defaults(func=_undo)
@@ -377,10 +369,10 @@ def _register_clipboard_util_commands(sub: _SubParsers) -> None:
             if not a.quiet:
                 status = "held" if held else "released"
                 print(f"press hold: {status}", file=sys.stderr)
-        except Exception as exc:
-            if not a.quiet:
-                print(f"press hold: error: {exc}", file=sys.stderr)
-            return 1
+        # toggle_hold_file only surfaces clipboard (OSError/RuntimeError),
+        # file (OSError) and DPAPI (RuntimeError) failures.
+        except (OSError, RuntimeError) as exc:
+            return report_error("hold", exc, quiet=a.quiet)
         return 0
 
     p.set_defaults(func=_hold)

@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
-__all__ = ["save_snapshot", "swap_undo", "undo_disabled", "undo_path"]
+__all__ = ["save_snapshot", "snapshot_allowed", "swap_undo", "undo_disabled", "undo_path"]
 
 
 def undo_path() -> Path:
@@ -33,6 +33,26 @@ def undo_disabled() -> bool:
     the ``PRESS_NO_DAEMON`` precedent.
     """
     return os.environ.get("PRESS_NO_UNDO", "") not in ("", "0")
+
+
+def snapshot_allowed() -> bool:
+    """Whether press may keep the clipboard text it is about to overwrite.
+
+    One rule, two slots: the CLI writes a file (``_snapshot_clipboard_for_undo``)
+    and the daemon keeps an in-memory slot (``CommandDispatcher._remember_for_undo``),
+    but both decline for the same three reasons — the user opted out with
+    ``PRESS_NO_UNDO=1``, the content carries the sensitive-exclusion formats
+    (a genpass password, a KeePassXC copy), or the marks cannot be read at
+    all, in which case not keeping it is the safe answer.
+    """
+    if undo_disabled():
+        return False
+    try:
+        from press.clipboard import clipboard_has_sensitive_marks
+
+        return not clipboard_has_sensitive_marks()
+    except (OSError, RuntimeError):
+        return False
 
 
 def save_snapshot(text: str) -> None:

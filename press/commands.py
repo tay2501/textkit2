@@ -635,6 +635,16 @@ def _nesting_error(name: str, step: str) -> str:
     return f"pipeline {name!r}: step {step!r} is a pipeline (nesting is not supported)"
 
 
+def unknown_step_error(name: str, step: str) -> str:
+    """Return the canonical message for a pipeline step that is not a transform.
+
+    Shared by :func:`validate_pipelines` (``press config validate``) and by
+    daemon dispatch, which hits the same rule at run time — one defect must
+    not read two different ways depending on which one the user meets first.
+    """
+    return f"pipeline {name!r}: unknown step {step!r}"
+
+
 def expand_pipeline_steps(steps: list[str], pipelines: dict[str, tuple[str, ...]]) -> list[str]:
     """Expand ``[pipelines]`` names one level; registry commands pass through.
 
@@ -674,5 +684,5 @@ def validate_pipelines(pipelines: dict[str, tuple[str, ...]]) -> list[str]:
             if step in pipelines:
                 errors.append(_nesting_error(name, step))
             elif not is_registry_command(step):
-                errors.append(f"pipeline {name!r}: unknown step {step!r}")
+                errors.append(unknown_step_error(name, step))
     return errors

@@ -81,7 +81,8 @@ def _handle_config(args: argparse.Namespace) -> int:
                 print(f"press config reset: config{section} reset to defaults → {cfg_path}")
                 return 0
             except Exception as exc:
-                print(f"press config reset: error: {exc}", file=sys.stderr)
-                return 1
+                from press._cli_helpers import report_error
+
+                return report_error("config reset", exc)
         case _:
             return 1

@@ -15,7 +15,7 @@ import argparse
 import sys
 from typing import TYPE_CHECKING
 
-from press._cli_helpers import _add_io_args, _run_transform, _SubParsers
+from press._cli_helpers import _add_io_args, _run_transform, _SubParsers, report_error
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -122,9 +122,7 @@ def _register_chain_commands(sub: _SubParsers) -> None:
         try:
             composed = _resolve_chain(a.steps)
         except ValueError as exc:
-            if not a.quiet:
-                print(f"press chain: error: {exc}", file=sys.stderr)
-            return 1
+            return report_error("chain", exc, quiet=a.quiet)
         return _run_transform(composed, a)
 
     p.set_defaults(func=_handler)

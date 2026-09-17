@@ -45,6 +45,18 @@ def write_clipboard_or_warn(text: str, *, cmd: str, quiet: bool, sensitive: bool
     return True
 
 
+def report_error(cmd: str, exc: BaseException, *, quiet: bool = False) -> int:
+    """Print ``press <cmd>: error: <exc>`` on stderr and return exit code 1.
+
+    The clipboard-state commands all fail the same way — one line naming the
+    command, exit status 1 — so the wording lives here instead of being
+    respelled in every handler.
+    """
+    if not quiet:
+        print(f"press {cmd}: error: {exc}", file=sys.stderr)
+    return 1
+
+
 def _read_input(args: argparse.Namespace) -> str:
     """Read input: clipboard (TTY default), positional arg, stdin pipe, or '-' sentinel."""
     if getattr(args, "clip_in", False):
@@ -84,15 +96,13 @@ def _snapshot_clipboard_for_undo() -> None:
     never snapshotted, and ``PRESS_NO_UNDO=1`` opts out of the file write
     entirely for EDR-strict environments.
     """
-    from press.transforms.undo import save_snapshot, undo_disabled
+    from press.transforms.undo import save_snapshot, snapshot_allowed
 
-    if undo_disabled():
+    if not snapshot_allowed():
         return
     try:
-        from press.clipboard import clipboard_has_sensitive_marks, get_clipboard_text
+        from press.clipboard import get_clipboard_text
 
-        if clipboard_has_sensitive_marks():
-            return
         save_snapshot(get_clipboard_text())
     except (OSError, RuntimeError):
         return

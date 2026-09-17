@@ -209,7 +209,8 @@ class TestDispatcherPipelines:
 
         config = PressConfig(pipelines={"bad": ("dict",)})
         d = CommandDispatcher(config)
-        with pytest.raises(ValueError, match="not a transform command"):
+        # Same wording `press config validate` uses — commands.unknown_step_error.
+        with pytest.raises(ValueError, match=r"pipeline 'bad': unknown step 'dict'"):
             d.transform("bad", "x")
 
     def test_nested_pipeline_step_rejected(self) -> None:
@@ -217,5 +218,5 @@ class TestDispatcherPipelines:
 
         config = PressConfig(pipelines={"outer": ("inner",), "inner": ("upper",)})
         d = CommandDispatcher(config)
-        with pytest.raises(ValueError, match="not a transform command"):
+        with pytest.raises(ValueError, match=r"pipeline 'outer': unknown step 'inner'"):
             d.transform("outer", "x")

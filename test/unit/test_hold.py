@@ -158,6 +158,20 @@ class TestLegacyPlaintextHoldFile:
         set_text.assert_called_once_with("legacy text\nsecond line")
         assert not hold_file.exists()
 
+    def test_undecodable_file_raises_runtime_error(self, tmp_path: Path) -> None:
+        """A corrupt legacy file must reach the handler as RuntimeError.
+
+        ``press hold`` catches OSError and RuntimeError; a bare
+        UnicodeDecodeError would escape it as a traceback.
+        """
+        from press.transforms.hold import _read_hold_file
+
+        hold_file = tmp_path / "hold.txt"
+        hold_file.write_bytes(bytes([0xFF, 0xFE]) + b" not utf-8")
+
+        with pytest.raises(RuntimeError, match="not valid UTF-8"):
+            _read_hold_file(hold_file)
+
 
 @pytest.mark.windows_only
 class TestDpapi:
