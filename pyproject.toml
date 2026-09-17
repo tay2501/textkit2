@@ -50,7 +50,7 @@ Changelog     = "https://github.com/tay2501/textkit2/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 build = [
-    "pyinstaller>=6.21.0",
+    "pyinstaller>=6.22.3",
 ]
 docs = [
     "sphinx>=9.1",
@@ -62,9 +62,9 @@ docs = [
 dev = [
     "pytest>=9.1.1",
     "pytest-mock>=3.15.1",
-    "pytest-benchmark>=5.2.3",
+    "pytest-benchmark>=5.3.0",
     "pytest-cov>=7.1.0",
-    "hypothesis>=6.165.5",
+    "hypothesis>=6.168.0",
     "pip-audit>=2.10.1",
     "ruff>=0.16.8",
     "mypy>=2.3.1",
