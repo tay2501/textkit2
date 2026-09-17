@@ -66,8 +66,8 @@ dev = [
     "pytest-cov>=7.1.0",
     "hypothesis>=6.165.5",
     "pip-audit>=2.10.1",
-    "ruff>=0.16.2",
-    "mypy>=2.3.0",
+    "ruff>=0.16.8",
+    "mypy>=2.3.1",
 ]
 
 [build-system]
@@ -179,10 +179,13 @@ omit = [
 
 [tool.coverage.report]
 # Interim gate after widening the denominator (2026-07-15): the binding lane
-# is Ubuntu (74.80% — 79 windows_only tests skip there); Windows measures
-# 81.65%. Ratchet this up in +2% steps as CLI handler tests accumulate; the
-# old 80% figure was measured against a denominator that omitted all I/O code.
-fail_under = 74
+# is Ubuntu, where the windows_only tests skip; Windows measures higher.
+# Ratcheted 74 -> 76 on 2026-09-18 (the +2% step this comment has always
+# called for): Windows now measures 86.05% (was 81.65%) and deselecting the
+# 116 windows_only tests locally lands at 83.37%, so the Ubuntu lane keeps
+# several points of headroom. The old 80% figure was measured against a
+# denominator that omitted all I/O code.
+fail_under = 76
 exclude_lines = [
     "pragma: no cover",
     "if __name__ == .__main__.:",
