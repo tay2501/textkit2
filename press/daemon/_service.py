@@ -57,12 +57,9 @@ def run_daemon(config_path: Path | None = None) -> None:
     pid_path.parent.mkdir(parents=True, exist_ok=True)
     pid_path.write_text(str(os.getpid()), encoding="utf-8")
 
-    import contextlib
-    from importlib.metadata import version as _pkg_version
+    from press._version import press_version
 
-    _ver = "unknown"
-    with contextlib.suppress(Exception):
-        _ver = _pkg_version("press")
+    _ver = press_version()
 
     _lifecycle._write_status_file(
         {

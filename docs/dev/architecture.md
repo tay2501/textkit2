@@ -54,6 +54,7 @@ pipe instead of importing the transform module — see
 | `keystrokes.py` | Win32 `SendInput` synthesis for the `type` command — pure `plan_keystrokes()` plus a Windows-only sender |
 | `config.py` | TOML loader → frozen `PressConfig` dataclass hierarchy (`slots=True`); the `_SECTIONS` registry drives loading, `config reset`, and serialization from one table |
 | `_paths.py` | Single source for `%APPDATA%\press` locations |
+| `_version.py` | Single source for the installed version string; absorbs both shapes of a damaged install (`PackageNotFoundError`, and 3.15's `MetadataNotFound`) |
 | `_pipe.py` | Named-pipe protocol + CLI client (`try_delegate`); deliberately import-light |
 | `daemon/` | Windows daemon package (see below); public API is `run_daemon`, `stop_daemon`, `daemon_status`, `daemon_logs` |
 | `dictionary.py` | TSV file CRUD — `add_entry`, `remove_entry`, `list_entries` |
@@ -285,6 +286,7 @@ press/
 ├── keystrokes.py        Win32 SendInput synthesis (the `type` command)
 ├── config.py            TOML → PressConfig dataclass (_SECTIONS registry)
 ├── _paths.py            %APPDATA%\press path helpers
+├── _version.py          Installed version lookup (CLI + daemon)
 ├── _pipe.py             Named-pipe protocol + CLI client
 ├── daemon/              pystray + pynput daemon (Windows only)
 │   ├── __init__.py      Public API re-exports
