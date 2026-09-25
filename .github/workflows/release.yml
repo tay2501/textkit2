@@ -178,24 +178,43 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Untrusted values (the workflow_dispatch `tag` input above all) reach the
+      # shell only through env vars, never through ${{ }} expansion inside
+      # `run:` — GitHub's "Security hardening for GitHub Actions" guidance on
+      # script injection.  The tag is then validated as a whole string (bash
+      # [[ =~ ]] anchors ^/$ to the entire value, unlike line-based grep), so a
+      # newline cannot smuggle extra keys into $GITHUB_OUTPUT and a leading
+      # "-" cannot turn into a git option downstream.
       - name: Get tag name
         id: tag_name
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "TAG_NAME=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            TAG_NAME="$INPUT_TAG"
           else
-            echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
           fi
+          if [[ ! "$TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::release tag must look like v1.2.3 or v1.2.3-rc.1"
+            exit 1
+          fi
+          echo "TAG_NAME=$TAG_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Generate changelog
         id: changelog
+        shell: bash
+        env:
+          TAG_NAME: ${{ steps.tag_name.outputs.TAG_NAME }}
         run: |
-          PREVIOUS_TAG=$(git describe --tags --abbrev=0 ${{ steps.tag_name.outputs.TAG_NAME }}^ 2>/dev/null || echo "")
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 "${TAG_NAME}^" 2>/dev/null || echo "")
 
           if [ -z "$PREVIOUS_TAG" ]; then
-            CHANGELOG=$(git log --pretty=format:"* %s (%h)" ${{ steps.tag_name.outputs.TAG_NAME }})
+            CHANGELOG=$(git log --pretty=format:"* %s (%h)" "$TAG_NAME")
           else
-            CHANGELOG=$(git log --pretty=format:"* %s (%h)" ${PREVIOUS_TAG}..${{ steps.tag_name.outputs.TAG_NAME }})
+            CHANGELOG=$(git log --pretty=format:"* %s (%h)" "${PREVIOUS_TAG}..${TAG_NAME}")
           fi
 
           {
@@ -203,7 +222,7 @@ jobs:
             echo ""
             echo "$CHANGELOG"
             echo ""
-            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG:-}...${{ steps.tag_name.outputs.TAG_NAME }}"
+            echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${PREVIOUS_TAG:-}...${TAG_NAME}"
           } > changelog.md
 
       - name: Download build artifacts
