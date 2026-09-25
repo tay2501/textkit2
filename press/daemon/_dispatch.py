@@ -226,19 +226,25 @@ class CommandDispatcher:
             self._undo_text = text
 
     def _undo_swap(self) -> None:
-        """Swap the clipboard with the undo slot (undo twice = redo)."""
+        """Swap the clipboard with the undo slot (undo twice = redo).
+
+        The replaced text becomes the redo slot under the same rule as every
+        other snapshot (:func:`press.transforms.undo.snapshot_allowed`).
+        """
         from press.clipboard import get_clipboard_text, set_clipboard_text
+        from press.transforms.undo import snapshot_allowed
 
         if self._undo_text is None:
             self._notify_error("undo", "nothing to undo")
             return
         saved = self._undo_text
+        keep_current = snapshot_allowed()  # marks describe the clipboard *now*
         try:
             current = get_clipboard_text()
         except (OSError, RuntimeError):
             current = ""  # empty/non-text clipboard — the redo slot becomes empty
         set_clipboard_text(saved)
-        self._undo_text = current
+        self._undo_text = current if keep_current else None
         self._notify_success("undo", "")
 
     def _on_hold_conflict(self) -> None:

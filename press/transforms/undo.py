@@ -69,6 +69,11 @@ def swap_undo(get_text: Callable[[], str], set_text: Callable[[str], None]) -> N
         get_text: Callable returning the current clipboard text.
         set_text: Callable writing text to the clipboard.
 
+    The text being replaced becomes the redo slot only when
+    :func:`snapshot_allowed` says so — asked *before* the write, because the
+    sensitive marks describe the clipboard as it is now.  Otherwise the slot
+    is deleted: undoing over a genpass password must not persist it.
+
     Raises:
         FileNotFoundError: When no undo snapshot exists.
         RuntimeError: When the snapshot cannot be decrypted (DPAPI is
@@ -76,10 +81,14 @@ def swap_undo(get_text: Callable[[], str], set_text: Callable[[str], None]) -> N
     """
     path = undo_path()
     saved = _read_hold_file(path)
+    keep_current = snapshot_allowed()
     try:
         current = get_text()
     except (OSError, RuntimeError):
         # Empty / non-text clipboard: the redo slot becomes empty text.
         current = ""
     set_text(saved)
-    _write_hold_file(path, current)
+    if keep_current:
+        _write_hold_file(path, current)
+    else:
+        path.unlink(missing_ok=True)

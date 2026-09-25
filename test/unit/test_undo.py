@@ -32,6 +32,33 @@ class _FakeClipboard:
 
 
 class TestSwapUndo:
+    @pytest.fixture(autouse=True)
+    def _unmarked_clipboard(self) -> object:
+        # swap_undo asks snapshot_allowed() before keeping the redo slot;
+        # pin it so these tests never depend on the host's real clipboard.
+        with patch("press.clipboard.clipboard_has_sensitive_marks", return_value=False):
+            yield
+
+    def test_sensitive_clipboard_not_kept_as_redo(self, undo_file: Path) -> None:
+        # e.g. `press genpass` then `press undo`: the password must not be
+        # persisted as the redo slot.
+        save_snapshot("before")
+        clip = _FakeClipboard("s3cret")
+        with patch("press.clipboard.clipboard_has_sensitive_marks", return_value=True):
+            swap_undo(clip.get, clip.set)
+        assert clip.text == "before"
+        assert not undo_file.exists()
+
+    def test_opt_out_env_does_not_keep_redo(
+        self, undo_file: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        save_snapshot("before")
+        monkeypatch.setenv("PRESS_NO_UNDO", "1")
+        clip = _FakeClipboard("after")
+        swap_undo(clip.get, clip.set)
+        assert clip.text == "before"
+        assert not undo_file.exists()
+
     def test_swap_restores_snapshot(self, undo_file: Path) -> None:
         save_snapshot("before")
         clip = _FakeClipboard("after")
@@ -241,6 +268,19 @@ class TestDispatcherUndo:
             d = self._dispatcher()
             d.dispatch("upper")
             assert clip.text == "S3CRET"
+            assert d._undo_text is None  # type: ignore[attr-defined]
+
+    def test_undo_does_not_remember_sensitive_clipboard(self) -> None:
+        clip = _FakeClipboard("s3cret")
+        with (
+            patch("press.clipboard.get_clipboard_text", side_effect=clip.get),
+            patch("press.clipboard.set_clipboard_text", side_effect=clip.set),
+            patch("press.clipboard.clipboard_has_sensitive_marks", return_value=True),
+        ):
+            d = self._dispatcher()
+            d._undo_text = "before"  # type: ignore[attr-defined]
+            d.dispatch("undo")
+            assert clip.text == "before"
             assert d._undo_text is None  # type: ignore[attr-defined]
 
     def test_clear_is_undoable(self) -> None:
