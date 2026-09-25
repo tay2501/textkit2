@@ -140,8 +140,7 @@ def _run_transform(
         result = fn(text, **kwargs)
     except Exception as exc:
         if getattr(args, "fallback", False):
-            _write_output(text, args)
-            return 0
+            return _write_output_or_report(text, args, cmd=cmd, quiet=quiet)
         if not quiet:
             print(f"press {cmd}: error: {exc}", file=sys.stderr)
         return 1
@@ -151,9 +150,24 @@ def _run_transform(
         print(f"after:  {result!r}", file=sys.stderr)
 
     write_start = time.perf_counter() if trace is not None else None
-    _write_output(result, args)
+    code = _write_output_or_report(result, args, cmd=cmd, quiet=quiet)
     if trace is not None and write_start is not None:
         trace["write"] = time.perf_counter() - write_start
+    return code
+
+
+def _write_output_or_report(text: str, args: argparse.Namespace, *, cmd: str, quiet: bool) -> int:
+    """Run :func:`_write_output`, turning a clipboard failure into exit code 1.
+
+    ``-C`` fails for ordinary reasons — another application holding the
+    clipboard open, an RDP session — and ``clipboard.py`` raises only
+    ``OSError``/``RuntimeError`` for them, so they are reported like every
+    other clipboard command instead of escaping as a traceback.
+    """
+    try:
+        _write_output(text, args)
+    except (OSError, RuntimeError) as exc:
+        return report_error(cmd, exc, quiet=quiet)
     return 0
 
 
