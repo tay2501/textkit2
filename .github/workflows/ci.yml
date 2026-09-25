@@ -6,10 +6,10 @@ on:
   pull_request:
     branches: [ "main", "develop" ]
 
+# Least privilege: no step writes to PRs or check runs (ruff's github
+# output format annotates via stdout; Codecov uploads tokenless).
 permissions:
   contents: read
-  pull-requests: write
-  checks: write
 
 jobs:
   test:
