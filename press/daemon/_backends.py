@@ -24,6 +24,7 @@ class TrayIcon(Protocol):
     """Structural type for the system-tray icon handle (satisfied by pystray.Icon)."""
 
     icon: Any
+    visible: bool
 
     def notify(self, message: str, title: str | None = None) -> None: ...
 
@@ -119,7 +120,8 @@ def run_tray_icon(
         name: Icon identifier.
         title: Tooltip text.
         image: Initial icon image.
-        setup: Called with the icon handle once the icon is visible.
+        setup: Called with the icon handle once the icon has been made
+            visible (this wrapper sets ``visible`` — see pystray's contract).
         on_quit: Called when the user picks Quit, before the icon stops.
     """
     import pystray
@@ -133,5 +135,14 @@ def run_tray_icon(
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Quit", _handle_quit),
     )
+
+    def _show_then_setup(icon: TrayIcon) -> None:
+        # pystray's Icon.run(): "If you specify a custom setup function, you
+        # must explicitly set this attribute."  Without it the Win32 backend
+        # never sends NIM_ADD, so the icon, its Quit menu and every
+        # notification (NIM_MODIFY) silently do not exist.
+        icon.visible = True
+        setup(icon)
+
     icon = pystray.Icon(name=name, icon=image, title=title, menu=menu)
-    icon.run(setup=setup)
+    icon.run(setup=_show_then_setup)

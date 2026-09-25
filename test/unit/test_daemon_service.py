@@ -67,3 +67,42 @@ class TestRunDaemonStartupTimed:
         assert "startup.tray_init" in labels
         assert "startup.hotkeys_init" in labels
         assert "startup.pipe_server_start" in labels
+
+
+class TestRunTrayIconVisibility:
+    """pystray's Icon.run() contract: a custom setup callback must set
+    ``icon.visible = True`` itself, otherwise the icon is never added to the
+    notification area (Win32 NIM_ADD) and notifications silently fail."""
+
+    def test_icon_is_visible_before_caller_setup_runs(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import sys
+        import types
+
+        from press.daemon._backends import run_tray_icon
+
+        visible_seen: list[bool] = []
+
+        class FakeIcon:
+            def __init__(self, **_kwargs: Any) -> None:
+                self.visible = False
+
+            def run(self, setup: Any) -> None:
+                setup(self)  # pystray calls it once the loop is running
+
+        fake = types.ModuleType("pystray")
+        fake.Icon = FakeIcon  # type: ignore[attr-defined]
+        fake.Menu = MagicMock()  # type: ignore[attr-defined]
+        fake.MenuItem = MagicMock()  # type: ignore[attr-defined]
+        monkeypatch.setitem(sys.modules, "pystray", fake)
+
+        run_tray_icon(
+            name="press",
+            title="press",
+            image=MagicMock(),
+            setup=lambda icon: visible_seen.append(icon.visible),
+            on_quit=lambda: None,
+        )
+
+        assert visible_seen == [True]
