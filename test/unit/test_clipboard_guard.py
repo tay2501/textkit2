@@ -330,3 +330,70 @@ class TestClipboardGuardConflictHandling:
             guard._handle_conflict()
 
         assert guard.is_active is False
+
+
+@pytest.mark.windows_only
+class TestMonitorWindowClassLifetime:
+    """The monitor's window class outlives any one start()/stop() cycle.
+
+    Window classes stay registered until the process exits (Microsoft Learn,
+    RegisterClassExW), so the WNDPROC stored in the class must be a callback
+    that lives as long as the process.  A per-start() callback left the class
+    pointing at a freed ctypes thunk from the second hold onwards.
+    """
+
+    @staticmethod
+    def _class_wndproc(hwnd: int) -> int:
+        import ctypes
+
+        from press import clipboard
+
+        get_class_long = clipboard._user32.GetClassLongPtrW
+        get_class_long.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        get_class_long.restype = ctypes.c_void_p
+        return int(get_class_long(hwnd, -24))  # GCLP_WNDPROC
+
+    def test_every_start_uses_the_process_lifetime_callback(self) -> None:
+        import ctypes
+
+        from press import clipboard
+
+        expected = ctypes.cast(clipboard._WND_PROC, ctypes.c_void_p).value
+        monitor = clipboard._ClipboardMonitorWindow(lambda: None)  # never restores
+        for _ in range(2):
+            monitor.start()
+            assert monitor._hwnd is not None
+            assert self._class_wndproc(monitor._hwnd) == expected
+            thread = monitor._thread
+            monitor.stop()
+            assert thread is not None
+            thread.join(timeout=2.0)
+            assert not thread.is_alive()
+
+    def test_start_raises_when_the_window_cannot_be_created(self) -> None:
+        from press import clipboard
+
+        monitor = clipboard._ClipboardMonitorWindow(lambda: None)
+        with (
+            patch.object(clipboard._user32, "CreateWindowExW", return_value=None),
+            pytest.raises(RuntimeError, match="clipboard monitor window"),
+        ):
+            monitor.start()
+        assert monitor._hwnd is None
+
+
+@pytest.mark.windows_only
+class TestClipboardGuardEngageFailure:
+    def test_failed_layer_start_leaves_guard_inactive(self) -> None:
+        from press.clipboard import ClipboardGuard
+
+        guard = ClipboardGuard()
+        with (
+            patch.object(guard, "_start_layer1", side_effect=RuntimeError("no window")),
+            patch.object(guard, "_start_layer2"),
+            patch.object(guard, "_stop_layer1"),
+            patch.object(guard, "_stop_layer2"),
+            pytest.raises(RuntimeError),
+        ):
+            guard.engage("secret")
+        assert guard.is_active is False

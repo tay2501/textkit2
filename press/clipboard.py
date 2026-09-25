@@ -6,6 +6,7 @@ import sys
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    import threading
     from collections.abc import Callable
 
 
@@ -292,6 +293,8 @@ if sys.platform == "win32":
     WM_CLIPBOARDUPDATE = 0x031D
     WM_CLOSE = 0x0010
     WM_DESTROY = 0x0002
+    ERROR_CLASS_ALREADY_EXISTS = 1410
+    _MONITOR_CLASS_NAME = "pressClipboardMonitor"
 
     # WNDPROC function type: LRESULT CALLBACK(HWND, UINT, WPARAM, LPARAM)
     # LRESULT is LONG_PTR — pointer-sized and signed (64-bit on x64); c_long
@@ -410,6 +413,7 @@ if sys.platform == "win32":
             self._on_storm = on_storm
             self._restoring: bool = False
             self._hwnd: int | None = None
+            self._thread: threading.Thread | None = None
             self._restore_times: list[float] = []
 
         def _on_clipboard_update(self) -> None:
@@ -445,27 +449,24 @@ if sys.platform == "win32":
             return len(self._restore_times) >= _STORM_LIMIT
 
         def start(self) -> None:  # pragma: no cover
-            """Create the hidden window and start the message loop in a thread."""
+            """Create the hidden window and start the message loop in a thread.
+
+            Raises:
+                RuntimeError: When the window class, the window, or the
+                    clipboard listener cannot be set up.
+            """
             import threading
 
             ready = threading.Event()
+            failure: list[str] = []
             self._restore_times = []  # re-arm resets the storm window
-
-            # Keep a strong reference to the WNDPROC so it is not GC'd
-            self._wnd_proc_ref = _WNDPROC(self._wnd_proc)
+            _register_monitor_class()
 
             def _thread_func() -> None:
-                wnd_class = _WNDCLASSEXW()
-                wnd_class.cbSize = ctypes.sizeof(wnd_class)
-                wnd_class.lpfnWndProc = self._wnd_proc_ref
-                wnd_class.hInstance = _kernel32.GetModuleHandleW(None)
-                wnd_class.lpszClassName = "pressClipboardMonitor"
-                _user32.RegisterClassExW(ctypes.byref(wnd_class))
-
                 hwnd = _user32.CreateWindowExW(
                     0,
-                    "pressClipboardMonitor",
-                    "pressClipboardMonitor",
+                    _MONITOR_CLASS_NAME,
+                    _MONITOR_CLASS_NAME,
                     0,
                     0,
                     0,
@@ -476,8 +477,19 @@ if sys.platform == "win32":
                     _kernel32.GetModuleHandleW(None),
                     None,
                 )
+                if not hwnd:
+                    failure.append(f"CreateWindowExW failed (error {ctypes.get_last_error()})")
+                    ready.set()
+                    return
+                _monitors_by_hwnd[hwnd] = self
+                if not _user32.AddClipboardFormatListener(hwnd):
+                    failure.append(
+                        f"AddClipboardFormatListener failed (error {ctypes.get_last_error()})"
+                    )
+                    _user32.DestroyWindow(hwnd)  # WM_DESTROY drops the hwnd mapping
+                    ready.set()
+                    return
                 self._hwnd = hwnd
-                _user32.AddClipboardFormatListener(hwnd)
                 ready.set()
 
                 msg = ctypes.wintypes.MSG()
@@ -487,32 +499,64 @@ if sys.platform == "win32":
                     _user32.TranslateMessage(ctypes.byref(msg))
                     _user32.DispatchMessageW(ctypes.byref(msg))
 
-            t = threading.Thread(target=_thread_func, daemon=True, name="press-cb-monitor")
-            t.start()
-            ready.wait(timeout=2.0)
-
-        def _wnd_proc(  # pragma: no cover
-            self,
-            hwnd: int,
-            msg: int,
-            wparam: int,
-            lparam: int,
-        ) -> int:
-            """Window procedure that handles clipboard update and destroy messages."""
-            if msg == WM_CLIPBOARDUPDATE:
-                self._on_clipboard_update()
-                return 0
-            if msg == WM_DESTROY:
-                _user32.RemoveClipboardFormatListener(hwnd)
-                _user32.PostQuitMessage(0)
-                return 0
-            return int(_user32.DefWindowProcW(hwnd, msg, wparam, lparam))
+            self._thread = threading.Thread(
+                target=_thread_func, daemon=True, name="press-cb-monitor"
+            )
+            self._thread.start()
+            if not ready.wait(timeout=2.0):
+                raise RuntimeError("clipboard monitor window did not start within 2s")
+            if failure:
+                raise RuntimeError(f"clipboard monitor window: {failure[0]}")
 
         def stop(self) -> None:  # pragma: no cover
             """Send WM_CLOSE to the hidden window to terminate the message loop."""
             if self._hwnd is not None:
                 _user32.PostMessageW(self._hwnd, WM_CLOSE, 0, 0)
                 self._hwnd = None
+
+    # One window class and one WNDPROC for the life of the process.  A class
+    # stays registered until the process exits (Microsoft Learn,
+    # RegisterClassExW), so a callback created per start() left the class
+    # pointing at a freed ctypes thunk from the second hold onwards.  The
+    # ctypes docs require the CFUNCTYPE object to outlive every C-side use;
+    # a module-level object does, and it routes messages to the monitor that
+    # owns the window.
+    _monitors_by_hwnd: dict[int, _ClipboardMonitorWindow] = {}
+
+    def _monitor_wnd_proc(hwnd: int, msg: int, wparam: int, lparam: int) -> int:  # pragma: no cover
+        """Window procedure shared by every monitor window."""
+        if msg == WM_CLIPBOARDUPDATE:
+            monitor = _monitors_by_hwnd.get(hwnd)
+            if monitor is not None:
+                monitor._on_clipboard_update()
+            return 0
+        if msg == WM_DESTROY:
+            _monitors_by_hwnd.pop(hwnd, None)
+            _user32.RemoveClipboardFormatListener(hwnd)
+            _user32.PostQuitMessage(0)
+            return 0
+        return int(_user32.DefWindowProcW(hwnd, msg, wparam, lparam))
+
+    _WND_PROC = _WNDPROC(_monitor_wnd_proc)
+
+    def _register_monitor_class() -> None:
+        """Register the monitor window class (idempotent).
+
+        ``ERROR_CLASS_ALREADY_EXISTS`` means an earlier start() registered it,
+        necessarily with :data:`_WND_PROC` — nothing else registers this name.
+
+        Raises:
+            RuntimeError: When registration fails for any other reason.
+        """
+        wnd_class = _WNDCLASSEXW()
+        wnd_class.cbSize = ctypes.sizeof(wnd_class)
+        wnd_class.lpfnWndProc = _WND_PROC
+        wnd_class.hInstance = _kernel32.GetModuleHandleW(None)
+        wnd_class.lpszClassName = _MONITOR_CLASS_NAME
+        if not _user32.RegisterClassExW(ctypes.byref(wnd_class)):
+            error = ctypes.get_last_error()
+            if error != ERROR_CLASS_ALREADY_EXISTS:
+                raise RuntimeError(f"clipboard monitor window: RegisterClassExW failed ({error})")
 
     # -----------------------------------------------------------------------
     # _PasteInterceptor
@@ -696,8 +740,15 @@ if sys.platform == "win32":
                 self._stop_layer2()
 
             self._protected_text = text
-            self._start_layer1()
-            self._start_layer2()
+            try:
+                self._start_layer1()
+                self._start_layer2()
+            except RuntimeError:
+                # A half-armed guard must not report itself active.
+                self._stop_layer1()
+                self._stop_layer2()
+                self._protected_text = None
+                raise
 
         def release(self) -> None:
             """Deactivate protection.  The clipboard is left as-is."""
