@@ -72,26 +72,60 @@ def is_shift_key(key: object) -> bool:
     return key in (kb.Key.shift, kb.Key.shift_l, kb.Key.shift_r)
 
 
-def create_key_listener(
+_WM_KEYDOWN = 0x0100
+_WM_SYSKEYDOWN = 0x0104
+
+
+def create_leader_listener(
     on_press: Callable[[Any], None],
     on_release: Callable[[Any], None],
-    *,
-    suppress: bool = False,
+    should_suppress: Callable[..., bool],
 ) -> KeyListener:
-    """Return a started-on-demand listener for raw key press/release events.
+    """Return a listener that swallows only the events *should_suppress* claims.
 
-    ``suppress=True`` swallows the events system-wide while the listener is
-    running (pynput's documented behaviour) — the leader-key listener uses it
-    so typed sequence characters do not leak into the foreground window.
-    Callers must guarantee the listener is short-lived (timeout-bounded).
+    pynput's ``suppress=True`` swallows *every* event, including the key-ups
+    of the prefix chord the user is still holding — which leaves those keys
+    logically down for the whole desktop.  pynput's documented alternative is
+    a ``win32_event_filter`` that calls ``listener.suppress_event()`` for the
+    events to hide (https://pynput.readthedocs.io/en/latest/faq.html).
+
+    A suppressed event never reaches pynput's callbacks, so the filter itself
+    delivers every event to *on_press* / *on_release* (as pynput key objects)
+    and returns ``False`` so pynput does not deliver it a second time.  It runs
+    on the hook thread, inside ``LowLevelHooksTimeout`` — the callbacks must
+    stay cheap (they only feed the resolver and enqueue).
+
+    Args:
+        on_press: Called with the pressed key.
+        on_release: Called with the released key.
+        should_suppress: ``(vk, *, is_press) -> bool``; see
+            :class:`press.daemon._sequence.KeySuppression`.
     """
     from pynput import keyboard as kb
 
+    from press.keystrokes import vk_to_char
+
+    special_keys = {key.value.vk: key for key in kb.Key}
+    listener: Any = None
+
+    def to_key(vk: int) -> object:
+        try:
+            return special_keys[vk]
+        except KeyError:
+            char = vk_to_char(vk)
+            return kb.KeyCode.from_char(char) if char else kb.KeyCode.from_vk(vk)
+
+    def event_filter(msg: int, data: Any) -> bool:
+        vk = int(data.vkCode)
+        is_press = msg in (_WM_KEYDOWN, _WM_SYSKEYDOWN)
+        (on_press if is_press else on_release)(to_key(vk))
+        if should_suppress(vk, is_press=is_press):
+            listener.suppress_event()  # raises; pynput turns it into "swallow"
+        return False  # already delivered above
+
+    listener = kb.Listener(win32_event_filter=event_filter)
     # pynput ships no type information; the cast is the seam's raison d'être.
-    return cast(
-        "KeyListener",
-        kb.Listener(on_press=on_press, on_release=on_release, suppress=suppress),
-    )
+    return cast("KeyListener", listener)
 
 
 def create_global_hotkeys(hotkeys: Mapping[str, Callable[[], None]]) -> KeyListener:

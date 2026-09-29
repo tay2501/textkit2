@@ -36,6 +36,7 @@ __all__ = [
     "NewlineMode",
     "plan_keystrokes",
     "type_text",
+    "vk_to_char",
 ]
 
 # How a newline in the clipboard is turned into input.
@@ -148,6 +149,29 @@ def type_text(
     raise OSError("Keystroke synthesis is only supported on Windows")
 
 
+def vk_to_char(vk: int) -> str | None:
+    """Return the unshifted, lower-case character virtual key *vk* produces.
+
+    Used by the leader-key hook, which sees raw ``KBDLLHOOKSTRUCT`` virtual-key
+    codes rather than characters.  ``MapVirtualKeyW`` with
+    ``MAPVK_VK_TO_CHAR`` is the documented Win32 translation; it ignores
+    modifier state, which is what a sequence key wants (Shift is tracked
+    separately), and maps ``A``..``Z`` the same on every layout, matching the
+    ASCII command names.  ``ToUnicode`` is deliberately not used: it mutates
+    the kernel's dead-key state, which a hook must not do to the user's typing.
+
+    Returns:
+        The character, or ``None`` for keys that produce none (F-keys,
+        arrows, modifiers) and for dead keys.
+
+    Raises:
+        OSError: On non-Windows platforms.
+    """
+    if sys.platform == "win32":
+        return _win_vk_to_char(vk)
+    raise OSError("Virtual-key translation is only supported on Windows")
+
+
 # ---------------------------------------------------------------------------
 # Windows implementation via ctypes
 # ---------------------------------------------------------------------------
@@ -210,6 +234,18 @@ if sys.platform == "win32":
     _user32.SendInput.restype = ctypes.wintypes.UINT
     _user32.GetAsyncKeyState.argtypes = [ctypes.c_int]
     _user32.GetAsyncKeyState.restype = ctypes.c_short
+    _user32.MapVirtualKeyW.argtypes = [ctypes.wintypes.UINT, ctypes.wintypes.UINT]
+    _user32.MapVirtualKeyW.restype = ctypes.wintypes.UINT
+
+    _MAPVK_VK_TO_CHAR = 2
+    _DEAD_KEY_FLAG = 0x80000000  # MapVirtualKeyW: top bit marks a dead key
+
+    def _win_vk_to_char(vk: int) -> str | None:
+        """``MapVirtualKeyW`` translation; see :func:`vk_to_char`."""
+        mapped = _user32.MapVirtualKeyW(vk, _MAPVK_VK_TO_CHAR)
+        if mapped == 0 or mapped & _DEAD_KEY_FLAG:
+            return None
+        return chr(mapped & 0xFFFF).lower()
 
     def _build_inputs(strokes: list[KeyStroke]) -> ctypes.Array[_INPUT]:
         """Build the ``INPUT`` array for *strokes* (two events per stroke)."""

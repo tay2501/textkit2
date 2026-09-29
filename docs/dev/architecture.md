@@ -141,9 +141,13 @@ Responsibilities are split so the rules can be tested without concurrency:
 - `_hotkeys.LeaderKeyListener` owns the machinery: the pynput listener, shift
   tracking, the timeout watcher, and the once-only handoff to the queue.
 
-The listener runs with pynput's `suppress=True` so typed characters do not leak
-into the focused window — which also means they are consumed rather than
-delivered. Because every keystroke re-arms the inactivity timeout, a second,
+The listener swallows the keys it consumes so typed characters do not leak into
+the focused window — which also means they are consumed rather than delivered.
+It does **not** use pynput's blanket `suppress=True`: a low-level hook runs
+before Windows updates the async key state, so swallowing the prefix chord's
+key-ups left Ctrl/Shift logically held. A `win32_event_filter` driven by
+`_sequence.KeySuppression` swallows only the presses the leader consumed and
+their releases, and lets modifiers through. Because every keystroke re-arms the inactivity timeout, a second,
 non-re-armable `_LEADER_HARD_LIMIT` bounds how long press can hold the keyboard
 at all; it is a safety valve, not part of the interaction.
 

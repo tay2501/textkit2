@@ -455,7 +455,8 @@ class TestLeaderKeyListenerTimeout:
         item = q.get_nowait()
         assert item == ("timeout",)
 
-    def test_leader_listener_requests_suppression(self) -> None:
+    def test_leader_listener_suppresses_selectively(self) -> None:
+        """``suppress=True`` would swallow the prefix chord's key-ups (stuck Shift)."""
         from press.daemon import LeaderKeyListener
 
         q: queue.Queue[tuple[str, ...]] = queue.Queue()
@@ -464,7 +465,9 @@ class TestLeaderKeyListenerTimeout:
             MockListener.return_value.start.return_value = None
             ll.start()
             time.sleep(0.2)
-        assert MockListener.call_args.kwargs.get("suppress") is True
+        kwargs = MockListener.call_args.kwargs
+        assert kwargs.get("suppress", False) is False
+        assert callable(kwargs["win32_event_filter"])
 
     def test_hard_limit_releases_the_keyboard_despite_continuous_typing(
         self, monkeypatch: pytest.MonkeyPatch
@@ -497,6 +500,76 @@ class TestLeaderKeyListenerTimeout:
 
         assert q.get_nowait() == ("timeout",)
         assert ll._listener is None  # suppression actually released
+
+
+class TestLeaderEventFilter:
+    """The ``win32_event_filter`` that replaced pynput's blanket ``suppress=True``.
+
+    Regression: ``Ctrl+Shift+0`` then ``h a`` left Shift logically held (text
+    selection could not be cleared by clicking) because the leader hook
+    swallowed the prefix chord's key-ups.  pynput's ``GlobalHotKeys`` never saw
+    them either, so every second prefix press was ignored.
+    """
+
+    _WM_KEYDOWN, _WM_KEYUP = 0x0100, 0x0101
+    _VK_LCONTROL, _VK_LSHIFT, _VK_0 = 0xA2, 0xA0, 0x30
+    _VK_A, _VK_H, _VK_L, _VK_U = 0x41, 0x48, 0x4C, 0x55
+
+    def _start(self) -> tuple[Any, queue.Queue[tuple[str, ...]], Any, Any]:
+        from press.commands import hotkey_sequence_candidates
+        from press.daemon import LeaderKeyListener
+
+        q: queue.Queue[tuple[str, ...]] = queue.Queue()
+        ll = LeaderKeyListener({"shift+u": "upper"}, hotkey_sequence_candidates(), q, timeout=30.0)
+        with patch("pynput.keyboard.Listener") as MockListener:
+            MockListener.return_value.start.return_value = None
+            ll.start()
+        event_filter = MockListener.call_args.kwargs["win32_event_filter"]
+        return ll, q, event_filter, MockListener.return_value
+
+    def _feed(self, event_filter: Any, msg: int, vk: int) -> Any:
+        from types import SimpleNamespace
+
+        return event_filter(msg, SimpleNamespace(vkCode=vk, flags=0))
+
+    def test_prefix_chord_releases_reach_the_os(self) -> None:
+        ll, _q, event_filter, listener = self._start()
+        for vk in (self._VK_0, self._VK_LSHIFT, self._VK_LCONTROL):
+            self._feed(event_filter, self._WM_KEYUP, vk)
+        listener.suppress_event.assert_not_called()
+        ll._finish(("timeout",))
+
+    def test_sequence_keys_are_swallowed_and_resolved(self) -> None:
+        """The reported sequence: prefix, then ``h a l`` (unique at ``hal``)."""
+        _ll, q, event_filter, listener = self._start()
+        for vk in (self._VK_H, self._VK_A):
+            self._feed(event_filter, self._WM_KEYDOWN, vk)
+            self._feed(event_filter, self._WM_KEYUP, vk)
+        assert listener.suppress_event.call_count == 4
+        self._feed(event_filter, self._WM_KEYDOWN, self._VK_L)
+        assert listener.suppress_event.call_count == 5
+        assert q.get_nowait() == ("dispatch", "halfwidth")
+
+    def test_filter_never_forwards_to_pynput_callbacks(self) -> None:
+        """Events are handled in the filter; posting them too would double-count."""
+        ll, _q, event_filter, _listener = self._start()
+        assert self._feed(event_filter, self._WM_KEYDOWN, self._VK_H) is False
+        assert self._feed(event_filter, self._WM_KEYUP, self._VK_LSHIFT) is False
+        ll._finish(("timeout",))
+
+    def test_shift_chord_binding_still_resolves(self) -> None:
+        _ll, q, event_filter, listener = self._start()
+        self._feed(event_filter, self._WM_KEYDOWN, self._VK_LSHIFT)
+        self._feed(event_filter, self._WM_KEYDOWN, self._VK_U)
+        assert q.get_nowait() == ("dispatch", "upper")
+        assert listener.suppress_event.call_count == 1  # U only, never Shift
+
+    def test_sided_ctrl_is_not_a_sequence_key(self) -> None:
+        """A low-level hook reports LCONTROL, which pynput names ``ctrl_l``."""
+        ll, q, event_filter, _listener = self._start()
+        self._feed(event_filter, self._WM_KEYDOWN, self._VK_LCONTROL)
+        assert q.empty()
+        ll._finish(("timeout",))
 
 
 # ---------------------------------------------------------------------------

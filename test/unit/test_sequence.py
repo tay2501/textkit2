@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 
 from press.commands import hotkey_sequence_candidates
-from press.daemon._sequence import SequenceResolver
+from press.daemon._sequence import KeySuppression, SequenceResolver
 
 
 def _resolver(bindings: dict[str, str] | None = None) -> SequenceResolver:
@@ -157,3 +157,56 @@ class TestPipelineNames:
         """Registry names win — the same precedence CommandDispatcher applies."""
         candidates = hotkey_sequence_candidates(["tm"])
         assert candidates["tm"] == "trim"  # not the "tm" pipeline
+
+
+# Virtual-key codes used by the suppression table below.
+_VK_LSHIFT, _VK_LCONTROL, _VK_LMENU, _VK_LWIN = 0xA0, 0xA2, 0xA4, 0x5B
+_VK_0, _VK_A, _VK_H = 0x30, 0x41, 0x48
+
+
+class TestKeySuppression:
+    """Which raw key events the leader listener may swallow.
+
+    A low-level hook that swallows a key-up leaves Windows believing the key is
+    still down (the hook runs before the async key state is updated), so the
+    listener may only swallow events it owns: the presses it consumed and their
+    matching releases.
+    """
+
+    @pytest.mark.parametrize("vk", [_VK_LSHIFT, _VK_LCONTROL, _VK_LMENU, _VK_LWIN, 0x10, 0x11])
+    def test_modifiers_always_pass_through(self, vk: int) -> None:
+        policy = KeySuppression()
+        assert policy.should_suppress(vk, is_press=True) is False
+        assert policy.should_suppress(vk, is_press=False) is False
+
+    def test_prefix_keys_released_during_the_leader_pass_through(self) -> None:
+        """Ctrl+Shift+0 are still held when the leader starts; their ups must reach the OS."""
+        policy = KeySuppression()
+        assert policy.should_suppress(_VK_0, is_press=False) is False
+        assert policy.should_suppress(_VK_LCONTROL, is_press=False) is False
+        assert policy.should_suppress(_VK_LSHIFT, is_press=False) is False
+
+    def test_sequence_key_press_and_release_are_both_swallowed(self) -> None:
+        policy = KeySuppression()
+        assert policy.should_suppress(_VK_H, is_press=True) is True
+        assert policy.should_suppress(_VK_H, is_press=False) is True
+
+    def test_release_is_swallowed_only_once(self) -> None:
+        policy = KeySuppression()
+        policy.should_suppress(_VK_A, is_press=True)
+        policy.should_suppress(_VK_A, is_press=False)
+        assert policy.should_suppress(_VK_A, is_press=False) is False
+
+    def test_autorepeat_press_is_released_once(self) -> None:
+        policy = KeySuppression()
+        policy.should_suppress(_VK_A, is_press=True)
+        assert policy.should_suppress(_VK_A, is_press=True) is True  # auto-repeat
+        assert policy.should_suppress(_VK_A, is_press=False) is True
+        assert policy.should_suppress(_VK_A, is_press=False) is False
+
+    def test_reset_forgets_presses_from_the_previous_leader(self) -> None:
+        """A key consumed last time and held into the next leader was pressed before it."""
+        policy = KeySuppression()
+        policy.should_suppress(_VK_A, is_press=True)
+        policy.reset()
+        assert policy.should_suppress(_VK_A, is_press=False) is False

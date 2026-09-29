@@ -197,3 +197,26 @@ class TestWin32Send:
         fake = fake_user32(held_modifiers=())
         type_text("a")
         assert len(fake.events) == 2
+
+
+# ---------------------------------------------------------------------------
+# vk_to_char (Win32 MapVirtualKeyW)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.windows_only
+class TestVkToChar:
+    @pytest.mark.parametrize(
+        ("vk", "expected"),
+        [(0x41, "a"), (0x5A, "z"), (0x30, "0"), (0x39, "9"), (0xBD, "-")],
+    )
+    def test_printable_keys(self, vk: int, expected: str) -> None:
+        from press.keystrokes import vk_to_char
+
+        assert vk_to_char(vk) == expected
+
+    @pytest.mark.parametrize("vk", [0x70, 0x25, 0xA0])  # F1, LEFT, LSHIFT
+    def test_non_printable_keys(self, vk: int) -> None:
+        from press.keystrokes import vk_to_char
+
+        assert vk_to_char(vk) is None

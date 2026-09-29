@@ -129,3 +129,45 @@ class SequenceResolver:
         if buf in self._candidates:
             self._pending = buf
         return None
+
+
+# Virtual-key codes of the modifier keys: the generic codes plus the left/right
+# ones a low-level keyboard hook actually reports (VK_LSHIFT .. VK_RMENU).
+MODIFIER_VKS = frozenset({0x10, 0x11, 0x12, 0x5B, 0x5C, 0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5})
+
+
+class KeySuppression:
+    """Decide which raw key events the leader listener may swallow.
+
+    A ``WH_KEYBOARD_LL`` hook runs *before* Windows updates the key's async
+    state, so a swallowed key-up leaves the key logically held for the whole
+    desktop.  The prefix chord is still down when the leader starts, and a
+    blanket suppression used to eat its releases: Shift stayed "held" (clicks
+    extended the text selection instead of clearing it) and pynput's
+    ``GlobalHotKeys`` kept the chord in its pressed set, ignoring the next
+    prefix press.
+
+    The rule is therefore ownership: swallow only the presses the leader
+    consumes and the releases matching them.  Modifiers are never swallowed —
+    Shift is read for ``shift+<key>`` bindings but must still reach the OS.
+    """
+
+    def __init__(self) -> None:
+        self._swallowed: set[int] = set()
+
+    def reset(self) -> None:
+        """Forget earlier presses; keys held into a new leader were pressed before it."""
+        self._swallowed.clear()
+
+    def should_suppress(self, vk: int, *, is_press: bool) -> bool:
+        """Return ``True`` when the event for *vk* must not reach the OS."""
+        if vk in MODIFIER_VKS:
+            return False
+        if is_press:
+            self._swallowed.add(vk)
+            return True
+        try:
+            self._swallowed.remove(vk)
+        except KeyError:
+            return False  # pressed before the leader started
+        return True

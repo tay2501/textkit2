@@ -10,10 +10,10 @@ from press.daemon._backends import (
     KeyListener,
     _normalize_key,
     create_global_hotkeys,
-    create_key_listener,
+    create_leader_listener,
     is_shift_key,
 )
-from press.daemon._sequence import SequenceResolver
+from press.daemon._sequence import KeySuppression, SequenceResolver
 
 if TYPE_CHECKING:
     import queue
@@ -31,6 +31,12 @@ _STOP_TIMEOUT = 1.0
 
 # Token set for _to_pynput_hotkey: these need angle-bracket wrapping
 _MODIFIER_TOKENS = frozenset({"ctrl", "shift", "alt", "cmd", "win", "meta"})
+
+# pynput names of the non-shift modifiers.  A low-level hook reports the sided
+# virtual keys, so pynput hands back ``ctrl_l`` rather than ``ctrl``.
+_IGNORED_MODIFIERS = frozenset(
+    {"ctrl", "ctrl_l", "ctrl_r", "alt", "alt_l", "alt_r", "alt_gr", "cmd", "cmd_l", "cmd_r"}
+)
 
 
 def _to_pynput_hotkey(press_spec: str) -> str:
@@ -66,9 +72,12 @@ class LeaderKeyListener:
     queue.  What a keystroke *means* lives in
     :class:`press.daemon._sequence.SequenceResolver`.
 
-    While the listener runs it is created with ``suppress=True``, so typed
-    sequence characters do not leak into the focused window.  That also means
-    they are **consumed** — a mistyped sequence swallows those keystrokes
+    While the listener runs it swallows the keys it consumes (see
+    :class:`~press.daemon._sequence.KeySuppression`), so typed sequence
+    characters do not leak into the focused window.  Modifiers and the
+    releases of keys held before the leader started always pass through —
+    swallowing those would leave them logically held.  Consumed keys are
+    **consumed** — a mistyped sequence swallows those keystrokes
     instead of delivering them to the application.  Two independent bounds keep
     the suppression from outliving its purpose:
 
@@ -102,6 +111,7 @@ class LeaderKeyListener:
         timeout: float = _LEADER_TIMEOUT,
     ) -> None:
         self._resolver = SequenceResolver(candidates, bindings)
+        self._suppression = KeySuppression()
         self._queue = work_queue
         self._timeout = timeout
         self._listener: KeyListener | None = None
@@ -118,13 +128,16 @@ class LeaderKeyListener:
         self._done.clear()
         self._shift_held = False
         self._resolver.reset()
+        self._suppression.reset()
         now = time.monotonic()
         self._deadline = now + self._timeout
         self._hard_deadline = now + _LEADER_HARD_LIMIT
 
-        # suppress=True: sequence characters must not leak into the focused
-        # window.  Bounded by the watcher below.
-        self._listener = create_key_listener(self._on_press, self._on_release, suppress=True)
+        # Sequence characters must not leak into the focused window, but the
+        # prefix chord's releases must.  Bounded by the watcher below.
+        self._listener = create_leader_listener(
+            self._on_press, self._on_release, self._suppression.should_suppress
+        )
         self._listener.start()
 
         watcher = threading.Thread(target=self._timeout_watcher, daemon=True)
@@ -170,7 +183,7 @@ class LeaderKeyListener:
 
         # Ignore other standalone modifiers (ctrl, alt, …)
         char = _normalize_key(key)
-        if char is None or char in {"ctrl", "alt", "cmd", "meta", "win"}:
+        if char is None or char in _IGNORED_MODIFIERS:
             return
 
         self._deadline = time.monotonic() + self._timeout  # re-arm per key
