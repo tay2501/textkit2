@@ -253,7 +253,7 @@ class TestTimedFieldsWhitelist:
     written yet, the way ``TestImportBudget`` guards the import budget.
 
     See ``press.daemon._logs.timed``'s Security note and
-    ``docs/dev/security-review-2026-08-06.md`` §4.
+    ``internal note security-review-2026-08-06.md (unpublished)`` §4.
     """
 
     def test_all_timed_call_sites_pass_only_counts(self) -> None:

@@ -43,7 +43,7 @@ def strip_newlines(text: str) -> str:
     place, so ``"研究\n開発"`` becomes ``"研究開発"`` and ``"hello\nworld"``
     becomes ``"helloworld"``.  Substituting a space between Latin words would
     make the result depend on the script of the surrounding characters — see
-    ``docs/dev/design-strip-newlines-2026-07-31.md`` — so the guarantee is
+    ``internal note design-strip-newlines-2026-07-31.md (unpublished)`` — so the guarantee is
     kept narrow: the output contains no U+000A and no U+000D, and no other
     character is added, removed or moved.  Chain it with ``trim`` or
     ``replace`` when more than that is wanted.

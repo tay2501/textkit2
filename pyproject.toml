@@ -120,7 +120,7 @@ select = [
 # No `ignore` list: with an explicit `select`, ignoring an unselected rule is a
 # no-op.  TRY003/ERA001 sat here for a while implying TRY and ERA had been
 # considered and tuned, when neither was ever selected.  Rules we deliberately
-# do NOT select, and why, are recorded in docs/dev/refactoring-plan-2026-07-26.md.
+# do NOT select, and why, are recorded in internal note refactoring-plan-2026-07-26.md (unpublished).
 
 [tool.ruff.lint.per-file-ignores]
 "test/**/*.py" = ["S101", "RUF001", "ARG"]  # pytest fixtures and mock helpers often have unused args
