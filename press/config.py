@@ -86,7 +86,12 @@ class TrimConfig:
 
 @dataclass(frozen=True, slots=True)
 class DictionaryConfig:
-    """Dictionary lookup configuration."""
+    """Dictionary lookup configuration.
+
+    Only ``files[0]`` is read (by the daemon's ``dict``/``dict_reverse``); the
+    CLI ``press dict`` uses ``--file`` or :func:`press.dictionary.default_dict_path`
+    instead.  Documented as such in ``docs/user/config.md``.
+    """
 
     files: tuple[str, ...] = ("%APPDATA%/press/dict/default.tsv",)
 

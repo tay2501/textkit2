@@ -98,7 +98,12 @@ Options applied when `trim` is dispatched via hotkey (the CLI uses `--both`).
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `files` | list of strings | `["%APPDATA%/press/dict/default.tsv"]` | Dictionary files in priority order |
+| `files` | list of strings | `["%APPDATA%/press/dict/default.tsv"]` | Dictionary file used by the daemon hotkeys (`dict` / `dict_reverse`). Only the **first** entry is read today; further entries are ignored |
+
+> The CLI `press dict` does not read this setting: it uses `--file PATH`, or
+> `%APPDATA%\press\dict\default.tsv` (Windows) / `~/.config/press/dict/default.tsv`
+> (elsewhere) when `--file` is omitted. With the default config both point at
+> the same file on Windows.
 
 ### `[ui]`
 
