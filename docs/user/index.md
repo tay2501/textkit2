@@ -11,4 +11,5 @@ dictionary
 config
 daemon
 edr-environments
+faq
 ```
