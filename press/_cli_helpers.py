@@ -38,7 +38,9 @@ def write_clipboard_or_warn(text: str, *, cmd: str, quiet: bool, sensitive: bool
         from press.clipboard import set_clipboard_text
 
         set_clipboard_text(text, sensitive=sensitive)
-    except Exception as exc:
+    # Everything clipboard.py raises: OSError off Windows, RuntimeError for a
+    # failed Win32 call.  Anything else is a bug and should surface as one.
+    except (OSError, RuntimeError) as exc:
         if not quiet:
             print(f"press {cmd}: warning: clipboard write failed: {exc}", file=sys.stderr)
         return False

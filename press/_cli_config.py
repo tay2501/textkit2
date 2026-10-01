@@ -17,14 +17,8 @@ def _register_config_commands(sub: _SubParsers) -> None:
     config_sub = config_p.add_subparsers(dest="config_action", metavar="ACTION")
     config_p.set_defaults(func=_handle_config)
 
-    _file_arg: dict[str, object] = {
-        "metavar": "PATH",
-        "default": None,
-        "help": "Config file (default: platform path)",
-    }
-
     val_p = config_sub.add_parser("validate", help="Parse config.toml and report errors")
-    val_p.add_argument("--file", **_file_arg)  # type: ignore[arg-type]
+    _add_file_arg(val_p)
 
     rst_p = config_sub.add_parser(
         "reset",
@@ -44,7 +38,17 @@ def _register_config_commands(sub: _SubParsers) -> None:
             "omit to reset the entire file"
         ),
     )
-    rst_p.add_argument("--file", **_file_arg)  # type: ignore[arg-type]
+    _add_file_arg(rst_p)
+
+
+def _add_file_arg(parser: argparse.ArgumentParser) -> None:
+    """Add the ``--file`` option shared by every ``config`` action."""
+    parser.add_argument(
+        "--file",
+        metavar="PATH",
+        default=None,
+        help="Config file (default: platform path)",
+    )
 
 
 def _handle_config(args: argparse.Namespace) -> int:
@@ -80,7 +84,9 @@ def _handle_config(args: argparse.Namespace) -> int:
                 section = f" [{key}]" if key else ""
                 print(f"press config reset: config{section} reset to defaults → {cfg_path}")
                 return 0
-            except Exception as exc:
+            # config_reset handles unreadable/invalid TOML itself, so only
+            # the backup copy and the rewrite (file I/O) can fail here.
+            except OSError as exc:
                 from press._cli_helpers import report_error
 
                 return report_error("config reset", exc)
