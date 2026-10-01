@@ -26,11 +26,7 @@ def handle_request(dispatcher: CommandDispatcher, raw: bytes) -> bytes:
     """
     import json
 
-    from press.commands import (
-        PARAMETRIC_ALIASES,
-        PARAMETRIC_COMMAND_INDEX,
-        SIMPLE_COMMAND_INDEX,
-    )
+    from press.commands import ParametricCommand, resolve_spec
 
     try:
         request = json.loads(raw.decode("utf-8"))
@@ -50,13 +46,14 @@ def handle_request(dispatcher: CommandDispatcher, raw: bytes) -> bytes:
 
     # Only registry transforms are reachable over the pipe.  Clipboard, hold,
     # and dict commands stay with the caller.
-    resolved = PARAMETRIC_ALIASES.get(command, command)
-    if resolved in SIMPLE_COMMAND_INDEX:
-        allowed: frozenset[str] = frozenset()
-    elif resolved in PARAMETRIC_COMMAND_INDEX:
-        allowed = frozenset(arg.kwarg for arg in PARAMETRIC_COMMAND_INDEX[resolved].cli_args)
-    else:
+    spec = resolve_spec(command)
+    if spec is None:
         return encode_response(ok=False, error=f"unknown command: {command!r}")
+    allowed = (
+        frozenset(arg.kwarg for arg in spec.cli_args)
+        if isinstance(spec, ParametricCommand)
+        else frozenset()
+    )
 
     unexpected = set(kwargs) - allowed
     if unexpected:

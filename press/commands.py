@@ -9,15 +9,15 @@ these with *default* (or config-driven) arguments only, since hotkey bindings
 cannot carry per-invocation parameters.  The optional ``daemon_kwargs``
 callable extracts config-driven kwargs from ``PressConfig``.
 
-This module is imported by both ``__main__.py`` (CLI registration) and
-``daemon.py`` (hotkey dispatch), making it the single source of truth for
-all transform commands.
+This module is imported by ``__main__.py`` (CLI registration), the daemon's
+dispatcher and pipe server (``press.daemon._dispatch`` / ``._pipe``), and the
+``chain`` command, making it the single source of truth for all transform
+commands.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -25,19 +25,23 @@ if TYPE_CHECKING:
     from press.config import PressConfig
 
 
-@dataclass(frozen=True, slots=True)
-class SimpleCommand:
+# The registry types are NamedTuples rather than frozen dataclasses on purpose:
+# this module is imported on every CLI run, and ``import dataclasses`` drags in
+# inspect/ast/dis/tokenize — 14 file opens, each one an endpoint-security scan
+# (measured 2026-10-01).  ``typing`` is already loaded, so NamedTuple costs 0.
+
+
+class SimpleCommand(NamedTuple):
     """Metadata for one simple (no-extra-args) transform command."""
 
     name: str
     module: str
     fn: str
-    aliases: tuple[str, ...] = field(default_factory=tuple)
+    aliases: tuple[str, ...] = ()
     help: str = ""
 
 
-@dataclass(frozen=True, slots=True)
-class CliArg:
+class CliArg(NamedTuple):
     """One declarative argparse option for a parametric command.
 
     ``kwarg`` doubles as the argparse ``dest`` and the keyword-argument name
@@ -53,21 +57,27 @@ class CliArg:
     default: Any = None
     metavar: str | None = None
 
-    def __post_init__(self) -> None:
-        # Fail fast at import time: argparse actions like "store_true" supply
-        # their own default and take no value, so combining them with the
-        # value-option fields would be silently ignored during registration.
-        if self.action is not None and (
-            self.type is not None or self.default is not None or self.metavar is not None
+
+def _check_cli_args(commands: Iterable[ParametricCommand]) -> None:
+    """Reject any ``CliArg`` that mixes an argparse action with value fields.
+
+    Actions like ``"store_true"`` supply their own default and take no value,
+    so combining them with ``type``/``default``/``metavar`` would be silently
+    ignored during registration.  Called on :data:`PARAMETRIC_COMMANDS` at
+    import time so the mistake fails fast (the job ``__post_init__`` did while
+    these were dataclasses).
+    """
+    for arg in (arg for cmd in commands for arg in cmd.cli_args):
+        if arg.action is not None and (
+            arg.type is not None or arg.default is not None or arg.metavar is not None
         ):
             raise ValueError(
-                f"CliArg {self.flags[0]!r}: action={self.action!r} "
+                f"CliArg {arg.flags[0]!r}: action={arg.action!r} "
                 "cannot be combined with type/default/metavar"
             )
 
 
-@dataclass(frozen=True, slots=True)
-class ParametricCommand:
+class ParametricCommand(NamedTuple):
     """Metadata for one parametric transform command.
 
     ``cli_args`` declares the extra CLI options registered by ``__main__.py``
@@ -81,9 +91,9 @@ class ParametricCommand:
     name: str
     module: str
     fn: str
-    aliases: tuple[str, ...] = field(default_factory=tuple)
+    aliases: tuple[str, ...] = ()
     help: str = ""
-    cli_args: tuple[CliArg, ...] = field(default_factory=tuple)
+    cli_args: tuple[CliArg, ...] = ()
     daemon_kwargs: Callable[[PressConfig], dict[str, Any]] | None = None
 
 
@@ -145,7 +155,7 @@ SIMPLE_COMMANDS: tuple[SimpleCommand, ...] = (
 )
 # fmt: on
 
-# O(1) lookup by command name or alias — used by daemon.CommandDispatcher._transform()
+# O(1) lookup by command name or alias — read through resolve_spec() below
 SIMPLE_COMMAND_INDEX: dict[str, SimpleCommand] = {
     name: cmd for cmd in SIMPLE_COMMANDS for name in (cmd.name, *cmd.aliases)
 }
@@ -398,15 +408,11 @@ PARAMETRIC_COMMANDS: tuple[ParametricCommand, ...] = (
     ),
 )
 
-# O(1) lookup by name or alias — used by daemon.CommandDispatcher._transform()
+_check_cli_args(PARAMETRIC_COMMANDS)
+
+# O(1) lookup by name or alias — read through resolve_spec() below
 PARAMETRIC_COMMAND_INDEX: dict[str, ParametricCommand] = {
     name: cmd for cmd in PARAMETRIC_COMMANDS for name in (cmd.name, *cmd.aliases)
-}
-
-# Alias → canonical name — derived from PARAMETRIC_COMMANDS (single source of truth).
-# Daemon dispatch resolves these before the registry lookup in CommandDispatcher._transform().
-PARAMETRIC_ALIASES: dict[str, str] = {
-    alias: cmd.name for cmd in PARAMETRIC_COMMANDS for alias in cmd.aliases
 }
 
 # ---------------------------------------------------------------------------
@@ -414,8 +420,7 @@ PARAMETRIC_ALIASES: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 
-@dataclass(frozen=True, slots=True)
-class SpecialCommand:
+class SpecialCommand(NamedTuple):
     """One command that is *not* a registry transform.
 
     These do not fit ``fn(text, **kwargs) -> str``: they generate values, act
@@ -434,7 +439,7 @@ class SpecialCommand:
     """
 
     name: str
-    aliases: tuple[str, ...] = field(default_factory=tuple)
+    aliases: tuple[str, ...] = ()
     hotkey: bool = False
 
 

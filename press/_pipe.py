@@ -17,15 +17,15 @@ as before.  Nothing here changes observable behaviour — only who does the work
 Import budget
 -------------
 This module is imported on every transform, so its body pulls in nothing
-beyond ``json``/``os``/``sys``.  ``ctypes`` and ``threading`` cost 8 file
-opens between them and are imported only after :func:`_daemon_may_be_running`
+beyond ``os``/``sys``.  ``json`` (4 file opens) is imported by the functions
+that encode or decode a message, i.e. only once delegation is attempted.
+``ctypes`` and ``threading`` cost 8 file opens between them and are imported only after :func:`_daemon_may_be_running`
 says a daemon is plausibly listening — otherwise delegation would make the
 no-daemon path *slower* on exactly the machines this exists to help.
 """
 
 from __future__ import annotations
 
-import json
 import os
 import sys
 from typing import Any
@@ -86,13 +86,17 @@ def _daemon_may_be_running() -> bool:
     """Cheap liveness gate: does the daemon's PID file exist?
 
     A stat is far cheaper than the ctypes import a real pipe probe needs.  A
-    stale PID file merely costs one failed connect before the local fallback.
+    stale PID file (daemon killed without cleanup) is not free, though: every
+    CLI run then pays the ctypes/threading imports (~14 file opens) plus one
+    failed connect before the local fallback, until the file is removed.
     """
     return os.path.exists(daemon_pid_path())  # noqa: PTH110
 
 
 def encode_request(command: str, text: str, kwargs: dict[str, object]) -> bytes:
     """Serialize a transform request."""
+    import json
+
     return json.dumps(
         {"v": PROTOCOL_VERSION, "cmd": command, "text": text, "kwargs": kwargs},
         ensure_ascii=False,
@@ -101,6 +105,8 @@ def encode_request(command: str, text: str, kwargs: dict[str, object]) -> bytes:
 
 def encode_response(*, ok: bool, text: str = "", error: str = "") -> bytes:
     """Serialize a transform response."""
+    import json
+
     payload = {"ok": ok, "text": text} if ok else {"ok": False, "error": error}
     return json.dumps(payload, ensure_ascii=False).encode("utf-8")
 
@@ -139,6 +145,8 @@ def try_delegate(command: str, text: str, kwargs: dict[str, object]) -> str | No
     raw = _round_trip_with_timeout(request)
     if raw is None:
         return None
+
+    import json
 
     try:
         reply = json.loads(raw.decode("utf-8"))

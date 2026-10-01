@@ -173,13 +173,13 @@ class TestImportBudget:
     """Delegation must not slow down the machines it exists to speed up."""
 
     def test_module_body_avoids_heavy_imports(self) -> None:
-        """ctypes/threading/pathlib cost file opens on every transform."""
+        """ctypes/threading/pathlib/json cost file opens on every transform."""
         import subprocess
         import sys as _sys
 
         code = (
             "import sys; import press._pipe; "
-            "print([m for m in ('ctypes', 'threading', 'pathlib') if m in sys.modules])"
+            "print([m for m in ('ctypes', 'threading', 'pathlib', 'json') if m in sys.modules])"
         )
         out = subprocess.run(
             [_sys.executable, "-c", code], capture_output=True, text=True, check=True

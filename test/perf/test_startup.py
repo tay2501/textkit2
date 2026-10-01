@@ -17,14 +17,16 @@ Two guards:
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
+import tempfile
 import time
 
 import pytest
 
 _MAX_VERSION_WALL_SECONDS = 2.0  # ROADMAP v0.6.0 / SPEC §4.1 target
-_MAX_TRANSFORM_FILE_OPENS = 60  # measured ~40 (2026-07); was 108 before lazy --version/argcomplete
+_MAX_TRANSFORM_FILE_OPENS = 60  # Windows 2026-10: 32 on 3.13, 49 on 3.14 (argparse loads dataclasses); was 108 before lazy --version/argcomplete
 
 _AUDIT_SNIPPET = """\
 import sys
@@ -50,14 +52,24 @@ print(f"RESULT opens={opens} lazy_ok={lazy_ok}", file=sys.stderr)
 
 
 def _run_audited_transform() -> tuple[int, bool]:
-    """Run ``press snake`` in a subprocess and return (open_count, lazy_ok)."""
-    result = subprocess.run(
-        [sys.executable, "-c", _AUDIT_SNIPPET],
-        input="hello world",
-        capture_output=True,
-        text=True,
-        check=True,
-    )
+    """Run ``press snake`` in a subprocess and return (open_count, lazy_ok).
+
+    The run is isolated from the developer's own press state: a leftover
+    ``press.pid`` sends the CLI down the delegation path (ctypes, threading,
+    json — ~14 extra opens) and a ``trace`` marker adds timing imports, so
+    the count would depend on whether a daemon ever ran on this machine.
+    """
+    env = {**os.environ, "PRESS_NO_DAEMON": "1"}
+    with tempfile.TemporaryDirectory() as appdata:
+        env["APPDATA"] = appdata
+        result = subprocess.run(
+            [sys.executable, "-c", _AUDIT_SNIPPET],
+            input="hello world",
+            capture_output=True,
+            text=True,
+            check=True,
+            env=env,
+        )
     line = next(ln for ln in result.stderr.splitlines() if ln.startswith("RESULT "))
     fields = dict(part.split("=") for part in line.removeprefix("RESULT ").split())
     return int(fields["opens"]), fields["lazy_ok"] == "True"
@@ -84,6 +96,19 @@ class TestStartupFileIo:
         """argcomplete and importlib.metadata must not load on a normal run."""
         _, lazy_ok = _run_audited_transform()
         assert lazy_ok, "argcomplete or importlib.metadata was imported on a plain transform run"
+
+    def test_command_registry_avoids_dataclasses(self) -> None:
+        """press.commands must not import dataclasses (inspect/ast/dis chain).
+
+        On 3.13 that chain is 11 of ~43 file opens per transform run.  3.14's
+        argparse pulls dataclasses in itself (via _colorize), so this checks
+        the module in isolation rather than the whole run.
+        """
+        code = "import sys, press.commands; print('dataclasses' in sys.modules)"
+        out = subprocess.run(
+            [sys.executable, "-c", code], capture_output=True, text=True, check=True
+        )
+        assert out.stdout.strip() == "False"
 
     def test_transform_run_file_open_budget(self) -> None:
         """File opens per transform run stay within the EDR-relevant budget."""

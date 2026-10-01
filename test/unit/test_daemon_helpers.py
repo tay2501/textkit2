@@ -192,11 +192,12 @@ class TestDaemonLogsBasic:
 
 
 class TestParametricCommandRegistry:
-    def test_aliases_consistent_with_parametric_aliases(self) -> None:
-        from press.commands import PARAMETRIC_ALIASES, PARAMETRIC_COMMANDS
+    def test_cli_arg_mixing_action_and_value_fields_is_rejected(self) -> None:
+        from press.commands import CliArg, ParametricCommand, _check_cli_args
 
-        derived = {alias: cmd.name for cmd in PARAMETRIC_COMMANDS for alias in cmd.aliases}
-        assert derived == PARAMETRIC_ALIASES
+        bad = CliArg(("--x",), "x", "help", action="store_true", default=1)
+        with pytest.raises(ValueError, match="cannot be combined"):
+            _check_cli_args([ParametricCommand("c", "m", "f", cli_args=(bad,))])
 
     def test_parametric_command_index_contains_all_names_and_aliases(self) -> None:
         from press.commands import PARAMETRIC_COMMAND_INDEX, PARAMETRIC_COMMANDS
