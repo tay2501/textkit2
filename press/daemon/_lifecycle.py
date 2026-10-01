@@ -197,7 +197,17 @@ def daemon_status(*, as_json: bool = False) -> int:
         if probe is None:
             running = True
         else:
-            _release_mutex(probe)
+            # Holding the mutex proves no daemon is running, and none can be
+            # between its own mutex acquisition and PID write (run_daemon does
+            # them in that order), so a leftover PID file is stale.  Remove it
+            # *before* releasing: every CLI run otherwise pays the delegation
+            # imports (~14 file opens) for a daemon that is gone.  Best effort:
+            # a file locked by another process must not break `status` itself.
+            try:
+                with contextlib.suppress(OSError):
+                    _PID_PATH.unlink(missing_ok=True)
+            finally:
+                _release_mutex(probe)
     elif pid is not None:
         import psutil
 

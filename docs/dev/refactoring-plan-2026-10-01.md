@@ -27,7 +27,13 @@
 あわせて `_pipe._daemon_may_be_running()` の docstring の「stale PID は接続失敗 1 回だけ」を
 「以後の毎回の CLI 実行で約 14 回のファイルオープン」へ訂正した。
 
-**積み残し（調査項目）**: stale PID ファイルを誰がいつ消すか。`status.json` も `running` のまま残っていた。
+**積み残し → 2026-10-02 対応済み**: 原因は `daemon_status()` が Windows で mutex により「停止」を確定させても
+PID ファイルを消さなかったこと（非 Windows 分岐のみ削除していた）。mutex を保持したまま削除してから解放するよう修正した
+（`run_daemon` は mutex 取得 → PID 書き込みの順なので、保持中に起動途中の daemon の PID を消す競合はない）。
+CLI 側 `try_delegate` での自動削除は、daemon の PID 書き込み〜パイプ作成の間に消してしまう競合があるため不採用。
+実機 E2E: stale PID あり 63 opens → `status` 後 50 opens / 稼働中 daemon では `status` 2 回でも PID 維持・委譲成功。
+あわせて `test_cli.TestDaemonStatus` が実 `%APPDATA%` に対して `status` を実行していたのを一時ディレクトリへ隔離した。
+**未対応**: `status --json` は停止中でも `status.json` の `state`（`running` のまま残りうる）をそのまま出力する。
 
 ## R2【性能】`commands.py` の dataclass → `typing.NamedTuple`
 

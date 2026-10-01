@@ -891,6 +891,138 @@ class TestDaemonStatusWindows:
         rc = daemon_status()
         assert rc == 1
         assert "not running" in capsys.readouterr().out
+        # The mutex proved the daemon gone, so the stale PID file is removed —
+        # otherwise every CLI run keeps paying the delegation imports.
+        assert not pid_file.exists()
+
+    @pytest.mark.windows_only
+    def test_running_keeps_pid_file(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        pid_file = tmp_path / "press.pid"
+        pid_file.write_text("99999", encoding="utf-8")
+        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
+
+        from press.daemon._lifecycle import _acquire_mutex, _release_mutex, daemon_status
+
+        handle = _acquire_mutex()  # simulate the live daemon
+        assert handle is not None
+        try:
+            assert daemon_status() == 0
+            assert pid_file.read_text(encoding="utf-8") == "99999"
+        finally:
+            _release_mutex(handle)
+
+    @pytest.mark.windows_only
+    def test_probe_mutex_is_released_after_cleanup(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A status probe must not leave the singleton mutex held."""
+        pid_file = tmp_path / "press.pid"
+        pid_file.write_text("99999", encoding="utf-8")
+        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
+
+        from press.daemon._lifecycle import _acquire_mutex, _release_mutex, daemon_status
+
+        assert daemon_status() == 1
+        handle = _acquire_mutex()
+        assert handle is not None, "daemon_status leaked the singleton mutex"
+        _release_mutex(handle)
+
+
+class TestDaemonStatusStalePidCleanup:
+    """The Win32 branch with the mutex stubbed, so the Linux lane covers it too."""
+
+    @staticmethod
+    def _stub_mutex(
+        monkeypatch: pytest.MonkeyPatch, *, held_elsewhere: bool, events: list[str]
+    ) -> None:
+        monkeypatch.setattr("sys.platform", "win32")
+        monkeypatch.setattr(
+            "press.daemon._lifecycle._acquire_mutex",
+            lambda: None if held_elsewhere else 42,
+        )
+        monkeypatch.setattr(
+            "press.daemon._lifecycle._release_mutex",
+            lambda handle: events.append(f"release:{handle}"),
+        )
+
+    def test_unlinks_before_releasing_the_mutex(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        pid_file = tmp_path / "press.pid"
+        pid_file.write_text("99999", encoding="utf-8")
+        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
+        events: list[str] = []
+        self._stub_mutex(monkeypatch, held_elsewhere=False, events=events)
+
+        real_release = events.append
+
+        def _release(handle: int) -> None:
+            # Ordering is the safety argument: while we hold the mutex no
+            # daemon can be between acquiring it and writing its PID.
+            assert not pid_file.exists(), "PID file must be gone before release"
+            real_release(f"release:{handle}")
+
+        monkeypatch.setattr("press.daemon._lifecycle._release_mutex", _release)
+
+        from press.daemon._lifecycle import daemon_status
+
+        assert daemon_status() == 1
+        assert events == ["release:42"]
+
+    def test_running_daemon_keeps_pid_file(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        pid_file = tmp_path / "press.pid"
+        pid_file.write_text("99999", encoding="utf-8")
+        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
+        events: list[str] = []
+        self._stub_mutex(monkeypatch, held_elsewhere=True, events=events)
+
+        from press.daemon._lifecycle import daemon_status
+
+        assert daemon_status() == 0
+        assert pid_file.exists()
+        assert events == []  # nothing acquired, nothing to release
+
+    def test_no_pid_file_is_fine(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", tmp_path / "press.pid")
+        events: list[str] = []
+        self._stub_mutex(monkeypatch, held_elsewhere=False, events=events)
+
+        from press.daemon._lifecycle import daemon_status
+
+        assert daemon_status() == 1
+        assert events == ["release:42"]
+
+    def test_unlink_failure_still_reports_and_releases(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """A locked PID file must not break ``status`` or leak the mutex."""
+        pid_file = tmp_path / "press.pid"
+        pid_file.write_text("99999", encoding="utf-8")
+        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
+        events: list[str] = []
+        self._stub_mutex(monkeypatch, held_elsewhere=False, events=events)
+
+        def _locked(self: Path, missing_ok: bool = False) -> None:
+            raise PermissionError("locked by another process")
+
+        monkeypatch.setattr(type(pid_file), "unlink", _locked)
+
+        from press.daemon._lifecycle import daemon_status
+
+        assert daemon_status() == 1
+        assert "not running" in capsys.readouterr().out
+        assert events == ["release:42"]
 
 
 # ---------------------------------------------------------------------------

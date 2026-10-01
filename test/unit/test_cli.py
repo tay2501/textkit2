@@ -468,7 +468,24 @@ class TestUnicodeNorm:
 
 
 class TestDaemonStatus:
-    def test_daemon_status_not_running(self) -> None:
-        result = _run("daemon", "status")
+    def test_daemon_status_not_running(self, tmp_path: Path) -> None:
+        # Isolated APPDATA: `status` removes a stale PID file on Windows, and a
+        # test must never touch the developer's real %APPDATA%\press state.
+        # The stale file is planted on Windows only: elsewhere `status` asks
+        # psutil, and PID 99999 may well be a live process on a CI runner.
+        pid_file = tmp_path / "press" / "press.pid"
+        if sys.platform == "win32":
+            pid_file.parent.mkdir()
+            pid_file.write_text("99999", encoding="utf-8")
+        result = subprocess.run(
+            [sys.executable, "-m", "press", "daemon", "status"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            env={**_UTF8_ENV, "APPDATA": str(tmp_path)},
+            cwd=_PRESS_ROOT,
+        )
         assert result.returncode == 1
         assert "not running" in result.stdout.lower()
+        if sys.platform == "win32":
+            assert not pid_file.exists()
