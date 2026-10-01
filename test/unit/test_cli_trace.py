@@ -82,6 +82,10 @@ class TestTraceStatus:
 
 
 class TestTraceNoAction:
-    def test_no_subcommand_returns_zero(self) -> None:
-        with patch("subprocess.run"):
+    def test_no_subcommand_prints_help_in_process(self, capsys: pytest.CaptureFixture[str]) -> None:
+        # In-process print_help, never a re-exec of sys.argv[0] (which is a
+        # .py path under `python -m press` and cannot be executed on Windows).
+        with patch("subprocess.run") as run:
             assert _run_cli(["trace"]) == 0
+        run.assert_not_called()
+        assert "usage: press trace" in capsys.readouterr().out

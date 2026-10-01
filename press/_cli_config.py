@@ -15,7 +15,8 @@ def _register_config_commands(sub: _SubParsers) -> None:
     """Register the ``config`` subcommand family."""
     config_p = sub.add_parser("config", help="Manage press configuration")
     config_sub = config_p.add_subparsers(dest="config_action", metavar="ACTION")
-    config_p.set_defaults(func=_handle_config)
+    # print_help: shown when no ACTION is given (see _handle_config).
+    config_p.set_defaults(func=_handle_config, print_help=config_p.print_help)
 
     val_p = config_sub.add_parser("validate", help="Parse config.toml and report errors")
     _add_file_arg(val_p)
@@ -52,19 +53,17 @@ def _add_file_arg(parser: argparse.ArgumentParser) -> None:
 
 
 def _handle_config(args: argparse.Namespace) -> int:
+    action: str | None = getattr(args, "config_action", None)
+    if action is None:
+        args.print_help()
+        return 0
+
     from pathlib import Path
 
     from press.config import config_reset, config_validate, default_config_path
 
     raw_file: str | None = getattr(args, "file", None)
     cfg_path = Path(raw_file) if raw_file else default_config_path()
-
-    action: str | None = getattr(args, "config_action", None)
-    if action is None:
-        import subprocess
-
-        subprocess.run([sys.argv[0], "config", "--help"], check=False)
-        return 0
 
     match action:
         case "validate":

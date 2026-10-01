@@ -10,7 +10,6 @@ re-checks the marker once per dispatched action
 from __future__ import annotations
 
 import contextlib
-import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -34,7 +33,8 @@ def _register_trace_commands(sub: _SubParsers) -> None:
         ),
     )
     trace_sub = trace_p.add_subparsers(dest="trace_action", metavar="ACTION")
-    trace_p.set_defaults(func=_handle_trace)
+    # print_help: shown when no ACTION is given (see _handle_trace).
+    trace_p.set_defaults(func=_handle_trace, print_help=trace_p.print_help)
 
     trace_sub.add_parser("on", help="Enable diagnostic trace logging")
     trace_sub.add_parser("off", help="Disable diagnostic trace logging")
@@ -44,9 +44,7 @@ def _register_trace_commands(sub: _SubParsers) -> None:
 def _handle_trace(args: argparse.Namespace) -> int:
     action: str | None = getattr(args, "trace_action", None)
     if action is None:
-        import subprocess
-
-        subprocess.run([sys.argv[0], "trace", "--help"], check=False)
+        args.print_help()
         return 0
 
     from press._paths import press_dir, trace_path

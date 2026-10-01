@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 # Path to the press package root
 _PRESS_ROOT = Path(__file__).parent.parent.parent
 
@@ -465,6 +467,22 @@ class TestUnicodeNorm:
 # ---------------------------------------------------------------------------
 # daemon (stub)
 # ---------------------------------------------------------------------------
+
+
+class TestGroupWithoutAction:
+    """``press <group>`` with no ACTION prints that group's help and exits 0.
+
+    Run through ``python -m press`` on purpose: the help used to be produced
+    by re-executing ``sys.argv[0]``, which is ``__main__.py`` in that mode
+    and raised OSError on Windows.
+    """
+
+    @pytest.mark.parametrize("group", ["config", "daemon", "trace"])
+    def test_prints_group_help(self, group: str) -> None:
+        result = _run(group)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.startswith(f"usage: press {group} ")
+        assert "Traceback" not in result.stderr
 
 
 class TestDaemonStatus:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -48,7 +47,8 @@ def _register_daemon_commands(sub: _SubParsers) -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     daemon_sub = daemon_p.add_subparsers(dest="daemon_action", metavar="ACTION")
-    daemon_p.set_defaults(func=_handle_daemon)
+    # print_help: shown when no ACTION is given (see _handle_daemon).
+    daemon_p.set_defaults(func=_handle_daemon, print_help=daemon_p.print_help)
 
     daemon_sub.add_parser(
         "start",
@@ -122,9 +122,7 @@ def _register_daemon_commands(sub: _SubParsers) -> None:
 def _handle_daemon(args: argparse.Namespace) -> int:
     action = getattr(args, "daemon_action", None)
     if action is None:
-        import subprocess
-
-        subprocess.run([sys.argv[0], "daemon", "--help"], check=False)
+        args.print_help()
         return 0
     match action:
         case "start":
