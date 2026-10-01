@@ -443,3 +443,66 @@ class TestMonitoringAgentDetection:
         data = json.loads(capsys.readouterr().out)
         assert data["monitoring_agents"] == ["Digital Guardian"]
         assert data["running"] is False
+
+    def test_json_status_ignores_stale_running_state(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """A dead daemon's leftover status.json must not read as running."""
+        from unittest.mock import patch
+
+        import psutil  # load the real platform module before faking sys.platform
+
+        pid_file = tmp_path / "press.pid"
+        pid_file.write_text("23776", encoding="utf-8")
+        status_file = tmp_path / "status.json"
+        status_file.write_text(
+            json.dumps({"pid": 23776, "state": "running", "version": "0.5.0"}),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
+        monkeypatch.setattr("press.daemon._lifecycle._STATUS_PATH", status_file)
+        monkeypatch.setattr("sys.platform", "linux")
+
+        from press.daemon import daemon_status
+
+        with (
+            patch.object(psutil, "pid_exists", return_value=False),
+            patch("press.daemon._lifecycle._detect_monitoring_agents", return_value=[]),
+        ):
+            rc = daemon_status(as_json=True)
+        assert rc == 1
+        data = json.loads(capsys.readouterr().out)
+        assert data["running"] is False
+        assert data["state"] == "stopped"
+        assert data["pid"] is None
+        assert data["version"] == "0.5.0"  # last-run facts are still reported
+
+    def test_json_status_running_reports_pid(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        from unittest.mock import patch
+
+        import psutil
+
+        pid_file = tmp_path / "press.pid"
+        pid_file.write_text("4242", encoding="utf-8")
+        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
+        monkeypatch.setattr("press.daemon._lifecycle._STATUS_PATH", tmp_path / "status.json")
+        monkeypatch.setattr("sys.platform", "linux")
+
+        from press.daemon import daemon_status
+
+        with (
+            patch.object(psutil, "pid_exists", return_value=True),
+            patch("press.daemon._lifecycle._detect_monitoring_agents", return_value=[]),
+        ):
+            rc = daemon_status(as_json=True)
+        assert rc == 0
+        data = json.loads(capsys.readouterr().out)
+        assert (data["running"], data["state"], data["pid"]) == (True, "running", 4242)

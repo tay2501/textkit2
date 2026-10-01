@@ -33,7 +33,7 @@ PID ファイルを消さなかったこと（非 Windows 分岐のみ削除し�
 CLI 側 `try_delegate` での自動削除は、daemon の PID 書き込み〜パイプ作成の間に消してしまう競合があるため不採用。
 実機 E2E: stale PID あり 63 opens → `status` 後 50 opens / 稼働中 daemon では `status` 2 回でも PID 維持・委譲成功。
 あわせて `test_cli.TestDaemonStatus` が実 `%APPDATA%` に対して `status` を実行していたのを一時ディレクトリへ隔離した。
-**未対応**: `status --json` は停止中でも `status.json` の `state`（`running` のまま残りうる）をそのまま出力する。
+**`status --json` → 2026-10-02 対応済み**: 停止中でも `status.json` の `state`（起動時に `running` を書くだけで以後更新されない）をそのまま出力していた。`state` / `pid` を mutex・psutil の生存判定のみから導くよう修正（`started_at` / `version` 等は前回起動の事実として引き続き出力）。
 
 ## R2【性能】`commands.py` の dataclass → `typing.NamedTuple`
 
@@ -89,6 +89,14 @@ daemon 側（不正クライアントで daemon を落とさない）。
 
 | 候補 | 理由 |
 |---|---|
-| `config` サブコマンド無指定時の `subprocess.run([sys.argv[0], "config", "--help"])` | 2 つ目のプロセス起動は EDR コスト上も不利で `print_help()` で足りるが、挙動（出力経路）変更を伴うため今回スコープ外。次回候補 |
 | `make_parser()` が `_cli_*` 5 モジュールを常に import（5 opens） | argparse がサブコマンド parser を事前構築する前提のため、遅延化は設計変更になる。費用対効果を別途評価 |
 | 予算 `_MAX_TRANSFORM_FILE_OPENS` の引き下げ | Ubuntu レーンの実測が未取得。CI 実測後に判断 |
+
+## 追補（2026-10-02 実施）
+
+| 項目 | 内容 |
+|---|---|
+| **バグ** `config` / `daemon` / `trace` の ACTION 無指定時ヘルプ | `subprocess.run([sys.argv[0], "<group>", "--help"])` で自分を再実行していた。`python -m press` では `sys.argv[0]` が `__main__.py` で、Windows では実行できずトレースバック（再現済み）。各グループの parser の `print_help` を `set_defaults(print_help=…)` で渡し、プロセス内で表示するよう修正。`python -m press <group>` 経由のテスト 3 件を追加（旧コードで失敗することを確認済み） |
+| `status --json` の state / pid | 上記 R1 追記のとおり |
+| テスト順序依存 `test_running_via_psutil` | `sys.platform` を `linux` に偽装した後で psutil が初回 import されると `psutil._pslinux` を読み Windows で失敗していた。偽装前に import するよう修正。全テストファイルを単独実行して他に同種の依存が無いことを確認 |
+| R7（3.15 レーン必須化） | 2026-10-02 時点でも 3.15.0 正式版は未公開（rc2）。引き続き保留 |

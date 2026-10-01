@@ -789,12 +789,18 @@ class TestDaemonStatus:
         monkeypatch: pytest.MonkeyPatch,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
+        # Import psutil while sys.platform is still real: first imported under
+        # the faked "linux" it would load psutil._pslinux and fail on Windows
+        # (no `resource` module) — this test only passed when an earlier test
+        # happened to import psutil first.
+        import psutil
+
         pid_file = tmp_path / "press.pid"
         pid_file.write_text("12345", encoding="utf-8")
         monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
         monkeypatch.setattr("sys.platform", "linux")
 
-        with patch("psutil.pid_exists", return_value=True):
+        with patch.object(psutil, "pid_exists", return_value=True):
             from press.daemon import daemon_status
 
             rc = daemon_status()

@@ -238,10 +238,14 @@ def daemon_status(*, as_json: bool = False) -> int:
             started = datetime.fromisoformat(str(status["started_at"]))
             uptime_seconds = int((datetime.now(UTC) - started.astimezone(UTC)).total_seconds())
 
+    # Liveness comes from the probe above, never from status.json: run_daemon
+    # writes "state": "running" at startup and nothing rewrites it when the
+    # daemon dies, so its state and the PID file describe the *last* run.
+    # started_at/version/restart_count still come from it — as last-run facts.
     result: dict[str, object] = {
         "running": running,
-        "state": "running" if running else str(status.get("state", "stopped")),
-        "pid": pid,
+        "state": "running" if running else "stopped",
+        "pid": pid if running else None,
         "started_at": status.get("started_at"),
         "uptime_seconds": uptime_seconds,
         "version": status.get("version"),
