@@ -3,572 +3,108 @@
 
 # press
 
-[![Python](https://img.shields.io/badge/python-3.13-blue)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.13%20%7C%203.14-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![CI](https://github.com/tay2501/textkit2/actions/workflows/ci.yml/badge.svg)](https://github.com/tay2501/textkit2/actions)
 
 Clipboard text transformer for Windows 11.
 
-> Copy text → run `press` → paste the transformed result.
+> Copy text → run `press <command>` (or a hotkey) → paste the transformed result.
+
+press has two front ends over the same 50+ transforms:
+
+| | **CLI** | **Daemon** |
+|---|---|---|
+| How you run it | `press upper` in a terminal | `Ctrl+Shift+0`, then `u`,`p` in any app |
+| Needs | nothing extra | the `daemon` extra, `press daemon start` |
+| Extras | pipes, `chain`, `genpass`, `uuid` | ClipboardGuard, `type`, tray icon |
 
 ---
 
-## Install
+## Common
 
-**Requirements:** Python 3.13, [uv](https://docs.astral.sh/uv/)
+### Install
+
+**Requirements:** Windows 11, Python 3.13+, [uv](https://docs.astral.sh/uv/) — or no Python at all with the release `.exe`.
 
 ```bash
-# Clone and install as a tool
 git clone https://github.com/tay2501/textkit2.git
 cd textkit2
-uv tool install .                      # CLI transforms only
-uv tool install '.[daemon]'            # + daemon / global hotkeys / ClipboardGuard
-```
-
-`press` and `px` are both available as command aliases.
-
-For development:
-
-```bash
-uv sync                    # CLI transforms only
-uv sync --extra daemon     # + daemon / global hotkeys / ClipboardGuard (pystray, pynput)
-uv run press --help
-```
-
----
-
-## Quick Start
-
-### CLI (stdin → stdout)
-
-```bash
-# Full-width → Half-width
-echo "ＴＡＢＬＥ１" | press halfwidth        # → TABLE1
-
-# Underscore ↔ Hyphen
-echo "USER_ID"     | press hyphen            # → USER-ID
-echo "USER-ID"     | press underscore        # → USER_ID
-
-# Strip commas (e.g. numbers copied from the web)
-echo "1,234,567"   | press strip-commas      # → 1234567
-
-# Keep digits only (currency symbols, separators, etc. removed)
-echo "¥1,234"      | press digits-only       # → 1234
-echo "€1.234"      | press digits-only       # → 1234  (comma/period both removed)
-echo "１２３円"     | press digits-only       # → １２３ (full-width preserved)
-
-# Case: identifier conversion
-echo "my_variable" | press camel            # → myVariable
-echo "myVariable"  | press snake            # → my_variable
-echo "my_variable" | press pascal           # → MyVariable
-echo "my_variable" | press kebab            # → my-variable
-
-# Case: upper / lower / title / capitalize / swapcase
-echo "hello world"   | press upper         # → HELLO WORLD
-echo "HELLO WORLD"   | press lower         # → hello world
-echo "they're here"  | press title         # → They're Here
-echo "HELLO WORLD"   | press capitalize    # → Hello world
-echo "Hello World"   | press swapcase      # → hELLO wORLD
-
-# Encoding
-echo "Hello World" | press base64-encode    # → SGVsbG8gV29ybGQ=
-echo "SGVsbG8gV29ybGQ=" | press base64-decode  # → Hello World
-echo "a=1&b=2"    | press url-encode       # → a%3D1%26b%3D2
-
-# SQL IN clause
-printf "USER1\nUSER2\nUSER3" | press sql-in  # → 'USER1','USER2','USER3'
-
-# JSON
-echo '{"b":2,"a":1}' | press json-format   # pretty-print (2-space indent)
-cat big.json         | press json-compress  # single line
-
-# Unicode escape ↔ text
-echo 'テスト' | press unicode-decode  # → テスト
-echo "テスト"              | press unicode-encode  # → テスト
-
-# HTML entities
-echo '&lt;div&gt;' | press html-decode      # → <div>
-
-# Unicode normalization (macOS NFD → Windows NFC, etc.)
-echo "café" | press nfc     # → NFC (canonical composition)
-echo "café" | press nfkc    # → NFKC (compatibility composition)
-
-# Line operations
-printf "banana\napple\ncherry" | press sort         # → apple / banana / cherry
-printf "hello   \nworld   "   | press trim          # → strip trailing whitespace
-printf "a\nb\na\nc"           | press dedupe        # → a / b / c
-printf "10\n2\n1\n20"         | press sort --numeric  # → 1 / 2 / 10 / 20
-
-# Password generation (cryptographically secure — secrets.choice / os.urandom)
-press genpass              # 20-char alphanumeric → stdout + clipboard (TTY)
-press genpass -n 32        # 32-char
-press genpass -n 16 -s     # 16-char with symbols
-press genpass -N           # stdout only, clipboard unchanged
-press gp                   # alias
-
-# Dictionary lookup
-press dict add FOOBER01 TABLE_HOGEHOGE --file ~/my.tsv
-echo "FOOBER01" | press dict --file ~/my.tsv  # → TABLE_HOGEHOGE
-echo "TABLE_HOGEHOGE" | press dict -r --file ~/my.tsv  # → FOOBER01 (reverse)
-
-# Normalize whitespace / line endings
-echo "  USER_ID  "  | press normalize        # → USER_ID
-cat file.txt        | press crlf             # all line endings → CRLF
-cat file.txt        | press lf               # all line endings → LF
-```
-
-### Daemon & global hotkeys
-
-```bash
-uv sync --extra daemon     # install pystray + pynput (first time only)
-press daemon start         # start tray icon + hotkey listener
-
-# --- transform from any app via two-step hotkey ---
-# Step 1: press the prefix chord simultaneously  →  Ctrl+Shift+0
-# Step 2: release, then type the command name — the same name the CLI takes
-# Copy "ＴＡＢＬＥ＿ＮＡＭＥ", then:
-#   Ctrl+Shift+0, then h,a,l    →  paste gives "TABLE_NAME"   (halfwidth)
-#   Ctrl+Shift+0, then n,o      →  paste gives normalized text (normalize)
-#   Ctrl+Shift+0, then s,o      →  paste gives sorted lines    (sort)
-# It fires as soon as the name can only mean one command — no table to memorise.
-
-# --- password + ClipboardGuard ---
-press genpass                    # generate password → clipboard
-#   Ctrl+Shift+0, then h,o       # ClipboardGuard ON  (tray turns red)
-#   <navigate to password field in any app>
-#   Ctrl+V                       # paste — guard auto-releases
-
-press daemon stop          # stop the daemon
-press daemon status        # show running / not running
-```
-
-### Clipboard in-place (`-c` read, `-C` write)
-
-```bash
-press halfwidth  -c -C   # transform clipboard in-place
-press sql-in     -c -C
-press normalize  -c -C
-press sort       -c -C
-press dedupe --ignore-case -c -C
-```
-
----
-
-## Transforms
-
-### Width
-
-| Command | Alias | Description |
-|---|---|---|
-| `halfwidth` | `hw` | Full-width → half-width (`ＴＡＢＬＥ１` → `TABLE1`) |
-| `fullwidth` | `fw` | Half-width → full-width (`TABLE1` → `ＴＡＢＬＥ１`) |
-| `enlarge-kana` | `ek` | Expand small kana to normal size (`ぁ` → `あ`, `ァ` → `ア`) |
-
-### Kana
-
-| Command | Alias | Description |
-|---|---|---|
-| `katakana` | `kata` | Hiragana → katakana (`ひらがな` → `ヒラガナ`) |
-| `hiragana` | `hira` | Katakana → hiragana (`カタカナ` → `かたかな`) |
-
-### Whitespace & Line Endings
-
-| Command | Alias | Description |
-|---|---|---|
-| `normalize` | `norm` | Strip leading/trailing whitespace and blank lines |
-| `crlf` | | Unify all line endings to `\r\n` |
-| `lf` | | Unify all line endings to `\n` |
-| `cr` | | Unify all line endings to `\r` |
-| `strip-newlines` | `nn` | Remove all line endings — one line, nothing inserted (`研究\n開発` → `研究開発`) |
-
-### Line Operations
-
-| Command | Alias | Options | Description |
-|---|---|---|---|
-| `trim` | `tm` | `--both` | Strip trailing whitespace from each line (`--both` strips leading too) |
-| `dedupe` | `dq` | `--ignore-case`, `--adjacent` | Remove duplicate lines, preserving first-occurrence order |
-| `sort` | `st` | `--reverse`, `--numeric`, `--ignore-case` | Sort lines (locale-aware; `--numeric` for natural number order) |
-| `number-lines` | `nl` | `--start N`, `--sep SEP` | Prefix each line with its line number (tab-separated by default) |
-| `reverse-lines` | `rl` | | Reverse the order of lines |
-
-### Separators
-
-| Command | Alias | Description |
-|---|---|---|
-| `hyphen` | `hy` | Underscores → hyphens (`USER_ID` → `USER-ID`) |
-| `underscore` | `us`, `underbar`, `ub` | Hyphens → underscores (`USER-ID` → `USER_ID`) |
-| `strip-commas` | `sc` | Remove commas (`1,234,567` → `1234567`; also strips full-width `，`) |
-| `digits-only` | `dg` | Keep only digit characters — removes currency symbols, punctuation, spaces (`¥1,234` → `1234`; `€1.234` → `1234`; `１２３円` → `１２３`) |
-
-### Case Conversion
-
-| Command | Alias | Description |
-|---|---|---|
-| `snake` | `sn` | Convert to `snake_case` (`myVariable` → `my_variable`) |
-| `camel` | `cm` | Convert to `camelCase` (`my_variable` → `myVariable`) |
-| `pascal` | `pc` | Convert to `PascalCase` (`my_variable` → `MyVariable`) |
-| `kebab` | `kb` | Convert to `kebab-case` (`my_variable` → `my-variable`) |
-| `upper` | `up` | Convert to `UPPERCASE` (`hello world` → `HELLO WORLD`) |
-| `lower` | `lo` | Convert to `lowercase` (`HELLO WORLD` → `hello world`) |
-| `title` | `tt` | Convert to `Title Case` (`they're here` → `They're Here`) |
-| `capitalize` | `cap` | Capitalize first letter of each line (`HELLO WORLD` → `Hello world`) |
-| `swapcase` | `sw` | Swap upper/lower case (`Hello World` → `hELLO wORLD`) |
-
-### Encoding
-
-| Command | Alias | Description |
-|---|---|---|
-| `base64-encode` | `be` | Encode text to Base64 |
-| `base64-decode` | `bd` | Decode Base64 to text |
-| `url-encode` | `urle` | Percent-encode URL text |
-| `url-decode` | `urld` | Decode percent-encoded URL text |
-| `fix-encoding` | `fe` | Repair mojibake — re-detect and re-decode the original encoding (`--threshold N`) |
-
-### Escape Sequences
-
-| Command | Alias | Description |
-|---|---|---|
-| `unicode-decode` | `ud` | Decode `\uXXXX` sequences to text |
-| `unicode-encode` | `ue` | Encode text to `\uXXXX` sequences |
-| `html-decode` | `hd` | Decode HTML entities (`&amp;` → `&`) |
-| `html-encode` | `he` | Escape HTML special characters (`&` → `&amp;`) |
-
-### Text Utilities
-
-| Command | Alias | Options | Description |
-|---|---|---|---|
-| `replace` | `rp` | `--pattern`, `--repl`, `--ignore-case`, `--fixed` | Regex (or fixed-string) search & replace (`\1` group refs supported) |
-| `hash` | `hs` | `--algo NAME` | Hex digest of the text (default: SHA-256; also `sha1`, `sha512`, `md5`, …) |
-| `count` | `wc` | | Count characters, words, lines, and UTF-8 bytes (`non-space` for Japanese manuscript counting) |
-| `markdown-table` | `mdt` | | TSV/CSV → Markdown table (delimiter auto-detected; Excel clipboard ready) |
-| `slug` | `sl` | `--unicode` | URL slug: lowercase, hyphens, ASCII-folded (`--unicode` keeps Japanese) |
-| `unix-to-date` | `u2d` | `--utc` | Unix time (s/ms auto-detected, per line) → ISO 8601 date |
-| `date-to-unix` | `d2u` | `--ms` | ISO 8601 date (per line) → Unix time in seconds |
-
-### Unicode Normalization
-
-| Command | Alias | Description |
-|---|---|---|
-| `nfc` | | Canonical composition — precomposed form (Windows/web standard, fixes macOS NFD filenames) |
-| `nfd` | | Canonical decomposition — base character + combining marks (macOS HFS+ form) |
-| `nfkc` | | Compatibility composition — collapses full-width, ligatures, etc. |
-| `nfkd` | | Compatibility decomposition |
-| `check-norm` | `cn` | Report which normalization forms (NFC/NFD/NFKC/NFKD) the text already satisfies |
-
-### Password Generation
-
-```
-press genpass [-n N] [-s] [-N] [-C] [--clear-after SEC]
-```
-
-| Flag | Description |
-|---|---|
-| `-n N` / `--length N` | Password length (default: **20**) |
-| `-s` / `--symbols` | Include ASCII punctuation (`!"#$%&'()*+,...`) |
-| `-N` / `--no-clip` | **Print to stdout only — do NOT write to clipboard** (prevents accidental overwrite) |
-| `-C` / `--clip-out` | Force clipboard write even in pipe mode |
-| `--clear-after SEC` | Auto-clear the clipboard after SEC seconds **if it still holds the password** (KeePassXC-style; 0 = disabled) |
-
-```bash
-press genpass                    # 20-char alphanumeric → stdout + clipboard (TTY)
-press genpass -n 32              # 32-char alphanumeric
-press genpass -n 16 -s           # 16-char with symbols
-press genpass -N                 # show in terminal only, clipboard unchanged
-press genpass --clear-after 12   # wipe the clipboard after 12s (KeePassXC default)
-press gp                         # alias
-```
-
-> **TTY auto-clipboard**: when running interactively, the password is written to the clipboard automatically so it is ready to paste immediately. Use `-N` if you only want to view the password without replacing the current clipboard contents.
-
-> **Conditional auto-clear**: `--clear-after` records the Windows clipboard sequence number after the write and only clears if it is unchanged after the delay — if you copied something else in the meantime, your clipboard is left untouched.
-
-### UUID Generation
-
-```
-press uuid [-n N] [-U] [-C]
-```
-
-| Flag | Description |
-|---|---|
-| `-n N` / `--count N` | Number of UUIDs to generate, one per line (default: 1) |
-| `-U` / `--upper` | Uppercase output |
-| `-C` / `--clip-out` | Write output to clipboard (also prints to stdout) |
-
-```bash
-press uuid           # one random UUID (version 4)
-press uuid -n 5      # five UUIDs, one per line
-press uuid -U -C     # uppercase, copied to clipboard
-```
-
-Uses `secrets.choice()` (backed by `os.urandom()`) — cryptographically secure.
-
-### Clipboard Utilities
-
-| Command | Alias | Description |
-|---|---|---|
-| `clear` | `cl` | Clear the clipboard |
-| `hold` | | Save clipboard text; call again to restore it (see [Clipboard Hold](#clipboard-hold) for real-time protection) |
-| `undo` | | Restore the clipboard text the last press command overwrote (run again = redo); skips sensitive-marked content; `PRESS_NO_UNDO=1` opts out |
-
-### Dictionary
-
-| Command | Description |
-|---|---|
-| `press dict [--file PATH] [-r]` | TSV dictionary lookup — exact match per line (`-r` for reverse) |
-| `press dict list [--file PATH]` | List all entries in the dictionary file |
-| `press dict add KEY VALUE [--file PATH]` | Add an entry to the dictionary |
-| `press dict remove KEY [--file PATH]` | Remove an entry from the dictionary |
-
-Default dictionary file: `%APPDATA%\press\dict\default.tsv` (Windows) / `~/.config/press/dict/default.tsv`
-
-TSV format:
-```
-# comment lines are ignored
-FOOBER01	TABLE_HOGEHOGE
-USER-ID	USER_ID
-```
-
-- Encoding: **UTF-8, no BOM** / line endings: **CRLF** — `press dict add` / `remove` always write this canonical format
-- Tab-separated, first two columns used (extra columns ignored); blank lines and `#` comments skipped
-- Hand-edited files are read leniently: a UTF-8 BOM (Notepad / Excel) is stripped and LF endings are accepted; other encodings (Shift_JIS, UTF-16) are not supported
-
-See [docs/user/dictionary.md](docs/user/dictionary.md) for details.
-
-### SQL & JSON
-
-| Command | Alias | Description |
-|---|---|---|
-| `sql-in` | `sq` | Newline list → SQL `IN` clause (`'A','B','C'`) |
-| `json-format` | `jf` | Pretty-print JSON (default: 2-space indent, `--indent N`) |
-| `json-compress` | `jc` | Compress JSON to a single line |
-
-### Chained Transforms & Pipelines
-
-Apply multiple transforms in one invocation — a single input read, a single
-output write, and one process launch instead of one per step:
-
-```bash
-press chain trim dedupe lf          # three transforms, left to right
-press chain tm lo -C                # aliases work; write result to clipboard
-echo "Hello World" | press chain snake upper   # composable with shell pipes
-press ch upper                      # `ch` alias
-```
-
-Name a step list once in `%APPDATA%\press\config.toml` and reuse it. The name is
-typeable from the daemon hotkey exactly like a built-in command — no binding
-needed:
-
-```toml
-[pipelines]
-cleanup = ["trim", "dedupe", "lf"]
-```
-
-```text
-Ctrl+Shift+0   then   c l e a n    →  runs the whole pipeline
-```
-
-```bash
-press chain cleanup                 # run the pipeline by name
-press chain --list                  # show configured pipelines
-press config validate               # reports unknown steps / name collisions
-```
-
-Rules: registry commands always win a name collision; parametric steps run
-with their defaults (daemon hotkeys use `[sql_in]`/`[trim]` config values);
-pipelines cannot reference other pipelines; any unknown or failing step
-aborts before anything is written.
-
-### Common options
-
-| Flag | Description |
-|---|---|
-| `-c` / `--clip-in` | Read input from clipboard |
-| `-C` / `--clip-out` | Write output to clipboard (also prints to stdout) |
-| `-v` / `--verbose` | Show before/after on stderr |
-| `-q` / `--quiet` | Suppress all stderr output |
-| `--fallback` | Return original text on failure (exit 0) |
-
----
-
-## Clipboard Hold
-
-`press hold` protects clipboard contents from being overwritten. It works in two modes:
-
-### CLI mode (file-based, no daemon required)
-
-```bash
-press hold          # saves current clipboard text to disk → prints "press hold: held"
-# ... do other copy-paste work ...
-press hold          # restores the saved text to the clipboard → prints "press hold: released"
-```
-
-First call saves; second call restores. Survives process restarts because the text is written to `%APPDATA%\press\hold.txt`.
-
-### Daemon mode (real-time dual-layer protection)
-
-When the daemon is running, the hotkey sequence **Ctrl+Shift+0, then `h`,`o`** engages **ClipboardGuard** — a two-layer defence that makes the clipboard effectively read-only until you release it:
-
-> **Key sequence:** Press **Ctrl+Shift+0** simultaneously (prefix chord), release all keys, then type **`h`,`o`** — enough to identify `hold`.
-
-**Workflow — generate a password and protect it until pasted:**
-
-```
-1. press daemon start               # start the daemon (once)
-2. press genpass                    # generate password → auto-written to clipboard
-3. Ctrl+Shift+0, then h,o           # engage ClipboardGuard (tray icon turns red)
-   ↳ now any app that tries to overwrite the clipboard is blocked
-4. Navigate to the password field in any app
-5. Ctrl+V                           # paste the password
-   ↳ ClipboardGuard auto-releases after the paste (Layer 2)
-```
-
-> Repeat **Ctrl+Shift+0, then h,o** at any time to manually release protection.
-
-| Layer | Mechanism | Reaction time |
-|---|---|---|
-| **Layer 1** | Hidden Win32 window monitors `WM_CLIPBOARDUPDATE`. Any application that writes to the clipboard triggers an immediate restore. | < 1 ms |
-| **Layer 2** | `WH_KEYBOARD_LL` hook intercepts **Ctrl+V / Shift+Insert** *before* the OS dispatches the keystroke, so the protected text is in place before the receiving application reads the clipboard. | 0 ms gap |
-
-The tray icon turns **red** while protection is active. Repeat the sequence (**Ctrl+Shift+0, then h,o**) to release.
-
-> **Note:** Windows does not allow a full exclusive clipboard lock (holding `OpenClipboard` open). Layer 1 restores within < 1 ms of any external write; Layer 2 covers the paste path with zero gap. Together they provide near-absolute protection for normal desktop workflows.
-
----
-
-## Daemon & Global Hotkeys
-
-The `press daemon` runs a background process with a system tray icon and global hotkey support. Once started, any clipboard transform is available from any application via a key chord.
-
-```bash
-press daemon start    # start tray icon + hotkey listener
-press daemon stop     # stop the daemon
-press daemon status   # show running / not running
-```
-
-### Type the command name
-
-Two-step sequence: **press Ctrl+Shift+0 simultaneously** (prefix chord) → **release, then type the command name or alias** — the same one the CLI accepts.
-
-```text
-Ctrl+Shift+0   then   t m       →  trim        (press tm)
-Ctrl+Shift+0   then   u p       →  upper       (press up)
-Ctrl+Shift+0   then   h a l     →  halfwidth   (fires early — only one match)
-Ctrl+Shift+0   then   c l e a n →  runs the "cleanup" pipeline
-```
-
-There is no key table to memorise: anything in `press --help`, plus any `[pipelines]` name, is typeable. Dispatch happens as soon as the keystrokes can only mean one command — usually after two or three keys. If what you typed is complete but a longer name extends it (`cr` vs `crlf`), press waits — `Enter` confirms the short one, or just pause. `Backspace` edits, `Esc` cancels.
-
-> [!IMPORTANT]
-> **Stop typing once it fires.** Dispatch releases the keyboard, so characters typed after it reach the focused application — typing `h`,`o`,`l`,`d` runs hold at `ho` and types `ld` into your document.
-
-`genpass`, `uuid`, and `chain` are CLI-only — see [docs/user/hotkeys.md](docs/user/hotkeys.md) for why.
-
-### Single-key bindings
-
-Two ship by default, both `Shift+` chords: `Shift+D` → `dict_reverse` (no CLI name to type), `Shift+Z` → `undo` (a panic key). Add your own in `%APPDATA%\press\config.toml`; entries are **merged with** the defaults:
-
-```toml
-[hotkeys]
-prefix = "ctrl+shift+0"   # optional — change the leader key
-
-[hotkeys.bindings]
-"shift+w" = "halfwidth"   # Ctrl+Shift+0, then Shift+W
-"shift+x" = "cleanup"     # a pipeline works too
+uv tool install .              # CLI only
+uv tool install '.[daemon]'    # CLI + daemon (pystray, pynput)
 ```
 
 > [!WARNING]
-> A **single-character** binding fires on the first keypress and hides every typed sequence starting with that letter — `k = "trim"` makes `kata`, `kb`, and every other `k…` name unreachable. `shift+<key>` chords never collide. `press config validate` warns about it.
+> press is **not on PyPI**. `pip install press` / `uv tool install press` install an unrelated project with the same name.
+
+A standalone `press.exe` (no Python required) is attached to each [GitHub Release](https://github.com/tay2501/textkit2/releases) with `SHA256SUMS.txt`. `press` and `px` are both available as command names.
+
+### Shared settings and files
+
+Everything lives in `%APPDATA%\press\`. No configuration is required.
+
+| File | Used by | Purpose |
+|---|---|---|
+| `config.toml` | both | Hotkeys, per-command defaults, pipelines — `press config validate` / `reset` |
+| `dict\default.tsv` | both | TSV dictionary for `press dict` / the `Shift+D` hotkey |
+| `hold.txt`, `undo.txt` | CLI | `press hold` / `press undo` slots (DPAPI-encrypted) |
+| `daemon.log`, `trace` | daemon | Log file; `press trace on` creates the marker |
+
+Details: [config](docs/user/config.md) · [dictionary](docs/user/dictionary.md) · [EDR / slow PCs](docs/user/edr-environments.md) · [FAQ](docs/user/faq.md)
 
 ---
 
-## Configuration Management
+## CLI usage
 
-Use `press config` to manage `config.toml` without editing it manually.
-
-### Validate
-
-Check that the config file is syntactically correct and structurally valid:
+Input is the clipboard when run from a terminal, or stdin when piped. Output goes to stdout; add `-C` to write it back to the clipboard.
 
 ```bash
-press config validate
-# press config validate: '%APPDATA%\press\config.toml': valid (schema_version=1)
-
-press config validate --file path/to/config.toml
+press halfwidth -C                   # clipboard "ＴＡＢＬＥ１" → clipboard "TABLE1"
+echo "my_variable" | press camel     # → myVariable
+printf "A\nB\nC" | press sql-in      # → 'A','B','C'
+press sort --numeric -C              # options per command: press sort --help
+press chain trim dedupe lf -C        # several transforms, one read and one write
+press undo                           # put back what the last -C overwrote
 ```
 
-A missing file is not an error — press will use defaults.
+| Flag | Meaning |
+|---|---|
+| `-c` / `-C` | Read from / write to the clipboard |
+| `-v` / `-q` | Before/after on stderr / no stderr |
+| `--fallback` | On failure, output the input unchanged (exit 0) |
 
-### Reset
+Clipboard tools: `clear`, `hold` (save, then restore on the second call), `undo` (run again = redo).
+Generators: `genpass` (secure password, kept out of Win+V history), `uuid`.
 
-Restore the config to built-in defaults (creates a `.toml.bak` backup first):
-
-```bash
-press config reset           # reset entire file
-press config reset --key hotkeys     # reset only [hotkeys] section
-press config reset --key sql_in      # reset only [sql_in]
-press config reset --key trim        # reset only [trim]
-press config reset --key dictionary  # reset only [dictionary]
-press config reset --key ui          # reset only [ui]
-press config reset --key hold        # reset only [hold]
-press config reset --key pipelines   # reset only [pipelines]
-```
-
-Valid `--key` values: `hotkeys`, `sql_in`, `trim`, `dictionary`, `ui`, `hold`, `pipelines`.
-
-### Config file format
-
-The full config file with all options and defaults (generated by `press config reset`):
-
-```toml
-schema_version = 1
-
-[hotkeys]
-prefix = "ctrl+shift+0"
-
-[hotkeys.bindings]
-"shift+d" = "dict_reverse"
-"shift+z" = "undo"
-
-[sql_in]
-quote_char = "'"
-wrap = false
-
-[trim]
-both = false   # true: hotkey trim strips leading whitespace too (CLI --both)
-
-[dictionary]
-files = ["%APPDATA%/press/dict/default.tsv"]
-
-[ui]
-startup_notification = true
-hold_icon = true
-notify_level = "off"   # "off" | "success" | "error" | "all"
-
-[hold]
-monitor_clipboard = true       # Layer 1: WM_CLIPBOARDUPDATE watcher
-intercept_paste_keys = true    # Layer 2: Ctrl+V / Shift+Insert hook
-```
+→ **All commands:** [docs/user/transforms.md](docs/user/transforms.md) · CLI-only tools: [docs/user/cli.md](docs/user/cli.md) · or `press --help`
 
 ---
 
-## Design Philosophy
+## Daemon usage
 
-press follows a **hybrid CLI design** modeled after [uv](https://docs.astral.sh/uv/) and [ruff](https://docs.astral.sh/ruff/):
-
-- **Transform commands** — short and fast (`press hw`, `px sn`). These are the 90% case.
-- **Management commands** — explicit and safe (`press daemon start`). These are rare, low-frequency operations.
-
-All transforms are pure functions with no side effects. I/O is handled exclusively by the CLI layer:
-
-```
-stdin / clipboard / positional arg
-        ↓
-   transform fn(text) → str
-        ↓
-   stdout + optional clipboard write
+```bash
+press daemon start     # tray icon + hotkeys; keeps running in this terminal
+press daemon status    # exit 0 = running (--json for details)
+press daemon stop      # from another terminal, or tray → Quit
 ```
 
-Error messages follow the format `press <subcommand>: error: <message>` so they are machine-parseable and consistent with tools like git and cargo.
+**Hotkeys** — press `Ctrl+Shift+0` together, release, then type the command name or alias you would type on the CLI:
+
+```text
+Ctrl+Shift+0, then t m      →  trim
+Ctrl+Shift+0, then h a l    →  halfwidth   (fires as soon as only one name matches)
+Ctrl+Shift+0, then h o      →  ClipboardGuard on/off
+Ctrl+Shift+0, then Shift+Z  →  undo        (default single-key binding)
+```
+
+> [!IMPORTANT]
+> Stop typing once it fires — later keys go to the focused app (`h`,`o`,`l`,`d` runs hold at `ho` and types `ld`).
+
+- **ClipboardGuard** blocks every clipboard overwrite until your next `Ctrl+V` (tray icon turns red) — e.g. `press genpass`, then `h`,`o`, then paste into a login form.
+- **`type`** (`t`,`y`) types the clipboard into the focused window when `Ctrl+V` stalls.
+- **Delegation:** while the daemon runs, CLI calls are handed to it over a named pipe, so a CLI transform costs the same on a slow, EDR-monitored PC.
+
+→ **Details:** [docs/user/daemon.md](docs/user/daemon.md) · [docs/user/hotkeys.md](docs/user/hotkeys.md)
 
 ---
 
@@ -576,48 +112,23 @@ Error messages follow the format `press <subcommand>: error: <message>` so they 
 
 | | |
 |---|---|
-| **User Guide** | [docs/user/](docs/user/index.md) — transforms, hotkeys, dictionary, config |
-| **Developer Guide** | [docs/dev/](docs/dev/index.md) — architecture, contributing, API reference |
+| **User Guide** | [docs/user/](docs/user/index.md) — common, CLI, and daemon sections |
+| **Developer Guide** | [docs/dev/](docs/dev/index.md) — architecture, contributing, code style, API |
 | **Changelog** | [CHANGELOG.md](CHANGELOG.md) |
 
-Build the docs locally:
-
 ```bash
-uv sync --group docs
-uv run sphinx-autobuild docs docs/_build/html   # live preview at http://127.0.0.1:8000
+uv sync --group docs && uv run sphinx-autobuild docs docs/_build/html   # http://127.0.0.1:8000
 ```
 
----
-
-## Windows Executable
-
-A standalone `press.exe` (no Python required) is attached to each [GitHub Release](https://github.com/tay2501/textkit2/releases).
-
-### Code signing policy
+## Windows executable and code signing
 
 Free code signing is provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
 This program will not transfer any information to other networked systems.
-See [docs/dev/code-signing.md](docs/dev/code-signing.md) for the full policy
-(committers, approvers, and privacy details). Release artifacts also ship with
-SHA-256 checksums (`SHA256SUMS.txt`) for integrity verification.
+See [docs/dev/code-signing.md](docs/dev/code-signing.md) for the full policy (committers, approvers, privacy).
 
-To build locally:
-
-```bash
-uv sync --group build
-uv run pyinstaller \
-  --onedir --name press --distpath dist-exe --noconfirm \
-  --collect-all press --collect-all jaconv \
-  --hidden-import argcomplete \
-  press/__main__.py
-# → dist-exe/press/press.exe
-```
-
-> **Note for corporate environments**: Use `--onedir` (not `--onefile`). Antivirus/EDR software caches scans of the unpacked directory after the first run, giving fast startup on subsequent calls.
+Build locally with `uv sync --group build`, then the PyInstaller command in [docs/dev/contributing.md](docs/dev/contributing.md). Use `--onedir`, not `--onefile` — EDR caches the unpacked directory after the first run.
 
 ### PowerShell UTF-8 setup
-
-Add to your PowerShell profile to ensure correct UTF-8 I/O:
 
 ```powershell
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8

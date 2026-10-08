@@ -1,5 +1,8 @@
 # Configuration Reference
 
+> **Applies to:** both. Sections marked *(daemon)* only affect hotkeys; the CLI
+> uses its own flags for the same options.
+
 **Location:** `%APPDATA%\press\config.toml`
 
 If the file does not exist, all defaults apply. No configuration is required to start using `press`.
@@ -50,13 +53,13 @@ cleanup = ["trim", "dedupe", "lf"]
 
 ## Keys reference
 
-### `[hotkeys]`
+### `[hotkeys]` *(daemon)*
 
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `prefix` | string | `"ctrl+shift+0"` | Prefix key in pynput notation |
 
-### `[hotkeys.bindings]`
+### `[hotkeys.bindings]` *(daemon)*
 
 Map a **single keystroke** after the prefix to a command name. Keys are
 case-insensitive; use `"shift+x"` syntax for shifted keys. User-defined entries
@@ -77,7 +80,7 @@ is still valid, and validation still exits 0).
 
 See {doc}`hotkeys` for how sequences resolve.
 
-### `[sql_in]`
+### `[sql_in]` *(daemon)*
 
 Options applied when `sql-in` is dispatched via hotkey (the CLI uses its own flags).
 
@@ -86,7 +89,7 @@ Options applied when `sql-in` is dispatched via hotkey (the CLI uses its own fla
 | `quote_char` | string | `"'"` | Character used to quote each value |
 | `wrap` | bool | `false` | Wrap result in `( )` |
 
-### `[trim]`
+### `[trim]` *(daemon)*
 
 Options applied when `trim` is dispatched via hotkey (the CLI uses `--both`).
 
@@ -94,7 +97,7 @@ Options applied when `trim` is dispatched via hotkey (the CLI uses `--both`).
 |---|---|---|---|
 | `both` | bool | `false` | `true`: strip leading whitespace too (like CLI `trim --both`); `false`: trailing only |
 
-### `[dictionary]`
+### `[dictionary]` *(daemon)*
 
 | Key | Type | Default | Description |
 |---|---|---|---|
@@ -105,7 +108,7 @@ Options applied when `trim` is dispatched via hotkey (the CLI uses `--both`).
 > (elsewhere) when `--file` is omitted. With the default config both point at
 > the same file on Windows.
 
-### `[ui]`
+### `[ui]` *(daemon)*
 
 | Key | Type | Default | Description |
 |---|---|---|---|
@@ -113,14 +116,14 @@ Options applied when `trim` is dispatched via hotkey (the CLI uses `--both`).
 | `hold_icon` | bool | `true` | Change tray icon when HOLD is active |
 | `notify_level` | string | `"off"` | Tray notification verbosity: `"off"`, `"success"`, `"error"`, or `"all"` |
 
-### `[hold]`
+### `[hold]` *(daemon)*
 
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `monitor_clipboard` | bool | `true` | Layer 1: watch `WM_CLIPBOARDUPDATE` and restore held text |
 | `intercept_paste_keys` | bool | `true` | Layer 2: hook `Ctrl+V` / `Shift+Insert` while HOLD is active |
 
-### `[type]`
+### `[type]` *(daemon)*
 
 Options for the `type` command, which pastes by synthesizing keystrokes
 instead of by `Ctrl+V` (hotkey-only — see {doc}`hotkeys`).
@@ -138,11 +141,11 @@ with `"enter"`, a multi-line clipboard **sends** each line. An unrecognised
 value falls back to `"enter"` rather than stopping the daemon.
 ```
 
-### `[pipelines]`
+### `[pipelines]` *(both)*
 
 Named transform chains. Each key maps a pipeline name to an ordered array of
-registry command names or aliases. Run with `press chain <name>` or bind the
-name to a hotkey in `[hotkeys.bindings]` like any built-in command.
+registry command names or aliases. Run with `press chain <name>`, or type the
+name after the hotkey prefix like any built-in command.
 
 | Rule | Behaviour |
 |---|---|
@@ -156,13 +159,9 @@ name to a hotkey in `[hotkeys.bindings]` like any built-in command.
 cleanup = ["trim", "dedupe", "lf"]
 
 [hotkeys.bindings]
-x = "cleanup"
+"shift+x" = "cleanup"   # optional — the name is typeable anyway
 ```
 
-> **Note — the same pipeline can behave differently by route.** A parametric
-> step such as `trim` uses its *function defaults* when the pipeline runs from
-> the CLI (`press chain cleanup`), but picks up your `[trim]` / `[sql_in]`
-> config values when the pipeline runs from a **hotkey**. If you need a step to
-> honour a specific option in both places, set it in the relevant config
-> section and remember the CLI `chain` path ignores it. Per-step CLI flags
-> inside a pipeline are not supported.
+> **Note:** a parametric step such as `trim` uses its defaults from the CLI
+> (`press chain cleanup`) but your `[trim]` / `[sql_in]` values from a hotkey.
+> Per-step flags inside a pipeline are not supported.

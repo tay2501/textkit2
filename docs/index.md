@@ -21,8 +21,8 @@ dev/index
 ## Quick links
 
 - {doc}`user/install` — Installation
-- {doc}`user/transforms` — All transforms reference
-- {doc}`user/hotkeys` — Hotkey configuration
-- {doc}`user/dictionary` — Custom TSV dictionary
+- {doc}`user/transforms` — All transforms (CLI and daemon)
+- {doc}`user/cli` — CLI usage: input/output, `chain`, clipboard tools, generators
+- {doc}`user/daemon` — Daemon usage: hotkeys, ClipboardGuard, diagnostics
 - {doc}`dev/architecture` — System design
 - {doc}`dev/contributing` — Contributing guide

@@ -1,5 +1,7 @@
 # Running press under endpoint security agents
 
+> **Applies to:** both (CLI and daemon).
+
 Corporate PCs run monitoring agents — EDR (CrowdStrike Falcon, Microsoft
 Defender for Endpoint, SentinelOne), endpoint DLP (Digital Guardian,
 Forcepoint, Symantec DLP), and asset-management/activity-logging tools

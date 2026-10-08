@@ -1,6 +1,6 @@
 # press — Roadmap
 
-**Current version:** v0.5.0-dev (2026-05-16)
+**Current version:** 0.5.0 (unreleased; last tag v0.3.0) — updated 2026-10-09
 **Status:** Beta (`Development Status :: 4 - Beta`)
 
 ---
@@ -66,7 +66,7 @@ Items that require user feedback or external dependencies before committing.
 - **`argparse.deprecated=True`**: mark old aliases as deprecated when renaming commands (Python 3.13 feature).
 - **macOS / Linux support** — `pynput` already supports both; main blocker is `pystray` on Linux (AppIndicator dependency). SPEC.md §13 defers this to after v1.0.0.
 - **PowerShell completion** — currently limited to bash/zsh/fish via `argcomplete`. Full PS7 support may require migrating to `typer` (pending startup-time measurement on HDD).
-- **Additional transforms** — driven by real-world usage reports. Candidates: `rot13`, `sha256`, `trim-lines`, `wrap`.
+- **Additional transforms** — driven by real-world usage reports. Candidates: `rot13`, `wrap`.
 - **Plugin / user-script support** — allow `~/.config/press/plugins/*.py` to register custom transform commands.
 
 ---

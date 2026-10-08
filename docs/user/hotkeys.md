@@ -1,6 +1,8 @@
-# Hotkey Configuration
+# Hotkeys
 
-The `press` daemon registers a **prefix key** system similar to Emacs and nano.
+> **Applies to:** daemon only. Start it first: `press daemon start` ({doc}`daemon`).
+
+The daemon uses a **prefix key**, like Emacs or tmux.
 
 **Two steps:**
 
@@ -156,14 +158,10 @@ shadows a sequence:
 
 ## Known limitations
 
-- Hotkeys do not work when an **elevated (administrator) process** has focus
-  (e.g. Task Manager, UAC dialogs). This is a Windows security restriction —
-  the same restriction stops `type` from delivering keystrokes there.
-- While you are typing a sequence, press **suppresses those keystrokes** so
-  they do not leak into the focused window. They are consumed, not delivered:
-  if you trigger the prefix by accident, the characters you type before press
-  gives up are lost. Press `Esc` to cancel immediately.
-- The sequence times out after **2 seconds of inactivity**, and is abandoned
-  after **10 seconds** in total regardless of typing.
+- Hotkeys do not work while an **elevated (administrator) window** has focus
+  (Task Manager, UAC) — a Windows restriction that also blocks `type` there.
+- Keys typed after the prefix are **consumed, not delivered** until a command
+  fires. After an accidental prefix, press `Esc`; otherwise the sequence ends
+  after **2 s** without a key or **10 s** in total.
 
-See {doc}`config` for the full configuration reference.
+Configuration keys: {doc}`config`.

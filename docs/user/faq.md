@@ -1,5 +1,7 @@
 # FAQ
 
+> **Applies to:** both (CLI and daemon).
+
 ## A `press` command sometimes takes 2–3 seconds
 
 Most `press` commands finish in well under a second. If one of them

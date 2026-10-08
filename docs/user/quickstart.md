@@ -1,56 +1,41 @@
 # Quick Start
 
+> **Applies to:** both — step 2 is the CLI, step 3 the daemon.
+
 ## 1. Install
 
-```bash
-uv tool install press
-```
+See {doc}`install` (release `.exe`, or `uv tool install '.[daemon]'` from a clone).
 
-## 2. Try a transform
+## 2. CLI — transform from a terminal
 
 ```bash
-echo "ＴＡＢＬＥ１" | press halfwidth
-# TABLE1
-
-printf "USER1\nUSER2\nUSER3" | press sql-in
-# 'USER1','USER2','USER3'
+echo "ＴＡＢＬＥ１" | press halfwidth      # → TABLE1
+printf "U1\nU2\nU3" | press sql-in        # → 'U1','U2','U3'
+press halfwidth -C                        # transform the clipboard in place
+press undo                                # changed your mind
 ```
 
-## 3. Use with clipboard
+More: {doc}`cli` and {doc}`transforms`.
 
-Copy any text to your clipboard, then:
-
-```bash
-press halfwidth -c -C     # transform clipboard in-place
-```
-
-## 4. Start the daemon
+## 3. Daemon — transform from any application
 
 ```bash
 press daemon start
 ```
 
-Now press **Ctrl+Shift+0** simultaneously (prefix chord), release, then type **`h`,`a`,`l`** — enough to identify `halfwidth`. Your clipboard is transformed instantly, in any application.
+Copy some text, press **Ctrl+Shift+0** together, release, then type
+**`h`,`a`,`l`** — `halfwidth` runs on the clipboard. Paste with `Ctrl+V`.
 
-Any command name or alias the CLI takes works the same way, so there is no key
-table to learn. See {doc}`hotkeys` for how sequences resolve.
+Any command name or alias the CLI accepts works the same way. More:
+{doc}`daemon` and {doc}`hotkeys`.
 
-## 5. Set up your dictionary
+## 4. Optional — a dictionary
 
-Create `%APPDATA%\press\dict\default.tsv`:
+Create `%APPDATA%\press\dict\default.tsv` (tab-separated):
 
 ```
 FOOBER01	TABLE_HOGEHOGE
-FOOBER02	TABLE_FUGAFUGA
 ```
 
-Then:
-
-```bash
-# Copy "FOOBER01" → press Prefix + D → clipboard becomes "TABLE_HOGEHOGE"
-press daemon restart   # reload after editing
-```
-
----
-
-**Next:** {doc}`transforms` — complete transforms reference
+Then `press dict -C` (CLI) or `Ctrl+Shift+0`, then `Shift+D` for the reverse
+lookup (daemon). See {doc}`dictionary`.

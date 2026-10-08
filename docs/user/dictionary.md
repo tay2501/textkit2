@@ -1,79 +1,44 @@
 # Custom Dictionary
 
-Use a TSV dictionary when there is **no pattern** between source and target names
-(e.g. system codes vs. document names).
+> **Applies to:** both — `press dict` on the CLI ({doc}`cli`) and
+> `Ctrl+Shift+0`, then `d`,`i`,`c`,`t` / `Shift+D` (reverse) from the daemon.
+
+Use a TSV dictionary when there is **no rule** linking source and target names
+(system codes vs. document names, for example). Each input line is looked up
+as an exact match.
 
 ## File format
 
 ```
-# Lines starting with # are comments
-# Format: SOURCE<TAB>TARGET
-
+# comment
 FOOBER01	TABLE_HOGEHOGE
-FOOBER02	TABLE_FUGAFUGA
 USER-ID	USER_ID
 ```
 
-- Encoding: **UTF-8, no BOM**
-- Line endings: **CRLF** (`\r\n`)
-- Separator: **tab** (`\t`)
-- Column 3 and beyond are ignored
-- Empty lines are ignored
+- `SOURCE<TAB>TARGET`; columns after the second, blank lines, and `#` lines are ignored.
+- `press dict add` / `remove` always write **UTF-8 without BOM, CRLF**.
+- Hand-edited files are read leniently: a UTF-8 BOM (Notepad, Excel) is
+  stripped and LF endings are accepted. Shift_JIS and UTF-16 are **not**
+  supported — re-save as UTF-8.
 
-`press dict add` / `press dict remove` always write this canonical format
-(UTF-8 without BOM, CRLF) on every platform.
+## Which file is used
 
-For hand-edited files the reader is lenient: a UTF-8 BOM (added by Notepad
-or Excel when saving as "UTF-8") is stripped automatically, and LF line
-endings are accepted. Other encodings (Shift_JIS, UTF-16) are **not**
-supported — re-save the file as UTF-8.
+| Front end | File |
+|---|---|
+| CLI | `--file PATH`, else `%APPDATA%\press\dict\default.tsv` (`~/.config/press/dict/default.tsv` off Windows) |
+| Daemon | The **first** entry of `[dictionary] files` in `config.toml` (default: the same `default.tsv`) |
 
-## Default location
-
-```
-%APPDATA%\press\dict\default.tsv
-```
-
-Windows path: `C:\Users\<username>\AppData\Roaming\press\dict\default.tsv`
+The daemon re-reads the file on every lookup, so edits apply immediately.
 
 ## Managing entries
 
 ```bash
-press dict list                          # show all entries in default.tsv
-press dict list --file ~/my.tsv          # show specific file
-press dict add FOOBER01 TABLE_HOGEHOGE   # append entry to default.tsv
-press dict remove FOOBER01               # remove entry from default.tsv
+press dict list                          # all entries
+press dict add FOOBER01 TABLE_HOGEHOGE   # add
+press dict remove FOOBER01               # remove (alias: rm)
+press dict list --file ~/my.tsv          # any command accepts --file
 ```
 
-## Multiple dictionary files
+## Reverse lookup
 
-List multiple files in `config.toml`. Files are searched **in order**; the first match wins.
-
-```toml
-[dictionary]
-files = [
-    "%APPDATA%/press/dict/project_a.tsv",
-    "%APPDATA%/press/dict/common.tsv",
-]
-```
-
-## Bidirectional lookup
-
-By default, `press dict -r` performs reverse lookup (TARGET → SOURCE).
-
-Disable reverse lookup:
-
-```toml
-[dictionary]
-bidirectional = false
-```
-
-## Reloading
-
-After editing a TSV file, reload without restarting the daemon:
-
-```bash
-press daemon restart
-```
-
-Or from the tray icon: right-click → **Reload dictionary**.
+`press dict -r` (CLI) and `Shift+D` (daemon) look up TARGET → SOURCE.

@@ -5,6 +5,7 @@
 
 architecture
 contributing
+code-style
 code-signing
 api
 changelog
