@@ -63,6 +63,24 @@ class TestDispatchRefreshLevel:
         assert refreshed == [True]
 
 
+class TestPipeRequestRefreshLevel:
+    def test_handle_request_calls_refresh_level(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Delegated CLI calls bypass dispatch(); `press trace on` must still apply."""
+        import json
+
+        from press.config import PressConfig
+        from press.daemon import CommandDispatcher
+        from press.daemon._pipe import handle_request
+
+        refreshed = []
+        monkeypatch.setattr("press.daemon._pipe.refresh_level", lambda: refreshed.append(True))
+        raw = json.dumps({"v": 1, "cmd": "upper", "text": "abc"}).encode()
+
+        handle_request(CommandDispatcher(PressConfig()), raw)
+
+        assert refreshed == [True]
+
+
 class TestDispatchClipboardTimed:
     def test_wraps_clipboard_get_and_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from press.config import PressConfig
