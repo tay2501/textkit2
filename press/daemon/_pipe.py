@@ -11,7 +11,7 @@ import threading
 from typing import TYPE_CHECKING
 
 from press._pipe import PROTOCOL_VERSION, encode_response, pipe_name
-from press.daemon._logs import _log, timed
+from press.daemon._logs import _log, refresh_level, timed
 
 if TYPE_CHECKING:
     from press.daemon._dispatch import CommandDispatcher
@@ -27,6 +27,10 @@ def handle_request(dispatcher: CommandDispatcher, raw: bytes) -> bytes:
     import json
 
     from press.commands import ParametricCommand, resolve_spec
+
+    # Delegated CLI calls never pass through CommandDispatcher.dispatch(), so
+    # the trace toggle has to be re-read here as well.
+    refresh_level()
 
     try:
         request = json.loads(raw.decode("utf-8"))
