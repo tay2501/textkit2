@@ -257,7 +257,7 @@ PARAMETRIC_COMMANDS: tuple[ParametricCommand, ...] = (
         "press.transforms.encoding_repair",
         "fix_encoding",
         ("fe",),
-        "Repair mojibake text by detecting and re-decoding the original encoding (F-15)",
+        "Repair mojibake text by detecting and re-decoding the original encoding",
         cli_args=(
             CliArg(
                 ("--threshold",),

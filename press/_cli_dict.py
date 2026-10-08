@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 def _register_dict_commands(sub: _SubParsers) -> None:
     """Register the ``dict`` command group and its management subcommands."""
-    dict_p = sub.add_parser("dict", help="Dictionary-based text replacement (F-08, F-09)")
+    dict_p = sub.add_parser("dict", help="Dictionary-based text replacement")
     dict_p.add_argument(
         "-r",
         "--reverse",
