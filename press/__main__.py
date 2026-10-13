@@ -7,6 +7,7 @@ import contextlib
 import locale
 import os
 import sys
+from functools import partial
 from typing import TYPE_CHECKING, Any, override
 
 from press._cli_helpers import (
@@ -19,9 +20,12 @@ from press._cli_helpers import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
     from press.commands import CliArg, ParametricCommand, SimpleCommand
+
+# category -> the commands in it, each as [name, *aliases]
+type CommandCatalog = dict[str, list[list[str]]]
 
 
 class _LazyVersionAction(argparse.Action):
@@ -310,33 +314,6 @@ def _register_clipboard_util_commands(sub: _SubParsers) -> None:
     p.set_defaults(func=_cl)
 
     p = sub.add_parser(
-        "undo",
-        help="Restore the clipboard text the last press command overwrote",
-        description=(
-            "Swap the clipboard with the snapshot taken before the last "
-            "clipboard-writing press command (-C transform or clear). "
-            "Running undo again swaps back (redo)."
-        ),
-    )
-    p.add_argument("-q", "--quiet", action="store_true", help="Suppress all stderr output")
-
-    def _undo(a: argparse.Namespace) -> int:
-        from press.clipboard import get_clipboard_text, set_clipboard_text
-        from press.transforms.undo import swap_undo
-
-        try:
-            swap_undo(get_clipboard_text, set_clipboard_text)
-        except FileNotFoundError:
-            if not a.quiet:
-                print("press undo: nothing to undo", file=sys.stderr)
-            return 1
-        except (OSError, RuntimeError) as exc:
-            return report_error("undo", exc, quiet=a.quiet)
-        return 0
-
-    p.set_defaults(func=_undo)
-
-    p = sub.add_parser(
         "hold",
         help="Save clipboard text; call again to restore it",
         description=(
@@ -377,6 +354,33 @@ def _register_clipboard_util_commands(sub: _SubParsers) -> None:
 
     p.set_defaults(func=_hold)
 
+    p = sub.add_parser(
+        "undo",
+        help="Restore the clipboard text the last press command overwrote",
+        description=(
+            "Swap the clipboard with the snapshot taken before the last "
+            "clipboard-writing press command (-C transform or clear). "
+            "Running undo again swaps back (redo)."
+        ),
+    )
+    p.add_argument("-q", "--quiet", action="store_true", help="Suppress all stderr output")
+
+    def _undo(a: argparse.Namespace) -> int:
+        from press.clipboard import get_clipboard_text, set_clipboard_text
+        from press.transforms.undo import swap_undo
+
+        try:
+            swap_undo(get_clipboard_text, set_clipboard_text)
+        except FileNotFoundError:
+            if not a.quiet:
+                print("press undo: nothing to undo", file=sys.stderr)
+            return 1
+        except (OSError, RuntimeError) as exc:
+            return report_error("undo", exc, quiet=a.quiet)
+        return 0
+
+    p.set_defaults(func=_undo)
+
 
 # ---------------------------------------------------------------------------
 # Argument parser construction
@@ -385,12 +389,23 @@ def _register_clipboard_util_commands(sub: _SubParsers) -> None:
 
 def make_parser() -> argparse.ArgumentParser:
     """Build and return the top-level argument parser."""
+    return _build_parser()[0]
+
+
+def _build_parser() -> tuple[argparse.ArgumentParser, CommandCatalog]:
+    """Build the top-level parser and the category listing of its commands.
+
+    Commands are registered sorted by (category, name), so ``press --help``
+    lists them in the same order as the unknown-command listing.  The catalog
+    is read back from ``sub.choices`` after each registration step, so it
+    cannot drift from what argparse actually accepts.
+    """
     from press._cli_chain import _register_chain_commands
     from press._cli_config import _register_config_commands
     from press._cli_daemon import _register_daemon_commands
     from press._cli_dict import _register_dict_commands
     from press._cli_trace import _register_trace_commands
-    from press.commands import PARAMETRIC_COMMANDS, SIMPLE_COMMANDS
+    from press.commands import PARAMETRIC_COMMANDS, SIMPLE_COMMANDS, TRANSFORM_CATEGORIES
 
     parser = argparse.ArgumentParser(
         prog="press",
@@ -404,25 +419,41 @@ def make_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
 
-    # Transform commands: parsers and handlers generated from the registry
+    # (category, first command name, registration step).  Transform parsers
+    # and handlers are generated from the registry; each special-purpose
+    # step registers the commands of one group (clear/hold/undo together).
     all_commands: tuple[SimpleCommand | ParametricCommand, ...] = (
         *SIMPLE_COMMANDS,
         *PARAMETRIC_COMMANDS,
     )
-    for cmd in all_commands:
-        _register_transform_command(sub, cmd)
+    steps: list[tuple[str, str, Callable[[], None]]] = [
+        (TRANSFORM_CATEGORIES[cmd.module], cmd.name, partial(_register_transform_command, sub, cmd))
+        for cmd in all_commands
+    ]
+    steps += [
+        ("Clipboard", "clear", partial(_register_clipboard_util_commands, sub)),
+        ("Dictionary", "dict", partial(_register_dict_commands, sub)),
+        ("Generators", "genpass", partial(_register_genpass_command, sub)),
+        ("Generators", "uuid", partial(_register_uuid_command, sub)),
+        ("Management", "config", partial(_register_config_commands, sub)),
+        ("Management", "daemon", partial(_register_daemon_commands, sub)),
+        ("Management", "trace", partial(_register_trace_commands, sub)),
+        ("Pipeline", "chain", partial(_register_chain_commands, sub)),
+    ]
 
-    # Special-purpose commands
-    _register_chain_commands(sub)
-    _register_genpass_command(sub)
-    _register_uuid_command(sub)
-    _register_dict_commands(sub)
-    _register_clipboard_util_commands(sub)
-    _register_config_commands(sub)
-    _register_daemon_commands(sub)
-    _register_trace_commands(sub)
+    catalog: CommandCatalog = {}
+    seen: dict[int, list[str]] = {}  # id(subparser) -> its names, alias order kept
+    for category, _name, register in sorted(steps, key=lambda s: s[:2]):
+        before = len(sub.choices)
+        register()
+        for name, subparser in list(sub.choices.items())[before:]:
+            if id(subparser) in seen:
+                seen[id(subparser)].append(name)
+            else:
+                seen[id(subparser)] = names = [name]
+                catalog.setdefault(category, []).append(names)
 
-    return parser
+    return parser, catalog
 
 
 # ---------------------------------------------------------------------------
@@ -445,13 +476,21 @@ def main() -> None:
     if hasattr(sys.stderr, "reconfigure"):
         sys.stderr.reconfigure(encoding="utf-8")
 
-    parser = make_parser()
+    parser, catalog = _build_parser()
     # argcomplete is only needed when the shell-completion hook invokes us,
     # which it signals via _ARGCOMPLETE; skip the import on normal startup.
     if "_ARGCOMPLETE" in os.environ:
         import argcomplete
 
         argcomplete.autocomplete(parser)
+    # argparse's own "invalid choice" error lists every name and alias in
+    # registration order on one line; replace it with the grouped listing.
+    names = {name for group in catalog.values() for cmd in group for name in cmd}
+    match sys.argv[1:]:
+        case [first, *_] if not first.startswith("-") and first not in names:
+            from press._cli_catalog import exit_unknown_command
+
+            exit_unknown_command(parser, first, catalog)
     args = parser.parse_args()
 
     if args.command is None:

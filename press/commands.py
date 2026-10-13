@@ -415,6 +415,34 @@ PARAMETRIC_COMMAND_INDEX: dict[str, ParametricCommand] = {
     name: cmd for cmd in PARAMETRIC_COMMANDS for name in (cmd.name, *cmd.aliases)
 }
 
+# Display category of each transforms module.  ``press --help`` and the
+# unknown-command listing group commands by it (categories and the commands
+# inside them in alphabetical order).  A new transforms module needs a row
+# here; test_cli_catalog.TestCommandCatalog pins that every module has one.
+# fmt: off
+TRANSFORM_CATEGORIES: dict[str, str] = {
+    "press.transforms.case":            "Case & separators",
+    "press.transforms.separator":       "Case & separators",
+    "press.transforms.encode":          "Encoding & escapes",
+    "press.transforms.encoding_repair": "Encoding & escapes",
+    "press.transforms.escape":          "Encoding & escapes",
+    "press.transforms.kana":            "Kana & width",
+    "press.transforms.width":           "Kana & width",
+    "press.transforms.lines":           "Lines",
+    "press.transforms.json_fmt":        "SQL, JSON & tables",
+    "press.transforms.sql":             "SQL, JSON & tables",
+    "press.transforms.table":           "SQL, JSON & tables",
+    "press.transforms.hashing":         "Text utilities",
+    "press.transforms.replace":         "Text utilities",
+    "press.transforms.slug":            "Text utilities",
+    "press.transforms.stats":           "Text utilities",
+    "press.transforms.timestamp":       "Text utilities",
+    "press.transforms.unicode_norm":    "Unicode normalization",
+    "press.transforms.lineending":      "Whitespace & line endings",
+    "press.transforms.whitespace":      "Whitespace & line endings",
+}
+# fmt: on
+
 # ---------------------------------------------------------------------------
 # Non-transform commands
 # ---------------------------------------------------------------------------
