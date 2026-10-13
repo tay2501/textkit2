@@ -104,3 +104,15 @@ and include:
 
 For general tuning on PCs with security software, see
 [Running press under endpoint security agents](edr-environments.md).
+
+## Japanese text shows up garbled in PowerShell
+
+Windows PowerShell does not use UTF-8 for console I/O by default, so text
+piped into or out of `press` can come out as mojibake. Switch the session to
+UTF-8 (add these lines to your `$PROFILE` to make it permanent):
+
+```powershell
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+[Console]::InputEncoding  = [System.Text.Encoding]::UTF8
+$env:PYTHONUTF8 = "1"
+```
