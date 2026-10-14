@@ -27,8 +27,8 @@ def _join(lines: list[str], trailing: bool) -> str:
     return result + "\n" if trailing else result
 
 
-def trim_lines(text: str, *, both: bool = False) -> str:
-    """Strip trailing (or both-sided) whitespace from each line."""
+def trim_lines(text: str, *, both: bool = True) -> str:
+    """Strip both-sided (or, with ``both=False``, trailing) whitespace from each line."""
     lines, trailing = _normalise(text)
     fn = str.strip if both else str.rstrip
     return _join([fn(line) for line in lines], trailing)

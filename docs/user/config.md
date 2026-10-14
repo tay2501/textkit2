@@ -27,7 +27,7 @@ quote_char = "'"
 wrap       = false
 
 [trim]
-both = false
+both = true
 
 [dictionary]
 files = ["%APPDATA%/press/dict/default.tsv"]
@@ -91,11 +91,13 @@ Options applied when `sql-in` is dispatched via hotkey (the CLI uses its own fla
 
 ### `[trim]` *(daemon)*
 
-Options applied when `trim` is dispatched via hotkey (the CLI uses `--both`).
+Options applied when `trim` is dispatched via hotkey (the CLI uses `--trailing`).
+The default matches the CLI, so `press tm` and `Ctrl+Shift+0`, `t`,`m` give
+the same result.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `both` | bool | `false` | `true`: strip leading whitespace too (like CLI `trim --both`); `false`: trailing only |
+| `both` | bool | `true` | `true`: strip leading and trailing whitespace; `false`: trailing only, keeping indentation (like CLI `trim --trailing`) |
 
 ### `[dictionary]` *(daemon)*
 

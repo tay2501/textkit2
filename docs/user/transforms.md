@@ -21,7 +21,7 @@
 | Command | Alias | Options | Effect |
 |---|---|---|---|
 | `normalize` | `norm` | | Strip each line and drop blank lines (`  USER_ID \t` → `USER_ID`) |
-| `trim` | `tm` | `-b`/`--both` | Strip trailing whitespace per line (all Unicode spaces, incl. U+3000); `--both` strips leading too |
+| `trim` | `tm` | `-t`/`--trailing` | Strip leading and trailing whitespace per line (all Unicode spaces, incl. U+3000); `--trailing` strips the end only, keeping indentation |
 | `crlf` / `lf` / `cr` | | | Unify every line ending to `\r\n` / `\n` / `\r` |
 | `strip-newlines` | `nn` | | Delete every line ending, insert nothing (`研究\n開発` → `研究開発`) |
 

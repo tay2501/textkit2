@@ -62,8 +62,11 @@ class TestTrimLines:
     def test_trailing_tab_removed(self) -> None:
         assert trim_lines("hello\t") == "hello"
 
-    def test_leading_spaces_preserved_by_default(self) -> None:
-        assert trim_lines("  hello") == "  hello"
+    def test_leading_spaces_stripped_by_default(self) -> None:
+        assert trim_lines("  hello  ") == "hello"
+
+    def test_both_false_keeps_leading_spaces(self) -> None:
+        assert trim_lines("  hello  ", both=False) == "  hello"
 
     def test_both_strips_leading_and_trailing(self) -> None:
         assert trim_lines("  hello  ", both=True) == "hello"
@@ -79,6 +82,9 @@ class TestTrimLines:
 
     def test_multiline_both(self) -> None:
         assert trim_lines("  foo  \n  bar  ", both=True) == "foo\nbar"
+
+    def test_multiline_trailing_only_keeps_indentation(self) -> None:
+        assert trim_lines("  foo  \n    bar  ", both=False) == "  foo\n    bar"
 
     def test_trailing_newline_preserved(self) -> None:
         assert trim_lines("hello  \n") == "hello\n"

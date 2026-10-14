@@ -331,10 +331,22 @@ class TestTrim:
         assert result.returncode == 0
         assert result.stdout.strip() == "hello"
 
+    def test_strips_both_sides_by_default(self) -> None:
+        # Same result as the hotkey: CLI and daemon transforms must agree.
+        result = _run("trim", input_text="  hello  \n  world  ")
+        assert result.returncode == 0
+        assert result.stdout == "hello\nworld"
+
     def test_both_flag(self) -> None:
         result = _run("trim", "--both", input_text="  hello  ")
         assert result.returncode == 0
         assert result.stdout.strip() == "hello"
+
+    @pytest.mark.parametrize("flag", ["--trailing", "-t"])
+    def test_trailing_flag_keeps_leading_whitespace(self, flag: str) -> None:
+        result = _run("trim", flag, input_text="  hello  \n    world  ")
+        assert result.returncode == 0
+        assert result.stdout == "  hello\n    world"
 
     def test_empty_input(self) -> None:
         result = _run("trim", input_text="")
