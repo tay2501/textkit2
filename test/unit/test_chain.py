@@ -30,7 +30,7 @@ class TestChainCLI:
     def test_two_steps_apply_left_to_right(self) -> None:
         result = _run("trim", "upper", stdin="  hello \n")
         assert result.returncode == 0
-        assert result.stdout == "  HELLO\n"
+        assert result.stdout == "HELLO\n"
 
     def test_aliases_resolve(self) -> None:
         # tm = trim (parametric, default kwargs), lo = lower (simple)
@@ -107,7 +107,7 @@ class TestChainPipelines:
             {"cleanup": ("trim", "lower", "underscore")},
         )
         assert rc == 0
-        assert capsys.readouterr().out == "  a_b\n"
+        assert capsys.readouterr().out == "a_b\n"
 
     def test_pipeline_mixed_with_commands(self, capsys: pytest.CaptureFixture[str]) -> None:
         rc = self._invoke(["chain", "cleanup", "upper"], "x-y", {"cleanup": ("underscore",)})
@@ -183,19 +183,19 @@ class TestDispatcherPipelines:
 
         config = PressConfig(pipelines={"cleanup": ("trim", "lower")})
         d = CommandDispatcher(config)
-        assert d.transform("cleanup", "  ABC  ") == "  abc"
+        assert d.transform("cleanup", "  ABC  ") == "abc"
 
     def test_pipeline_step_uses_daemon_config_kwargs(self) -> None:
         from press.config import TrimConfig
         from press.daemon import CommandDispatcher
 
-        # trim with both=True from config must apply inside a pipeline too
+        # a non-default [trim] value from config must apply inside a pipeline too
         config = PressConfig(
-            trim=TrimConfig(both=True),
+            trim=TrimConfig(both=False),
             pipelines={"cleanup": ("trim",)},
         )
         d = CommandDispatcher(config)
-        assert d.transform("cleanup", "  x  ") == "x"
+        assert d.transform("cleanup", "  x  ") == "  x"
 
     def test_unknown_command_still_raises(self) -> None:
         from press.daemon import CommandDispatcher

@@ -233,9 +233,9 @@ class TestParametricCommandRegistry:
 
         cmd = PARAMETRIC_COMMAND_INDEX["trim"]
         assert cmd.daemon_kwargs is not None
-        assert cmd.daemon_kwargs(PressConfig()) == {"both": False}
-        cfg = PressConfig(trim=TrimConfig(both=True))
-        assert cmd.daemon_kwargs(cfg) == {"both": True}
+        assert cmd.daemon_kwargs(PressConfig()) == {"both": True}
+        cfg = PressConfig(trim=TrimConfig(both=False))
+        assert cmd.daemon_kwargs(cfg) == {"both": False}
 
     def test_other_commands_have_no_daemon_kwargs(self) -> None:
         from press.commands import PARAMETRIC_COMMAND_INDEX

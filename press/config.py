@@ -81,7 +81,7 @@ class SqlInConfig:
 class TrimConfig:
     """Options for the ``trim`` transform when dispatched by the daemon."""
 
-    both: bool = False  # True: strip leading whitespace too (CLI --both)
+    both: bool = True  # False: trailing whitespace only (CLI --trailing)
 
 
 @dataclass(frozen=True, slots=True)

@@ -180,12 +180,22 @@ PARAMETRIC_COMMANDS: tuple[ParametricCommand, ...] = (
         "press.transforms.lines",
         "trim_lines",
         ("tm",),
-        "Strip trailing whitespace from each line",
+        "Strip leading and trailing whitespace from each line",
+        # Both flags share dest "both".  argparse takes a shared dest's default
+        # from the FIRST action registered, so --trailing (store_false, default
+        # True) must stay first or `press trim` silently becomes trailing-only
+        # and disagrees with the hotkey.  test_cli.TestTrim pins the default.
         cli_args=(
+            CliArg(
+                ("--trailing", "-t"),
+                "both",
+                "Strip trailing whitespace only, keeping indentation (str.rstrip())",
+                action="store_false",
+            ),
             CliArg(
                 ("--both", "-b"),
                 "both",
-                "Strip leading and trailing whitespace (str.strip())",
+                "Strip leading and trailing whitespace (the default; kept for scripts)",
                 action="store_true",
             ),
         ),
