@@ -157,6 +157,8 @@ if sys.platform == "win32":
     _user32.GetClipboardSequenceNumber.restype = ctypes.wintypes.DWORD
     _user32.IsClipboardFormatAvailable.argtypes = [ctypes.c_uint]
     _user32.IsClipboardFormatAvailable.restype = ctypes.wintypes.BOOL
+    _user32.GetClipboardOwner.argtypes = []
+    _user32.GetClipboardOwner.restype = ctypes.c_void_p
 
     CF_UNICODETEXT = 13
     GMEM_MOVEABLE = 0x0002
@@ -176,9 +178,32 @@ if sys.platform == "win32":
         "Clipboard Viewer Ignore",
     )
 
+    # OpenClipboard fails while another window has the clipboard open
+    # (Microsoft Learn, OpenClipboard).  WM_CLIPBOARDUPDATE is delivered while
+    # the writer — or another listener such as Win+V history — may still hold
+    # it, so a single attempt silently dropped ClipboardGuard restores.
+    # .NET's Clipboard.SetDataObject retries for the same reason (10 x 100 ms);
+    # 10 ms keeps the worst case at ~0.1 s on the monitor's message loop.
+    _OPEN_RETRIES = 10
+    _OPEN_RETRY_DELAY = 0.01
+
+    def _open_clipboard(owner: int | None = None) -> None:
+        """OpenClipboard with a bounded retry; raise once every attempt failed.
+
+        *owner* becomes the clipboard owner at the next ``EmptyClipboard``
+        (Microsoft Learn, OpenClipboard); ``None`` leaves the clipboard ownerless.
+        """
+        import time
+
+        for _ in range(_OPEN_RETRIES - 1):
+            if _user32.OpenClipboard(owner):
+                return
+            time.sleep(_OPEN_RETRY_DELAY)
+        if not _user32.OpenClipboard(owner):
+            raise RuntimeError(f"Failed to open clipboard (error {ctypes.get_last_error()})")
+
     def _win_get_text() -> str:
-        if not _user32.OpenClipboard(None):
-            raise RuntimeError("Failed to open clipboard")
+        _open_clipboard()
         try:
             handle = _user32.GetClipboardData(CF_UNICODETEXT)
             if not handle:
@@ -227,11 +252,10 @@ if sys.platform == "win32":
                 )
             _set_clipboard_format(fmt, (0).to_bytes(4, "little"))  # DWORD 0 = opt out
 
-    def _win_set_text(text: str, *, sensitive: bool = False) -> None:
+    def _win_set_text(text: str, *, sensitive: bool = False, owner: int | None = None) -> None:
         encoded = (text + "\x00").encode("utf-16-le")
 
-        if not _user32.OpenClipboard(None):
-            raise RuntimeError("Failed to open clipboard")
+        _open_clipboard(owner)
         try:
             # Both calls can genuinely fail (RDP sessions, clipboard managers,
             # Office holding the clipboard).  A failure must raise instead of
@@ -251,8 +275,7 @@ if sys.platform == "win32":
             _user32.CloseClipboard()
 
     def _win_clear() -> None:
-        if not _user32.OpenClipboard(None):
-            raise RuntimeError("Failed to open clipboard")
+        _open_clipboard()
         try:
             if not _user32.EmptyClipboard():
                 raise RuntimeError(f"Failed to empty clipboard (error {ctypes.get_last_error()})")
@@ -263,8 +286,7 @@ if sys.platform == "win32":
         return int(_user32.GetClipboardSequenceNumber())
 
     def _win_clear_if_unchanged(sequence_number: int) -> bool:
-        if not _user32.OpenClipboard(None):
-            raise RuntimeError("Failed to open clipboard")
+        _open_clipboard()
         try:
             # While we hold the clipboard open no other process can write to
             # it, so the sequence check and the clear are effectively atomic.
@@ -393,8 +415,9 @@ if sys.platform == "win32":
     class _ClipboardMonitorWindow:
         """Layer 1: Hidden Win32 window that listens for WM_CLIPBOARDUPDATE.
 
-        When the clipboard changes (and a restore is not already in progress),
-        the protected text is immediately written back to the clipboard.
+        When another application changes the clipboard, the protected text is
+        immediately written back — as this window, so the update that write
+        itself posts is recognised by ``GetClipboardOwner`` and ignored.
 
         Args:
             get_text: Callable that returns the current protected text, or
@@ -411,18 +434,26 @@ if sys.platform == "win32":
         ) -> None:
             self._get_text = get_text
             self._on_storm = on_storm
-            self._restoring: bool = False
             self._hwnd: int | None = None
             self._thread: threading.Thread | None = None
             self._restore_times: list[float] = []
 
+        def write(self, text: str) -> None:
+            """Put *text* on the clipboard as this window (its owner)."""
+            _win_set_text(text, owner=self._hwnd)
+
         def _on_clipboard_update(self) -> None:
             """Called when WM_CLIPBOARDUPDATE is received.
 
-            Guards against re-entrant calls that would cause an infinite loop
-            (our own SetClipboardData triggers WM_CLIPBOARDUPDATE again).
+            The message is *posted* for every change, this window's own
+            writes included (Microsoft Learn, AddClipboardFormatListener), so
+            it arrives after the write returned.  An in-progress flag cannot
+            catch it; ownership can — only a writer that empties the
+            clipboard takes it over.  Without this check one external copy
+            made the monitor restore its own restores until the storm limit
+            released the hold (~7 ms on real hardware).
             """
-            if self._restoring:
+            if self._hwnd is not None and _user32.GetClipboardOwner() == self._hwnd:
                 return
             text = self._get_text()
             if text is None:
@@ -433,11 +464,16 @@ if sys.platform == "win32":
                 if self._on_storm is not None:
                     self._on_storm()
                 return
-            self._restoring = True
             try:
-                _win_set_text(text)
-            finally:
-                self._restoring = False
+                self.write(text)
+            except RuntimeError as exc:
+                # This runs inside the WNDPROC: an exception escaping a ctypes
+                # callback is only printed to stderr ("Exception ignored ..."),
+                # never reaching daemon.log.  Imported here, not at module
+                # level, to keep logging off the CLI's import path.
+                import logging
+
+                logging.getLogger("press.daemon").warning("clipboard guard restore failed: %s", exc)
 
         def _storm_detected(self) -> bool:
             """Record a restore attempt; True when the rate exceeds the limit."""
@@ -578,6 +614,7 @@ if sys.platform == "win32":
             self._shift_held: bool = False
             self._listener: Any | None = None
             self._get_text: Callable[[], str | None] | None = None
+            self._write: Callable[[str], None] | None = None
 
         def _is_paste_shortcut(self, key: object) -> bool:
             """Return True if *key* is Ctrl+V or Shift+Insert.
@@ -606,10 +643,22 @@ if sys.platform == "win32":
             elif key in (kb.Key.shift, kb.Key.shift_l, kb.Key.shift_r):
                 self._shift_held = True
 
-            if self._is_paste_shortcut(key) and self._get_text is not None:
-                text = self._get_text()
-                if text is not None:
-                    _win_set_text(text)
+            if (
+                self._is_paste_shortcut(key)
+                and self._get_text is not None
+                and self._write is not None
+                and (text := self._get_text()) is not None
+            ):
+                try:
+                    self._write(text)
+                except RuntimeError as exc:
+                    # pynput stops the whole listener when a callback raises;
+                    # keep Layer 2 armed for the next paste and record why.
+                    import logging
+
+                    logging.getLogger("press.daemon").warning(
+                        "clipboard guard pre-paste write failed: %s", exc
+                    )
 
         def _on_release(self, key: object) -> None:  # pragma: no cover
             from pynput import keyboard as kb
@@ -619,16 +668,21 @@ if sys.platform == "win32":
             elif key in (kb.Key.shift, kb.Key.shift_l, kb.Key.shift_r):
                 self._shift_held = False
 
-        def start(self, get_text: Callable[[], str | None]) -> None:  # pragma: no cover
+        def start(
+            self, get_text: Callable[[], str | None], write: Callable[[str], None]
+        ) -> None:  # pragma: no cover
             """Start the key listener.
 
             Args:
                 get_text: Callable that returns the protected text, or ``None``
                     if the guard is inactive.
+                write: Puts the protected text on the clipboard as the guard,
+                    so Layer 1 recognises the write as its own.
             """
             from pynput import keyboard as kb
 
             self._get_text = get_text
+            self._write = write
             self._ctrl_held = False
             self._shift_held = False
             self._listener = kb.Listener(
@@ -644,6 +698,7 @@ if sys.platform == "win32":
                 self._listener.stop()
                 self._listener = None
             self._get_text = None
+            self._write = None
 
     # -----------------------------------------------------------------------
     # ClipboardGuard — public API
@@ -703,6 +758,11 @@ if sys.platform == "win32":
         def _get_protected(self) -> str | None:
             return self._protected_text
 
+        def _write_protected(self, text: str) -> None:
+            # Both layers write as the monitor window, so neither write is
+            # mistaken by Layer 1 for another application's copy.
+            self._monitor.write(text)
+
         # ------------------------------------------------------------------
         # Layer wiring (split out so tests can patch them individually)
 
@@ -716,7 +776,7 @@ if sys.platform == "win32":
 
         def _start_layer2(self) -> None:
             if self._layer2_enabled:
-                self._interceptor.start(self._get_protected)
+                self._interceptor.start(self._get_protected, self._write_protected)
 
         def _stop_layer2(self) -> None:
             if self._layer2_enabled:

@@ -221,40 +221,79 @@ class TestPasteInterceptorShortcutDetection:
 
 
 # ---------------------------------------------------------------------------
-# _ClipboardMonitorWindow — _restoring flag prevents infinite loop
+# _ClipboardMonitorWindow — its own restores must not re-trigger it
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.windows_only
-class TestClipboardMonitorWindowRestoringFlag:
-    """_on_clipboard_update ignores re-entrant calls when _restoring is True."""
+class TestClipboardMonitorOwnWrites:
+    """WM_CLIPBOARDUPDATE is *posted* for every change, the monitor's own
+    restores included (Microsoft Learn, AddClipboardFormatListener), so it
+    arrives after the restore returned.  Without recognising its own writes
+    the monitor restored its own restore until the storm guard released the
+    hold — one external copy released it within ~7 ms on real hardware."""
 
-    def test_restoring_flag_prevents_reentrance(self) -> None:
+    _HWND = 0x1234
+
+    def test_own_write_is_ignored(self) -> None:
         from press.clipboard import _ClipboardMonitorWindow  # type: ignore[attr-defined]
 
-        with patch("press.clipboard._win_set_text") as mock_set:
+        with (
+            patch("press.clipboard._win_set_text") as mock_set,
+            patch("press.clipboard._user32") as u32,
+        ):
+            u32.GetClipboardOwner.return_value = self._HWND
             monitor = _ClipboardMonitorWindow(lambda: "protected")
-            monitor._restoring = True
+            monitor._hwnd = self._HWND
             monitor._on_clipboard_update()
             mock_set.assert_not_called()
 
-    def test_not_restoring_calls_win_set_text(self) -> None:
+    def test_foreign_write_is_restored_as_the_monitor_window(self) -> None:
         from press.clipboard import _ClipboardMonitorWindow  # type: ignore[attr-defined]
 
-        with patch("press.clipboard._win_set_text") as mock_set:
+        with (
+            patch("press.clipboard._win_set_text") as mock_set,
+            patch("press.clipboard._user32") as u32,
+        ):
+            u32.GetClipboardOwner.return_value = 0x9999
             monitor = _ClipboardMonitorWindow(lambda: "protected")
-            monitor._restoring = False
+            monitor._hwnd = self._HWND
             monitor._on_clipboard_update()
-            mock_set.assert_called_once_with("protected")
+            mock_set.assert_called_once_with("protected", owner=self._HWND)
 
-    def test_restoring_flag_reset_after_update(self) -> None:
+    def test_own_writes_never_count_towards_a_storm(self) -> None:
+        from press import clipboard
         from press.clipboard import _ClipboardMonitorWindow  # type: ignore[attr-defined]
 
-        with patch("press.clipboard._win_set_text"):
+        on_storm = MagicMock()
+        with (
+            patch("press.clipboard._win_set_text"),
+            patch("press.clipboard._user32") as u32,
+        ):
+            u32.GetClipboardOwner.return_value = self._HWND
+            monitor = _ClipboardMonitorWindow(lambda: "protected", on_storm)
+            monitor._hwnd = self._HWND
+            for _ in range(clipboard._STORM_LIMIT * 3):  # type: ignore[attr-defined]
+                monitor._on_clipboard_update()
+        on_storm.assert_not_called()
+
+    def test_failed_restore_is_logged_not_raised(self, caplog: pytest.LogCaptureFixture) -> None:
+        """An exception escaping a ctypes callback is only printed to stderr
+        ("Exception ignored ...") and never reaches daemon.log."""
+        from press.clipboard import _ClipboardMonitorWindow  # type: ignore[attr-defined]
+
+        with (
+            patch(
+                "press.clipboard._win_set_text",
+                side_effect=RuntimeError("Failed to open clipboard (error 5)"),
+            ),
+            caplog.at_level("WARNING", logger="press.daemon"),
+        ):
             monitor = _ClipboardMonitorWindow(lambda: "protected")
-            monitor._restoring = False
             monitor._on_clipboard_update()
-            assert monitor._restoring is False
+
+        assert "Failed to open clipboard (error 5)" in caplog.text
+        assert "protected" not in caplog.text  # never log clipboard contents
 
 
 # ---------------------------------------------------------------------------
@@ -397,3 +436,26 @@ class TestClipboardGuardEngageFailure:
         ):
             guard.engage("secret")
         assert guard.is_active is False
+
+
+@pytest.mark.windows_only
+class TestPasteInterceptorWritesAsTheMonitor:
+    """Layer 2's pre-paste write must also be recognisable as the guard's own,
+    or every Ctrl+V would feed Layer 1 another restore."""
+
+    def test_layer2_is_armed_with_the_guards_writer(self) -> None:
+        from press.clipboard import ClipboardGuard
+
+        guard = ClipboardGuard()
+        with patch.object(guard._interceptor, "start") as start:  # type: ignore[attr-defined]
+            guard._start_layer2()  # type: ignore[attr-defined]
+        start.assert_called_once_with(guard._get_protected, guard._write_protected)  # type: ignore[attr-defined]
+
+    def test_write_protected_uses_the_monitor_window_as_owner(self) -> None:
+        from press.clipboard import ClipboardGuard
+
+        guard = ClipboardGuard()
+        guard._monitor._hwnd = 0x1234  # type: ignore[attr-defined]
+        with patch("press.clipboard._win_set_text") as mock_set:
+            guard._write_protected("protected")  # type: ignore[attr-defined]
+        mock_set.assert_called_once_with("protected", owner=0x1234)
