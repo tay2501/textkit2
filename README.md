@@ -41,6 +41,26 @@ press daemon start                   # then: Ctrl+Shift+0, release, type "up" �
 
 `press --help` lists every command; `press <command> --help` shows its options.
 
+## Diagnosing slow transforms
+
+If a transform takes seconds on a low-spec or EDR-monitored PC, turn on trace
+mode to log how long each stage takes. No daemon restart is needed — the
+running daemon picks the switch up on the next action.
+
+```bash
+press trace on                     # enable trace mode
+# reproduce the slow transform (hotkey or `press <command>`)
+press daemon logs --level debug    # per-stage timings (elapsed_ms=...)
+press trace off                    # disable when done
+```
+
+Daemon timings go to `%APPDATA%\press\daemon.log`. Without the daemon,
+`press <command>` prints its own breakdown to stderr
+(`press: trace read=… delegate=… transform=… write=…`). Clipboard contents are
+never logged — only character counts and command names. See
+[EDR / slow PCs](docs/user/edr-environments.md#step-4--still-slow-get-a-detailed-trace)
+for how to read the timings.
+
 ## Documentation
 
 | | |

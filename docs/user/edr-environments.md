@@ -96,7 +96,8 @@ specific machine:
 
 ```console
 $ press trace on
-trace ON — logs: C:\Users\you\AppData\Roaming\press\daemon.log
+press trace: ON — daemon logs: C:\Users\you\AppData\Roaming\press\daemon.log
+press trace: CLI-standalone runs will also print timing to stderr
 
 # reproduce the slow operation, e.g. via a hotkey or `press <command>`
 
