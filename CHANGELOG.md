@@ -74,6 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Reliable `GetLastError` via ctypes**: Win32 helpers now load kernel32 with `WinDLL(use_last_error=True)` and read `ctypes.get_last_error()` per the official ctypes guidance, and declare `CreateMutexW`/HANDLE return types as `c_void_p` so 64-bit handles are not truncated
 
 ### Changed
+- **Python 3.15 is fully supported, and the release `.exe` is built on it.** The 3.15 CI lane is no longer allow-failure: 3.15.0 final (2026-10-09) passed ruff, mypy and the full suite on Ubuntu and Windows, every daemon dependency ships a 3.15 Windows wheel (pywin32 312 and Pillow 12.3.0 `cp315`, psutil `abi3`, pystray/pynput pure Python), PyInstaller supports 3.15 since 6.21.0, and a 3.15 `--onedir` build was checked on real hardware (CLI transforms, daemon start/quit, a hotkey transform, pipe delegation). `release.yml` now installs 3.15 instead of 3.13; 3.13 and 3.14 stay supported
 - **`trim` / `tm` now strips both ends of each line by default** (breaking): `  a  ` → `a` instead of `  a`, on the CLI, from the hotkey, and in `press chain` / `[pipelines]` alike — a copied value with a stray leading space is the common case, and the CLI and the daemon must give the same result for the same command. The old behaviour is `press trim --trailing` / `-t` (keeps indentation, e.g. for code), or `[trim] both = false` for the hotkey. `--both` / `-b` is still accepted and is now the default
 - **Unknown command listing**: `press <typo>` now prints `unknown command 'uper', maybe you meant 'upper'?` followed by every command grouped by category, categories and commands in alphabetical order with aliases in parentheses — instead of argparse's one-line `invalid choice` dump of ~110 names and aliases in registration order. `press --help` lists commands in the same order. The suggestion uses the same `difflib` call as argparse's `suggest_on_error` (3.14+), so 3.13 behaves identically
 - **Docs reorganised into Common / CLI / Daemon.** The README is cut from ~630 to ~140 lines, the user guide gains a CLI page (`docs/user/cli.md`), every page states what it applies to, and `transforms.md` becomes one table per category
@@ -109,6 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Bug fixes**: corrected `_LAZY` omissions in `transforms/__init__.py` (missing `strip_commas`, `digits_only`); removed duplicate `except` clause; trimmed redundant docstrings
 
 ### Dependencies
+- Lock markupsafe 3.0.4 (docs group, via jinja2): 3.0.3 shipped no `cp315` Windows wheel, so `uv sync --group docs` on 3.15 had to build it from source
 - Raise the ruff floor to `>=0.16.8` and mypy to `>=2.3.1`. 0.16.3-0.16.8 fixed false positives and panics in five rule sets this project selects (`RET504` in `finally`, `DTZ901`, `ISC003`, `B031`, `SIM117`/`SIM109`); verified locally at 0.16.8 with no formatting diff and no new findings
 - Bump pynput to `>=1.8.2`
 - Bump pywin32 to `>=312`

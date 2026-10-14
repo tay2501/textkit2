@@ -5,7 +5,7 @@
 ## Requirements
 
 - Windows 11 (Windows 10 may work but is not tested)
-- Python 3.13 or 3.14 and [uv](https://docs.astral.sh/uv/) — or no Python with the release `.exe`
+- Python 3.13, 3.14 or 3.15 and [uv](https://docs.astral.sh/uv/) — or no Python with the release `.exe`
 
 ```{warning}
 press is **not published on PyPI**. `pip install press` and `uv tool install press`
