@@ -14,8 +14,13 @@ sits on the clipboard unmarked.
 from __future__ import annotations
 
 import ctypes
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from types import ModuleType
 
 _FAKE_HANDLE = 0xBEEF
 _CF_UNICODETEXT = 13
@@ -55,6 +60,9 @@ class _FakeUser32:
         self._register_ok = True
         self._sequence = 100
         self._formats: dict[str, int] = {}
+        self._open_failures = 0  # OpenClipboard fails this many times first
+        self.open_calls = 0
+        self.open_owners: list[object] = []  # hWndNewOwner per OpenClipboard
         self.set_calls: list[int] = []  # formats passed to SetClipboardData
         self.empty_calls = 0
         self.closed = 0
@@ -62,7 +70,12 @@ class _FakeUser32:
     def GetClipboardSequenceNumber(self) -> int:
         return self._sequence
 
-    def OpenClipboard(self, _hwnd: object) -> int:
+    def OpenClipboard(self, hwnd: object) -> int:
+        self.open_calls += 1
+        self.open_owners.append(hwnd)
+        if self._open_failures:
+            self._open_failures -= 1
+            return 0
         return 1
 
     def EmptyClipboard(self) -> int:
@@ -238,3 +251,86 @@ class TestWinClearFailurePath:
         with pytest.raises(RuntimeError, match="empty clipboard"):
             _win_clear()
         assert u32.closed == 1
+
+
+@pytest.fixture
+def sleeps(monkeypatch: pytest.MonkeyPatch) -> list[float]:
+    import time
+
+    recorded: list[float] = []
+    monkeypatch.setattr(time, "sleep", recorded.append)
+    return recorded
+
+
+@pytest.mark.windows_only
+class TestOpenClipboardRetry:
+    """OpenClipboard fails while another window holds the clipboard open.
+
+    WM_CLIPBOARDUPDATE arrives while the writer (or Win+V history) may still
+    hold it, so a single attempt dropped ClipboardGuard restores.  Every
+    entry point must retry a bounded number of times before giving up.
+    """
+
+    def test_transient_failure_is_retried(
+        self, fakes: tuple[_FakeUser32, _FakeKernel32], sleeps: list[float]
+    ) -> None:
+        from press import clipboard
+
+        u32, _ = fakes
+        u32._open_failures = 3
+        clipboard._win_set_text("abc")
+        assert u32.open_calls == 4
+        assert sleeps == [clipboard._OPEN_RETRY_DELAY] * 3
+        assert u32.set_calls == [_CF_UNICODETEXT]
+        assert u32.closed == 1
+
+    @pytest.mark.parametrize(
+        "call",
+        [
+            lambda c: c._win_get_text(),
+            lambda c: c._win_set_text("abc"),
+            lambda c: c._win_clear(),
+            lambda c: c._win_clear_if_unchanged(100),
+        ],
+        ids=["get", "set", "clear", "clear_if_unchanged"],
+    )
+    def test_persistent_failure_raises_after_bounded_retries(
+        self,
+        fakes: tuple[_FakeUser32, _FakeKernel32],
+        sleeps: list[float],
+        call: Callable[[ModuleType], object],
+    ) -> None:
+        from press import clipboard
+
+        u32, _ = fakes
+        u32._open_failures = 10_000
+        with pytest.raises(RuntimeError, match="Failed to open clipboard"):
+            call(clipboard)
+        assert u32.open_calls == clipboard._OPEN_RETRIES
+        assert len(sleeps) == clipboard._OPEN_RETRIES - 1  # no sleep after the last try
+        assert u32.closed == 0  # never close a clipboard we did not open
+
+
+@pytest.mark.windows_only
+class TestClipboardOwner:
+    """The guard writes as its monitor window so its own WM_CLIPBOARDUPDATE
+    can be recognised by GetClipboardOwner; other writers stay ownerless."""
+
+    def test_default_write_has_no_owner_window(
+        self, fakes: tuple[_FakeUser32, _FakeKernel32]
+    ) -> None:
+        from press.clipboard import _win_set_text
+
+        u32, _ = fakes
+        _win_set_text("abc")
+        assert u32.open_owners == [None]
+
+    def test_owner_is_passed_to_open_clipboard(
+        self, fakes: tuple[_FakeUser32, _FakeKernel32], sleeps: list[float]
+    ) -> None:
+        from press.clipboard import _win_set_text
+
+        u32, _ = fakes
+        u32._open_failures = 1
+        _win_set_text("abc", owner=0x42)
+        assert u32.open_owners == [0x42, 0x42]  # the retry keeps the owner

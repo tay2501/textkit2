@@ -40,23 +40,35 @@ Resolution rules, editing keys, bindings, and `type`: {doc}`hotkeys`.
 
 ## ClipboardGuard (`h`,`o`)
 
-`Ctrl+Shift+0`, then `h`,`o` makes the clipboard effectively read-only until
-you paste. The tray icon turns red; repeat the sequence to release early.
+`Ctrl+Shift+0`, then `h`,`o` is a toggle: the first press makes the clipboard
+effectively read-only and turns the tray icon red; the same sequence again
+releases it. In between, every copy by another application is undone and you
+can paste the held text as often as you like — pasting, copying and time
+passing never release the guard.
 
 ```text
 press genpass                 # password → clipboard
-Ctrl+Shift+0, then h o        # guard on
+Ctrl+Shift+0, then h o        # guard on  (tray icon red)
 <switch to the login form>
-Ctrl+V                        # paste — the guard releases itself
+Ctrl+V                        # paste — the guard stays on
+Ctrl+Shift+0, then h o        # guard off (tray icon back to normal)
 ```
+
+The guard also ends when the daemon exits, and it stands down on its own —
+with a tray notification — if another resident tool (a clipboard history
+manager, a sync agent) keeps rewriting the clipboard: more than 15 restores in
+3 seconds means two tools are fighting, and press gives way rather than loop.
 
 | Layer | Mechanism | Config (`[hold]`) |
 |---|---|---|
-| 1 | A hidden window watches `WM_CLIPBOARDUPDATE` and restores the held text after any external write (< 1 ms) | `monitor_clipboard` |
-| 2 | A `WH_KEYBOARD_LL` hook catches `Ctrl+V` / `Shift+Insert` before the target app reads the clipboard | `intercept_paste_keys` |
+| 1 | A hidden window watches `WM_CLIPBOARDUPDATE` and restores the held text after any external write (< 1 ms). It writes as the clipboard owner, so its own restores are recognised and not restored again | `monitor_clipboard` |
+| 2 | A `WH_KEYBOARD_LL` hook catches `Ctrl+V` / `Shift+Insert` and puts the held text back before the target app reads the clipboard | `intercept_paste_keys` |
 
 Windows has no exclusive clipboard lock, so this is near-absolute rather than
-absolute. It is separate from the CLI's file-based `press hold` ({doc}`cli`).
+absolute: an application can still read the other copy in the instant before
+the restore, and a restore that cannot open the clipboard even after retrying
+for ~0.1 s is skipped and recorded in `daemon.log`. It is separate from the
+CLI's file-based `press hold` ({doc}`cli`).
 
 ## Undo
 
