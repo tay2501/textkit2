@@ -1,7 +1,7 @@
 # Custom Dictionary
 
 > **Applies to:** both — `press dict` on the CLI ({doc}`cli`) and
-> `Ctrl+Shift+0`, then `d`,`i`,`c`,`t` / `Shift+D` (reverse) from the daemon.
+> `Ctrl+Alt+K`, then `d`,`i`,`c`,`t` / `Shift+D` (reverse) from the daemon.
 
 Use a TSV dictionary when there is **no rule** linking source and target names
 (system codes vs. document names, for example). Each input line is looked up

@@ -31,6 +31,9 @@ class TestToPynputHotkey:
             ("ctrl+shift+0", "<ctrl>+<shift>+0"),
             ("alt+f4", "<alt>+<f4>"),
             ("win+l", "<win>+l"),
+            ("ctrl+alt+space", "<ctrl>+<alt>+<space>"),
+            ("ctrl+shift+tab", "<ctrl>+<shift>+<tab>"),
+            ("CTRL+ALT+Space", "<ctrl>+<alt>+<space>"),
         ],
     )
     def test_conversion(self, press_spec: str, expected: str) -> None:

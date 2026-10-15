@@ -25,14 +25,14 @@ needed after editing a TSV file.
 
 ## Hotkeys
 
-Press `Ctrl+Shift+0` together, release, then type the command name or alias you
+Press `Ctrl+Alt+K` together, release, then type the command name or alias you
 would type on the CLI:
 
 ```text
-Ctrl+Shift+0, then t m      →  trim
-Ctrl+Shift+0, then h a l    →  halfwidth
-Ctrl+Shift+0, then Shift+D  →  reverse dictionary lookup
-Ctrl+Shift+0, then Shift+Z  →  undo the last hotkey transform
+Ctrl+Alt+K, then t m      →  trim
+Ctrl+Alt+K, then h a l    →  halfwidth
+Ctrl+Alt+K, then Shift+D  →  reverse dictionary lookup
+Ctrl+Alt+K, then Shift+Z  →  undo the last hotkey transform
 ```
 
 The command reads the clipboard and writes the result back; paste with `Ctrl+V`.
@@ -40,7 +40,7 @@ Resolution rules, editing keys, bindings, and `type`: {doc}`hotkeys`.
 
 ## ClipboardGuard (`h`,`o`)
 
-`Ctrl+Shift+0`, then `h`,`o` is a toggle: the first press makes the clipboard
+`Ctrl+Alt+K`, then `h`,`o` is a toggle: the first press makes the clipboard
 effectively read-only and turns the tray icon red; the same sequence again
 releases it. In between, every copy by another application is undone and you
 can paste the held text as often as you like — pasting, copying and time
@@ -48,10 +48,10 @@ passing never release the guard.
 
 ```text
 press genpass                 # password → clipboard
-Ctrl+Shift+0, then h o        # guard on  (tray icon red)
+Ctrl+Alt+K, then h o        # guard on  (tray icon red)
 <switch to the login form>
 Ctrl+V                        # paste — the guard stays on
-Ctrl+Shift+0, then h o        # guard off (tray icon back to normal)
+Ctrl+Alt+K, then h o        # guard off (tray icon back to normal)
 ```
 
 The guard also ends when the daemon exits, and it stands down on its own —

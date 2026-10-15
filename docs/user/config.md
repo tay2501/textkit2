@@ -16,7 +16,7 @@ Use `press config validate` to check the file and `press config reset` to restor
 schema_version = 1
 
 [hotkeys]
-prefix = "ctrl+shift+0"
+prefix = "ctrl+alt+k"
 
 [hotkeys.bindings]
 "shift+d" = "dict_reverse"
@@ -57,7 +57,7 @@ cleanup = ["trim", "dedupe", "lf"]
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `prefix` | string | `"ctrl+shift+0"` | Prefix key in pynput notation |
+| `prefix` | string | `"ctrl+alt+k"` | Prefix key in pynput notation |
 
 ### `[hotkeys.bindings]` *(daemon)*
 
@@ -66,7 +66,7 @@ case-insensitive; use `"shift+x"` syntax for shifted keys. User-defined entries
 are **merged with** the defaults — only specify what you want to add or change.
 
 Bindings are optional. After the prefix you can always **type a command name or
-alias** instead (`Ctrl+Shift+0`, then `t`, `m` runs trim, exactly like
+alias** instead (`Ctrl+Alt+K`, then `t`, `m` runs trim, exactly like
 `press tm`), so only two bindings ship by default: `shift+d` for `dict_reverse`
 (no CLI name to type) and `shift+z` for `undo` (a panic key).
 
@@ -92,7 +92,7 @@ Options applied when `sql-in` is dispatched via hotkey (the CLI uses its own fla
 ### `[trim]` *(daemon)*
 
 Options applied when `trim` is dispatched via hotkey (the CLI uses `--trailing`).
-The default matches the CLI, so `press tm` and `Ctrl+Shift+0`, `t`,`m` give
+The default matches the CLI, so `press tm` and `Ctrl+Alt+K`, `t`,`m` give
 the same result.
 
 | Key | Type | Default | Description |

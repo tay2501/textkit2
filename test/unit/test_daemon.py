@@ -33,12 +33,22 @@ class TestToPynputHotkey:
             ("f12", "<f12>"),
             ("shift+u", "<shift>+u"),
             ("ctrl+shift+f1", "<ctrl>+<shift>+<f1>"),
+            ("ctrl+alt+space", "<ctrl>+<alt>+<space>"),
         ],
     )
     def test_conversion(self, press_spec: str, expected: str) -> None:
         from press.daemon._hotkeys import _to_pynput_hotkey
 
         assert _to_pynput_hotkey(press_spec) == expected
+
+    def test_default_prefix_parses_in_pynput(self) -> None:
+        """The shipped default must be a spec pynput accepts, or the daemon cannot start."""
+        from pynput.keyboard import HotKey
+
+        from press.config import HotkeysConfig
+        from press.daemon._hotkeys import _to_pynput_hotkey
+
+        HotKey.parse(_to_pynput_hotkey(HotkeysConfig().prefix))
 
 
 # ---------------------------------------------------------------------------

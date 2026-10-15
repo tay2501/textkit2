@@ -40,7 +40,7 @@ class TestDefaultConfigWhenFileNotFound:
         assert isinstance(config.ui, UiConfig)
 
         # Spot-check defaults
-        assert config.hotkeys.prefix == "ctrl+shift+0"
+        assert config.hotkeys.prefix == "ctrl+alt+k"
         assert config.sql_in.quote_char == "'"
         assert config.sql_in.wrap is False
         assert config.trim.both is True
@@ -111,7 +111,7 @@ class TestPartialConfigSqlInOnly:
         assert config.sql_in.wrap is True
 
         # Sections not in file remain at defaults
-        assert config.hotkeys.prefix == "ctrl+shift+0"
+        assert config.hotkeys.prefix == "ctrl+alt+k"
         assert config.ui.startup_notification is True
 
 
@@ -206,7 +206,7 @@ class TestLoadConfigDefaultPath:
         monkeypatch.setenv("APPDATA", str(fake_appdata))
         config = load_config(path=None)
         assert isinstance(config, PressConfig)
-        assert config.hotkeys.prefix == "ctrl+shift+0"
+        assert config.hotkeys.prefix == "ctrl+alt+k"
 
 
 class TestBindingsMerge:
@@ -662,7 +662,7 @@ class TestConfigReset:
         )
         config_reset(cfg_file, key="hotkeys")
         reloaded = load_config(cfg_file)
-        assert reloaded.hotkeys.prefix == "ctrl+shift+0"  # reset
+        assert reloaded.hotkeys.prefix == "ctrl+alt+k"  # reset
         assert reloaded.sql_in.wrap is True  # other section untouched
 
     def test_partial_reset_key_sql_in(self, tmp_path: Path) -> None:

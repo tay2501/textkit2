@@ -29,9 +29,6 @@ _LEADER_HARD_LIMIT = 10.0
 # so a wedged pynput thread cannot stall the worker queue forever.
 _STOP_TIMEOUT = 1.0
 
-# Token set for _to_pynput_hotkey: these need angle-bracket wrapping
-_MODIFIER_TOKENS = frozenset({"ctrl", "shift", "alt", "cmd", "win", "meta"})
-
 # pynput names of the non-shift modifiers.  A low-level hook reports the sided
 # virtual keys, so pynput hands back ``ctrl_l`` rather than ``ctrl``.
 _IGNORED_MODIFIERS = frozenset(
@@ -45,18 +42,16 @@ def _to_pynput_hotkey(press_spec: str) -> str:
     Example::
 
         _to_pynput_hotkey("ctrl+shift+f10")  # "<ctrl>+<shift>+<f10>"
-        _to_pynput_hotkey("ctrl+a")           # "<ctrl>+a"
+        _to_pynput_hotkey("ctrl+alt+space")  # "<ctrl>+<alt>+<space>"
+        _to_pynput_hotkey("ctrl+a")          # "<ctrl>+a"
 
-    Single printable characters are left unbracketed; modifiers and function
-    keys are wrapped in ``<>``.
+    Single characters are left unbracketed; every named key (modifiers,
+    function keys, ``space``, ``tab`` ...) is wrapped in ``<>``.  pynput's
+    ``HotKey.parse`` rejects a bare ``space`` with ``ValueError``.
     """
-    parts: list[str] = []
-    for token in press_spec.lower().split("+"):
-        if token in _MODIFIER_TOKENS or (token.startswith("f") and token[1:].isdigit()):
-            parts.append(f"<{token}>")
-        else:
-            parts.append(token)
-    return "+".join(parts)
+    return "+".join(
+        token if len(token) == 1 else f"<{token}>" for token in press_spec.lower().split("+")
+    )
 
 
 # ---------------------------------------------------------------------------
