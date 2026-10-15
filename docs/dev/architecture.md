@@ -124,7 +124,7 @@ Adding either kind of command:
 
 ```
 [IDLE]
-  │  prefix chord pressed simultaneously (default: Ctrl+Shift+0)
+  │  prefix chord pressed simultaneously (default: Ctrl+Alt+Space)
   ▼
 [TYPING]  ─── 2 s inactivity, Esc, or 10 s hard limit ──→ [IDLE]
   │  keys accumulate: a [hotkeys.bindings] entry on the first key,

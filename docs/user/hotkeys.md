@@ -6,16 +6,16 @@ The daemon uses a **prefix key**, like Emacs or tmux.
 
 **Two steps:**
 
-1. Press the **prefix chord** simultaneously (default: `Ctrl+Shift+0`)
+1. Press the **prefix chord** simultaneously (default: `Ctrl+Alt+Space`)
 2. Release all keys, then **type the command name** — the same name or alias
    you would type on the command line
 
 ```text
-Ctrl+Shift+0   then   t m     →  trim        (press tm)
-Ctrl+Shift+0   then   u p     →  upper       (press up)
-Ctrl+Shift+0   then   h a l   →  halfwidth
-Ctrl+Shift+0   then   h o     →  hold
-Ctrl+Shift+0   then   t y     →  type        (see below)
+Ctrl+Alt+Space   then   t m     →  trim        (press tm)
+Ctrl+Alt+Space   then   u p     →  upper       (press up)
+Ctrl+Alt+Space   then   h a l   →  halfwidth
+Ctrl+Alt+Space   then   h o     →  hold
+Ctrl+Alt+Space   then   t y     →  type        (see below)
 ```
 
 There is no table of key assignments to memorise: **if the CLI accepts the
@@ -66,14 +66,14 @@ cleanup = ["trim", "dedupe", "lf"]
 ```
 
 ```text
-Ctrl+Shift+0   then   c l e a n    →  runs the whole pipeline
+Ctrl+Alt+Space   then   c l e a n    →  runs the whole pipeline
 ```
 
 A pipeline cannot shadow a built-in name: if both exist, the command wins.
 
 ## `type` — paste by typing instead of by `Ctrl+V`
 
-`Ctrl+Shift+0` then `t`,`y` types the clipboard into the focused window one
+`Ctrl+Alt+Space` then `t`,`y` types the clipboard into the focused window one
 character at a time. It exists for the case where `Ctrl+V` stalls: a paste
 makes the *foreground* application read the clipboard and parse every rich
 format on it, so a slow read freezes the window you are looking at. `type`
@@ -134,10 +134,10 @@ Add your own in `%APPDATA%\press\config.toml`:
 
 ```toml
 [hotkeys]
-prefix = "ctrl+shift+0"   # change the prefix chord
+prefix = "ctrl+alt+space" # change the prefix chord
 
 [hotkeys.bindings]
-"shift+w" = "halfwidth"   # Ctrl+Shift+0, then Shift+W
+"shift+w" = "halfwidth"   # Ctrl+Alt+Space, then Shift+W
 "shift+x" = "cleanup"     # a pipeline works too
 ```
 
@@ -163,5 +163,14 @@ shadows a sequence:
 - Keys typed after the prefix are **consumed, not delivered** until a command
   fires. After an accidental prefix, press `Esc`; otherwise the sequence ends
   after **2 s** without a key or **10 s** in total.
+- The prefix chord still **reaches the focused application**. The VS Code
+  extension Continue binds `Ctrl+Alt+Space` to "force autocomplete" (only
+  while no text is selected), so a suggestion popup may appear there. Remove
+  that binding in VS Code's Keyboard Shortcuts, or choose another `prefix`.
+- The default prefix was `Ctrl+Shift+0` before this release. It was changed
+  because Windows can claim `Ctrl+Shift+0` as an input-language switch key.
+  To keep the old chord, set `prefix = "ctrl+shift+0"` under `[hotkeys]`. A
+  `config.toml` written by `press config reset` already contains the old
+  value and keeps using it until you edit it.
 
 Configuration keys: {doc}`config`.

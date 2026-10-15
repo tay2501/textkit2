@@ -65,7 +65,7 @@ _DEFAULT_BINDINGS: dict[str, str] = {
 class HotkeysConfig:
     """Hotkey prefix and key-to-command binding map."""
 
-    prefix: str = "ctrl+shift+0"
+    prefix: str = "ctrl+alt+space"
     bindings: dict[str, str] = field(default_factory=lambda: dict(_DEFAULT_BINDINGS))
 
 

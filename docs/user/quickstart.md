@@ -23,7 +23,7 @@ More: {doc}`cli` and {doc}`transforms`.
 press daemon start
 ```
 
-Copy some text, press **Ctrl+Shift+0** together, release, then type
+Copy some text, press **Ctrl+Alt+Space** together, release, then type
 **`h`,`a`,`l`** — `halfwidth` runs on the clipboard. Paste with `Ctrl+V`.
 
 Any command name or alias the CLI accepts works the same way. More:
@@ -37,5 +37,5 @@ Create `%APPDATA%\press\dict\default.tsv` (tab-separated):
 FOOBER01	TABLE_HOGEHOGE
 ```
 
-Then `press dict -C` (CLI) or `Ctrl+Shift+0`, then `Shift+D` for the reverse
+Then `press dict -C` (CLI) or `Ctrl+Alt+Space`, then `Shift+D` for the reverse
 lookup (daemon). See {doc}`dictionary`.
