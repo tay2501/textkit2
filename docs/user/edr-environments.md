@@ -46,7 +46,7 @@ toll per process launch and per file open; the daemon pays it once:
 $ press daemon start
 ```
 
-Then use hotkeys (`Ctrl+Alt+Space`, then type the command name) for transforms.
+Then use hotkeys (`Ctrl+Alt+K`, then type the command name) for transforms.
 
 While the daemon runs, `press <command>` also gets faster automatically: the
 CLI hands the text to the daemon over a local named pipe instead of importing

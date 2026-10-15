@@ -36,7 +36,7 @@ echo "my_variable" | press camel     # → myVariable
 press chain trim dedupe lf -C        # several transforms in one pass
 press undo                           # put back what the last -C overwrote
 
-press daemon start                   # then: Ctrl+Alt+Space, release, type "up" → upper
+press daemon start                   # then: Ctrl+Alt+K, release, type "up" → upper
 ```
 
 `press --help` lists every command; `press <command> --help` shows its options.

@@ -1,7 +1,7 @@
 # Transforms Reference
 
 > **Applies to:** CLI **and** daemon. Every command below runs as
-> `press <name>` and as `Ctrl+Alt+Space`, then the name (see {doc}`hotkeys`).
+> `press <name>` and as `Ctrl+Alt+K`, then the name (see {doc}`hotkeys`).
 > From a hotkey, options come from `config.toml` (`[sql_in]`, `[trim]`) or the
 > defaults; CLI flags are shown in the *Options* column. Input/output flags
 > (`-c`, `-C`, …) are described in {doc}`cli`.
