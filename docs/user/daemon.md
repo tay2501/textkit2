@@ -75,6 +75,13 @@ CLI's file-based `press hold` ({doc}`cli`).
 Hotkey transforms keep their own in-memory undo slot (`Shift+Z`), separate from
 the CLI's `undo.txt`. Sensitive-marked clipboard content is never kept.
 
+## Notifications
+
+Errors only by default — including a typed sequence that ran nothing, which
+names the commands it could have been. Mute them before a screen share with
+`Ctrl+Alt+K`, then `Shift+M` (or `press notify off`); repeating it keeps them
+off. Details: {doc}`hotkeys`.
+
 ## CLI delegation
 
 While the daemon runs, `press <transform>` in a terminal is sent to it over a

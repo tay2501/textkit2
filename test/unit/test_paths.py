@@ -20,3 +20,10 @@ class TestTracePath:
         from press._paths import press_dir, trace_path
 
         assert trace_path() == press_dir() / "trace"
+
+
+class TestNotifyOffPath:
+    def test_is_a_marker_in_press_dir(self) -> None:
+        from press._paths import notify_off_path, press_dir
+
+        assert notify_off_path() == press_dir() / "notify-off"

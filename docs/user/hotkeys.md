@@ -120,14 +120,55 @@ than typing `Ctrl+Enter` where you meant `Enter`. Let go of the prefix chord.
 - **`chain`** needs a pipeline name as an argument — and pipeline names are
   already typeable directly (see above).
 
+## When a sequence runs nothing
+
+If the keys you typed still fit more than one command when you stop, nothing
+runs — `h`,`a` could be `halfwidth` or `hash`. After 2 s (or `Enter`) a
+notification says what was possible and how to reach each one:
+
+```text
+ha → halfwidth (hal / hw), hash (has / hs)
+```
+
+The first sequence continues what you typed; the second is the shortest
+overall. A name that matches nothing reads `tq → no command starts with this`.
+Both are also written to `daemon.log` (`press daemon logs`), so a missed
+notification can be looked up. `Esc`, or a prefix with nothing typed after it,
+cancels silently.
+
+## Notifications and screen sharing
+
+Tray notifications show errors only by default (`notify_level = "error"`).
+To keep them off a shared screen, switch them off — from the daemon or a
+terminal:
+
+```text
+Ctrl+Alt+K   then   Shift+M       →  notifications OFF
+Ctrl+Alt+K   then   m u           →  notifications OFF (mute)
+Ctrl+Alt+K   then   u n m         →  notifications ON  (unmute)
+
+press notify off | on | status
+```
+
+**Off and on are separate commands, not a toggle**: pressing `Shift+M` again
+in a hurry keeps notifications off. Turning them back on shows one
+"notifications on" confirmation. The switch takes effect immediately, survives
+a daemon restart, and is shared by the CLI and the hotkeys.
+
+press also stays quiet on its own while Windows reports that an application
+should not interrupt — a slideshow, a full-screen application, or Windows'
+presentation settings. Sharing a window in Teams or Zoom usually does **not**
+put Windows in that state, so use the switch before a meeting.
+
 ## Single-key bindings
 
 `[hotkeys.bindings]` still assigns one keystroke to a command, which is faster
-than typing a name for the handful you use constantly. Two defaults ship:
+than typing a name for the handful you use constantly. Three defaults ship:
 
 | Key after prefix | Command | Why a binding |
 |---|---|---|
 | `Shift+D` | dict_reverse | reverse lookup has no CLI name to type |
+| `Shift+M` | notify-off | a screen share can start without warning |
 | `Shift+Z` | undo | a panic key deserves a single stroke |
 
 Add your own in `%APPDATA%\press\config.toml`:

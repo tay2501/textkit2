@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-pytestmark = pytest.mark.windows_only
+pytestmark = [pytest.mark.windows_only, pytest.mark.usefixtures("notifications_open")]
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -276,6 +276,111 @@ class TestCommandDispatcherNotifyLevel:
             d2.set_icon(mock_icon2)
             d2.dispatch("halfwidth")
             assert mock_icon2.notify.call_count == 1
+
+
+class TestNotificationSwitch:
+    """``notify-off`` / ``notify-on`` from a hotkey, and the gate in front of every toast."""
+
+    @staticmethod
+    def _dispatcher(level: str = "error") -> tuple[Any, MagicMock]:
+        from press.config import PressConfig, UiConfig
+        from press.daemon import CommandDispatcher
+
+        d = CommandDispatcher(PressConfig(ui=UiConfig(notify_level=level)))
+        icon = MagicMock()
+        d.set_icon(icon)
+        return d, icon
+
+    def test_notify_off_silences_errors(self) -> None:
+        from press._notify import notifications_enabled
+
+        d, icon = self._dispatcher()
+        d.dispatch("notify-off")
+        assert notifications_enabled() is False
+        with patch("press.clipboard.get_clipboard_text", side_effect=OSError("boom")):
+            d.dispatch("halfwidth")
+        icon.notify.assert_not_called()
+
+    def test_repeated_notify_off_stays_off(self) -> None:
+        from press._notify import notifications_enabled
+
+        d, icon = self._dispatcher()
+        for _ in range(3):
+            d.dispatch("notify-off")
+        assert notifications_enabled() is False
+        icon.notify.assert_not_called()
+
+    def test_notify_on_restores_and_confirms_once(self) -> None:
+        from press._notify import notifications_enabled
+
+        d, icon = self._dispatcher()
+        d.dispatch("notify-off")
+        d.dispatch("notify-on")
+        assert notifications_enabled() is True
+        icon.notify.assert_called_once()
+        assert "on" in icon.notify.call_args.args[0]
+
+    def test_notify_on_confirmation_respects_level_off(self) -> None:
+        d, icon = self._dispatcher(level="off")
+        d.dispatch("notify-on")
+        icon.notify.assert_not_called()
+
+    def test_windows_busy_state_blocks_the_toast(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import press.daemon._notifications as gate
+
+        monkeypatch.setattr(gate, "windows_accepts_notifications", lambda: False)
+        d, icon = self._dispatcher()
+        with patch("press.clipboard.get_clipboard_text", side_effect=OSError("boom")):
+            d.dispatch("halfwidth")
+        icon.notify.assert_not_called()
+
+    def test_startup_notice_goes_through_the_gate(self) -> None:
+        d, icon = self._dispatcher()
+        d.notify_startup()
+        icon.notify.assert_called_once()
+        icon.notify.reset_mock()
+        d.dispatch("notify-off")
+        d.notify_startup()
+        icon.notify.assert_not_called()
+
+
+class TestWorkerUnresolvedSequence:
+    """A sequence that resolves to nothing tells the user why, and logs it."""
+
+    @staticmethod
+    def _run(item: tuple[str, ...]) -> MagicMock:
+        from press.config import PressConfig
+        from press.daemon import HotkeyManager
+        from press.daemon._hotkeys import _WorkerThread
+
+        config = PressConfig()
+        work_queue: queue.Queue[tuple[str, ...]] = queue.Queue()
+        dispatcher = MagicMock()
+        hm = HotkeyManager(config.hotkeys, work_queue)
+        work_queue.put(item)
+        work_queue.put(("stop",))
+        _WorkerThread(work_queue, dispatcher, hm).run()
+        return dispatcher
+
+    def test_ambiguous_names_the_candidates(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level("INFO", logger="press.daemon"):
+            dispatcher = self._run(("ambiguous", "ha"))
+        dispatcher.notify_error.assert_called_once_with(
+            "hotkey", "ha → halfwidth (hal / hw), hash (has / hs)"
+        )
+        assert "ha → halfwidth" in caplog.text
+
+    def test_unknown_says_nothing_matches(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level("INFO", logger="press.daemon"):
+            dispatcher = self._run(("unknown_key", "tq"))
+        dispatcher.notify_error.assert_called_once_with(
+            "hotkey", "tq → no command starts with this"
+        )
+        assert "tq → no command" in caplog.text
+
+    def test_plain_timeout_stays_silent(self) -> None:
+        dispatcher = self._run(("timeout",))
+        dispatcher.notify_error.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

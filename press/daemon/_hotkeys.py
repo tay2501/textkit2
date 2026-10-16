@@ -86,7 +86,7 @@ class LeaderKeyListener:
     keyboard matters more than running a command the user may have forgotten.
 
     Results are enqueued: ``("dispatch", command)``, ``("unknown_key",
-    sequence)``, or ``("timeout",)``.
+    sequence)``, ``("ambiguous", sequence)``, or ``("timeout",)``.
 
     Args:
         bindings: Mapping of first-key specs (e.g. ``"w"``, ``"shift+u"``)
@@ -240,6 +240,11 @@ class HotkeyManager:
         self._leader_active = False
         self._lock = threading.Lock()
 
+    @property
+    def candidates(self) -> dict[str, str]:
+        """Typeable sequence → command map the leader resolves against."""
+        return self._candidates
+
     def start(self) -> None:
         """Start the GlobalHotKeys listener in a background daemon thread."""
         self._leader = LeaderKeyListener(self._config.bindings, self._candidates, self._queue)
@@ -309,11 +314,24 @@ class _WorkerThread(threading.Thread):
                     self._dispatcher.dispatch(str(command))
                 case ("timeout",):
                     self._hm.reset_leader()
-                case ("unknown_key", key):
+                case ("ambiguous" | "unknown_key", sequence):
                     self._hm.reset_leader()
-                    self._dispatcher.notify_error("hotkey", f"no binding for: {key!r}")
+                    self._report_unresolved(str(sequence))
                 case ("stop",):
                     break
                 case _:
                     pass
             self._queue.task_done()
+
+    def _report_unresolved(self, sequence: str) -> None:
+        """Say why a typed sequence ran nothing, in the log and as a notification.
+
+        The log line survives a muted or missed notification.  It carries the
+        keys typed after the prefix and command names only — no clipboard text.
+        """
+        from press.daemon._logs import _log
+        from press.daemon._sequence import describe_unresolved
+
+        message = describe_unresolved(sequence, self._hm.candidates)
+        _log.info("hotkey: %s", message)
+        self._dispatcher.notify_error("hotkey", message)

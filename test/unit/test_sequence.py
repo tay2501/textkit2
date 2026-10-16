@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 
 from press.commands import hotkey_sequence_candidates
-from press.daemon._sequence import KeySuppression, SequenceResolver
+from press.daemon._sequence import KeySuppression, SequenceResolver, describe_unresolved
 
 
 def _resolver(bindings: dict[str, str] | None = None) -> SequenceResolver:
@@ -79,18 +79,67 @@ class TestSequenceResolution:
         _type(resolver, "cr")
         assert resolver.confirm() == ("dispatch", "cr")
 
-    def test_timeout_without_pending_is_plain_timeout(self) -> None:
+    def test_timeout_on_an_ambiguous_buffer_reports_it(self) -> None:
+        """``ha`` (halfwidth / hash) must not be cancelled without a word."""
         resolver = _resolver()
-        resolver.press("t")  # ambiguous, no exact match
-        assert resolver.on_timeout() == ("timeout",)
+        _type(resolver, "ha")
+        assert resolver.on_timeout() == ("ambiguous", "ha")
+
+    def test_timeout_with_nothing_typed_is_plain_timeout(self) -> None:
+        """An accidental prefix press stays silent."""
+        assert _resolver().on_timeout() == ("timeout",)
 
     def test_unreachable_sequence_reports_unknown(self) -> None:
         assert _type(_resolver(), "tq") == ("unknown_key", "tq")
 
-    def test_confirm_on_unknown_buffer_reports_it(self) -> None:
+    def test_confirm_on_an_ambiguous_buffer_reports_it(self) -> None:
         resolver = _resolver()
         resolver.press("t")
-        assert resolver.confirm() == ("unknown_key", "t")
+        assert resolver.confirm() == ("ambiguous", "t")
+
+    def test_confirm_with_nothing_typed_is_plain_timeout(self) -> None:
+        """Enter straight after the prefix cancels like Esc, not as an error."""
+        assert _resolver().confirm() == ("timeout",)
+
+    @pytest.mark.parametrize(
+        ("typed", "expected"),
+        [
+            ("mu", "notify-off"),  # mute — two keys
+            ("unm", "notify-on"),  # unmute — un… is shared with unicode/unix/undo
+        ],
+    )
+    def test_notification_switches_are_typeable(self, typed: str, expected: str) -> None:
+        assert _type(_resolver(), typed) == ("dispatch", expected)
+
+
+class TestDescribeUnresolved:
+    """The notification text for a sequence that resolved to no command."""
+
+    def test_ambiguous_lists_each_command_with_how_to_reach_it(self) -> None:
+        """Continuation of what was typed first, then the global shortest."""
+        assert describe_unresolved("ha", hotkey_sequence_candidates()) == (
+            "ha → halfwidth (hal / hw), hash (has / hs)"
+        )
+
+    def test_continuation_alone_when_it_is_already_the_shortest(self) -> None:
+        candidates = {"abc": "ABC", "abd": "ABD"}
+        assert describe_unresolved("ab", candidates) == "ab → ABC (abc), ABD (abd)"
+
+    def test_exact_match_needing_enter_says_so(self) -> None:
+        """``cr`` never resolves by typing alone — ``crlf`` extends it."""
+        candidates = {"cr": "cr", "crlf": "crlf"}
+        assert describe_unresolved("c", candidates) == "c → cr (cr+Enter), crlf (crl)"
+
+    def test_long_candidate_lists_are_truncated(self) -> None:
+        candidates = {f"a{c}": c.upper() for c in "bcdefg"}
+        assert describe_unresolved("a", candidates) == (
+            "a → B (ab), C (ac), D (ad), E (ae), … +2 more"
+        )
+
+    def test_unknown_sequence(self) -> None:
+        assert describe_unresolved("tq", hotkey_sequence_candidates()) == (
+            "tq → no command starts with this"
+        )
 
 
 class TestEditingKeys:

@@ -19,7 +19,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-__all__ = ["appdata_dir", "press_dir", "trace_path"]
+__all__ = ["appdata_dir", "notify_off_path", "press_dir", "trace_path"]
 
 
 def appdata_dir() -> Path:
@@ -41,3 +41,14 @@ def trace_path() -> Path:
     standalone trace output (:mod:`press.__main__`).
     """
     return press_dir() / "trace"
+
+
+def notify_off_path() -> Path:
+    """Return the notification switch marker path (``%APPDATA%\\press\\notify-off``).
+
+    Same marker-file pattern as :func:`trace_path`, inverted: the file existing
+    means tray notifications are OFF.  Written by ``press notify off`` and the
+    ``notify-off`` hotkey (:mod:`press._notify`), read by the daemon before
+    every notification (:mod:`press.daemon._notifications`).
+    """
+    return press_dir() / "notify-off"

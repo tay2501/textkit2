@@ -313,7 +313,16 @@ class TestSpecialCommandsRegistry:
         # dispatch() intercepts these before the transform path; transform()
         # handles the dictionary pair.  Kept explicit so that adding a row with
         # hotkey=True without wiring the dispatcher fails here, not at runtime.
-        wired = {"clear", "hold", "undo", "type", "dict", "dict_reverse"}
+        wired = {
+            "clear",
+            "hold",
+            "undo",
+            "type",
+            "dict",
+            "dict_reverse",
+            "notify-off",
+            "notify-on",
+        }
         assert wired == set(DAEMON_SPECIAL_COMMANDS)
 
     def test_cli_only_commands_are_not_hotkey_dispatchable(self) -> None:
