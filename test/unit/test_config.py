@@ -46,6 +46,10 @@ class TestDefaultConfigWhenFileNotFound:
         assert config.trim.both is True
         assert config.ui.startup_notification is True
         assert config.ui.hold_icon is True
+        # Errors only: a mistyped hotkey sequence must say so, a success stays quiet.
+        assert config.ui.notify_level == "error"
+        # One-stroke mute for an unexpected screen share.
+        assert config.hotkeys.bindings["shift+m"] == "notify-off"
 
 
 class TestFullConfig:
@@ -251,6 +255,12 @@ class TestBindingsMerge:
 
         assert config.hotkeys.bindings["shift+z"] == "undo"
         assert config.hotkeys.bindings["shift+d"] == "dict_reverse"
+
+    def test_unknown_notify_level_falls_back_to_the_default(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text('[ui]\nnotify_level = "loud"\n', encoding="utf-8")
+
+        assert load_config(cfg_file).ui.notify_level == UiConfig().notify_level
 
 
 # ---------------------------------------------------------------------------

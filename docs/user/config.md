@@ -35,7 +35,7 @@ files = ["%APPDATA%/press/dict/default.tsv"]
 [ui]
 startup_notification = true
 hold_icon            = true
-notify_level         = "off"
+notify_level         = "error"
 
 [hold]
 monitor_clipboard    = true
@@ -116,7 +116,7 @@ the same result.
 |---|---|---|---|
 | `startup_notification` | bool | `true` | Show tray notification on daemon start |
 | `hold_icon` | bool | `true` | Change tray icon when HOLD is active |
-| `notify_level` | string | `"off"` | Tray notification verbosity: `"off"`, `"success"`, `"error"`, or `"all"` |
+| `notify_level` | string | `"error"` | Tray notification verbosity: `"off"`, `"success"`, `"error"`, or `"all"`. Errors include a hotkey sequence that ran nothing. To mute temporarily (screen sharing) use `press notify off` instead — see {doc}`hotkeys` |
 
 ### `[hold]` *(daemon)*
 

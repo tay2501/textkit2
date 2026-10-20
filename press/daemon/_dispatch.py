@@ -56,8 +56,9 @@ class CommandDispatcher:
         refresh_level()
 
         try:
-            # The four cases below act on the clipboard as a whole rather than
-            # transforming its text, so each owns its own notification.
+            # The cases below act on the clipboard as a whole (or, for the
+            # notification switch, not on it at all) rather than transforming
+            # its text, so each owns its own notification.
             match command:
                 case "clear":
                     self._clear_clipboard()
@@ -67,6 +68,10 @@ class CommandDispatcher:
                     self._undo_swap()
                 case "type":
                     self._type_clipboard()
+                case "notify-off":
+                    self._set_notifications(enabled=False)
+                case "notify-on":
+                    self._set_notifications(enabled=True)
                 case _:
                     with timed("clipboard.get"):
                         text = get_clipboard_text()
@@ -135,6 +140,11 @@ class CommandDispatcher:
         """Deliver an error notification; public entry point for external callers."""
         self._notify_error(command, message)
 
+    def notify_startup(self) -> None:
+        """Announce that the daemon is running (``[ui] startup_notification``)."""
+        if self._config.ui.startup_notification:
+            self._notify("press", "press daemon started")
+
     # ------------------------------------------------------------------
     # Internal
 
@@ -157,10 +167,32 @@ class CommandDispatcher:
             self._notify(f"press: {command} failed", message[:120])
 
     def _notify(self, title: str, message: str) -> None:
-        if self._icon is None:
+        """Show a tray notification — the only caller of ``icon.notify``.
+
+        Every notification passes the one gate (the user's ``notify off``
+        switch and Windows' busy/presentation state), so no path can pop a
+        toast onto a shared screen.
+        """
+        from press.daemon._notifications import notifications_allowed
+
+        if self._icon is None or not notifications_allowed():
             return
         with contextlib.suppress(Exception):
             self._icon.notify(message, title)
+
+    def _set_notifications(self, *, enabled: bool) -> None:
+        """Apply the ``notify-off`` / ``notify-on`` hotkeys (idempotent).
+
+        Turning them back on is confirmed once — that is the moment the user
+        wants to know it worked — unless ``notify_level`` is ``"off"``.
+        """
+        from press._notify import set_notifications_enabled
+        from press.daemon._logs import _log
+
+        set_notifications_enabled(enabled)
+        _log.info("notifications %s", "on" if enabled else "off")
+        if enabled and self._config.ui.notify_level != "off":
+            self._notify("press", "notifications on")
 
     def _clear_clipboard(self) -> None:
         """Empty the clipboard, snapshotting what it held for undo first."""

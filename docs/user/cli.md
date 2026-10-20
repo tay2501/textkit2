@@ -89,5 +89,6 @@ File format and location: {doc}`dictionary`.
 | Command | Purpose |
 |---|---|
 | `press config validate` / `reset [--key SECTION]` | Check or restore `config.toml` ({doc}`config`) |
+| `press notify off` / `on` / `status` | Mute the daemon's tray notifications, e.g. for screen sharing; `off` is not a toggle ({doc}`hotkeys`) |
 | `press trace on` / `off` / `status` | Timing diagnostics ({doc}`edr-environments`) |
 | `press daemon …` | Start/stop the daemon ({doc}`daemon`) |

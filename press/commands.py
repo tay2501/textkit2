@@ -492,6 +492,13 @@ SPECIAL_COMMANDS: tuple[SpecialCommand, ...] = (
     # Daemon-only by nature: run from a shell it would type into that shell.
     # "ty" resolves in two keystrokes; "type" itself stays typeable.
     SpecialCommand("type", ("ty",), hotkey=True),
+    # Tray-notification switch — two commands, never a toggle, so pressing
+    # "off" again in a hurry before a screen share cannot turn it back on.
+    # Hotkey-only names; the CLI spells them `press notify off|on`.  The
+    # canonical names take 9 keys to type (notify-o… is shared), hence the
+    # aliases: m,u mutes and u,n,m unmutes.  Default binding shift+m mutes.
+    SpecialCommand("notify-off", ("mute",), hotkey=True),
+    SpecialCommand("notify-on", ("unmute",), hotkey=True),
     # CLI-only.  Each exclusion is deliberate:
     # - genpass writes with sensitive=True, which suppresses the undo snapshot
     #   by design — a mistyped sequence would destroy the clipboard with no way

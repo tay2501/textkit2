@@ -46,12 +46,14 @@ CURRENT_SCHEMA_VERSION: int = 1
 # alias typed after the prefix (prefix + "t","m" = trim, same as `press tm`),
 # so per-command default bindings are gone.  Only shift+<key> chords remain:
 # they can never shadow a typed sequence (sequences are plain characters),
-# and they cover the two cases a sequence serves poorly — dict_reverse has
-# no CLI alias to type, and undo is a panic key that deserves one stroke.
+# and they cover the cases a sequence serves poorly — dict_reverse has no CLI
+# alias to type, while undo and notify-off are panic keys (a bad transform,
+# a call that suddenly turns into a screen share) that deserve one stroke.
 # Single-letter user bindings still work but hide every sequence starting
 # with that letter (checked first); `press config validate` warns about it.
 _DEFAULT_BINDINGS: dict[str, str] = {
     "shift+d": "dict_reverse",
+    "shift+m": "notify-off",
     "shift+z": "undo",
 }
 
@@ -107,7 +109,10 @@ class UiConfig:
 
     startup_notification: bool = True
     hold_icon: bool = True
-    notify_level: str = "off"  # "off" | "success" | "error" | "all"
+    # "off" | "success" | "error" | "all".  "error" so a mistyped hotkey
+    # sequence says why nothing ran; successes stay quiet.  Muting for a
+    # screen share is `press notify off`, not this setting.
+    notify_level: str = "error"
 
 
 @dataclass(frozen=True, slots=True)
@@ -224,7 +229,9 @@ def _parse_pipelines(data: dict[str, Any]) -> dict[str, tuple[str, ...]]:
 def _parse_ui(data: dict[str, Any]) -> UiConfig:
     default = UiConfig()
     raw_level = data.get("notify_level", default.notify_level)
-    notify_level = raw_level if raw_level in ("off", "success", "error", "all") else "off"
+    notify_level = (
+        raw_level if raw_level in ("off", "success", "error", "all") else default.notify_level
+    )
     return UiConfig(
         startup_notification=data.get("startup_notification", default.startup_notification),
         hold_icon=data.get("hold_icon", default.hold_icon),

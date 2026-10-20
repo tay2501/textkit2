@@ -489,7 +489,7 @@ class TestGroupWithoutAction:
     and raised OSError on Windows.
     """
 
-    @pytest.mark.parametrize("group", ["config", "daemon", "trace"])
+    @pytest.mark.parametrize("group", ["config", "daemon", "notify", "trace"])
     def test_prints_group_help(self, group: str) -> None:
         result = _run(group)
         assert result.returncode == 0, result.stderr

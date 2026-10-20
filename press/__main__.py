@@ -404,6 +404,7 @@ def _build_parser() -> tuple[argparse.ArgumentParser, CommandCatalog]:
     from press._cli_config import _register_config_commands
     from press._cli_daemon import _register_daemon_commands
     from press._cli_dict import _register_dict_commands
+    from press._cli_notify import _register_notify_commands
     from press._cli_trace import _register_trace_commands
     from press.commands import PARAMETRIC_COMMANDS, SIMPLE_COMMANDS, TRANSFORM_CATEGORIES
 
@@ -437,6 +438,7 @@ def _build_parser() -> tuple[argparse.ArgumentParser, CommandCatalog]:
         ("Generators", "uuid", partial(_register_uuid_command, sub)),
         ("Management", "config", partial(_register_config_commands, sub)),
         ("Management", "daemon", partial(_register_daemon_commands, sub)),
+        ("Management", "notify", partial(_register_notify_commands, sub)),
         ("Management", "trace", partial(_register_trace_commands, sub)),
         ("Pipeline", "chain", partial(_register_chain_commands, sub)),
     ]

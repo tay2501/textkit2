@@ -90,8 +90,7 @@ def run_daemon(config_path: Path | None = None) -> None:
         dispatcher.set_icon(icon)
         hm.start()
         worker.start()
-        if config.ui.startup_notification:
-            icon.notify("press daemon started", "press")
+        dispatcher.notify_startup()
 
     def _on_quit() -> None:
         hm.stop()

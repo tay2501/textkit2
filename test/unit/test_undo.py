@@ -242,6 +242,7 @@ class TestDispatcherUndo:
             d.dispatch("undo")  # redo
             assert clip.text == "ABC"
 
+    @pytest.mark.usefixtures("notifications_open")
     def test_undo_without_history_notifies_error(self) -> None:
         from unittest.mock import MagicMock
 
