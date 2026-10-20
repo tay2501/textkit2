@@ -26,8 +26,10 @@ def _register_notify_commands(sub: _SubParsers) -> None:
             "Turn the daemon's tray notifications off or on.\n\n"
             "'press notify off' is not a toggle: running it again keeps\n"
             "notifications off. The running daemon applies it to the very next\n"
-            "notification, no restart needed. From the daemon itself: the\n"
-            "prefix chord, then Shift+M (off) or 'unmute' (on)."
+            "notification, no restart needed.\n\n"
+            "From the daemon: Ctrl+Alt+K, release, then Shift+M or 'm u' (mute)\n"
+            "for off, 'u n m' (unmute) for on. Type only those letters; extra\n"
+            "keys reach the app."
         ),
     )
     notify_sub = notify_p.add_subparsers(dest="notify_action", metavar="ACTION")

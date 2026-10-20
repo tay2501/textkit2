@@ -41,6 +41,16 @@ press daemon start                   # then: Ctrl+Alt+K, release, type "up" → 
 
 `press --help` lists every command; `press <command> --help` shows its options.
 
+## Muting notifications (screen sharing)
+
+| Action | Hotkey (Ctrl+Alt+K, release, then…) | CLI |
+|---|---|---|
+| Notifications OFF | `Shift+M`, or `m u` = **mu**te | `press notify off` |
+| Notifications ON | `u n m` = **unm**ute | `press notify on` |
+
+Mnemonic: **M**ute ↔ **un-m**ute. Type only `unm` — the command runs there, so
+any further keys reach the focused app.
+
 ## Diagnosing slow transforms
 
 If a transform takes seconds on a low-spec or EDR-monitored PC, turn on trace

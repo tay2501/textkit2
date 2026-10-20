@@ -150,6 +150,11 @@ Ctrl+Alt+K   then   u n m         →  notifications ON  (unmute)
 press notify off | on | status
 ```
 
+Mnemonic: **M**ute ↔ **un-m**ute. `unm` is the shortest prefix of `unmute`
+that no other command shares (`u` and `un` also start `undo`, `unicode-…`,
+`upper`), so the command runs on `m` — type nothing after it, or the extra
+keys reach the focused app.
+
 **Off and on are separate commands, not a toggle**: pressing `Shift+M` again
 in a hurry keeps notifications off. Turning them back on shows one
 "notifications on" confirmation. The switch takes effect immediately, survives
