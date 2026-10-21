@@ -26,7 +26,9 @@ jobs:
          # job from the day it was added.  The allowlist already denies the
          # copyleft licenses the old deny-licenses line listed (GPL-2.0,
          # LGPL-2.0, LGPL-2.1, AGPL-3.0), so keep only this one.
-         allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, PSF-2.0
+         # MIT-CMU is Pillow's license_expression on PyPI (a permissive
+         # MIT-style license); it went unchecked until a lock bump changed Pillow.
+         allow-licenses: MIT, MIT-CMU, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, PSF-2.0
          # Two packages are excluded from the license check (purl format, and
          # only ever by exception — both are classification artefacts, not real
          # copyleft dependencies):
