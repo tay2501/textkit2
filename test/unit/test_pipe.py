@@ -557,6 +557,21 @@ class TestCliTraceOutput:
             out.err,
         )
 
+    def test_quiet_suppresses_trace_output(
+        self, tmp_path: Any, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """``-q`` promises no stderr at all, trace mode included."""
+        marker = tmp_path / "trace"
+        marker.touch()
+        with (
+            patch("press._pipe.trace_marker_path", return_value=str(marker)),
+            patch("press._pipe.try_delegate", return_value=None),
+        ):
+            assert _run_cli(["halfwidth", "-q", "ＴＡＢＬＥ１"]) == 0
+        out = capsys.readouterr()
+        assert out.out == "TABLE1"
+        assert out.err == ""
+
     def test_trace_output_omits_transform_when_delegated(
         self, tmp_path: Any, capsys: pytest.CaptureFixture[str]
     ) -> None:
