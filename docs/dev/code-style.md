@@ -71,8 +71,8 @@ Benefits: independently testable, visible to type-checkers, no re-allocation on
 every call.
 
 ```python
-# Bad — _clean captures nothing from normalize_whitespace
-def normalize_whitespace(text: str) -> str:
+# Bad — _clean captures nothing from collapse_whitespace
+def collapse_whitespace(text: str) -> str:
     def _clean(line: str) -> str:   # no closure variables
         line = line.replace("　", " ")
         ...
@@ -82,7 +82,7 @@ def _clean_line(line: str) -> str:
     line = line.replace("　", " ")
     ...
 
-def normalize_whitespace(text: str) -> str:
+def collapse_whitespace(text: str) -> str:
     ...
 ```
 
@@ -97,7 +97,7 @@ stays nested by design.
 pattern appears in two or more sibling functions.**
 
 ```python
-# Bad — identical try/except in json_format and json_compress
+# Bad — identical try/except in json_format and json_compact
 def json_format(text: str, *, indent: int = 2) -> str:
     try:
         data = json.loads(text)

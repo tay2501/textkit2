@@ -30,14 +30,14 @@ class TestUuidCommand:
         assert parsed.version == 4
 
     def test_count(self, capsys: pytest.CaptureFixture[str]) -> None:
-        rc, _ = _run("uuid", "-n", "5")
+        rc, _ = _run("uuid", "--count", "5")
         lines = capsys.readouterr().out.strip().split("\n")
         assert rc == 0
         assert len(lines) == 5
         assert all(UUID4_RE.match(line) for line in lines)
 
     def test_each_uuid_unique(self, capsys: pytest.CaptureFixture[str]) -> None:
-        _run("uuid", "-n", "10")
+        _run("uuid", "--count", "10")
         lines = capsys.readouterr().out.strip().split("\n")
         assert len(set(lines)) == 10
 
@@ -55,4 +55,16 @@ class TestUuidCommand:
     def test_count_zero_rejected(self) -> None:
         parser = make_parser()
         with pytest.raises(SystemExit):
-            parser.parse_args(["uuid", "-n", "0"])
+            parser.parse_args(["uuid", "--count", "0"])
+
+    @pytest.mark.parametrize("old", ["-n", "-U"])
+    def test_short_flags_are_gone(self, old: str) -> None:
+        # uuidgen spells the count -C/--count, and press already uses -C for
+        # --copy, so the count and case options are long-only.
+        with pytest.raises(SystemExit) as exc:
+            make_parser().parse_args(["uuid", old, "2"] if old == "-n" else ["uuid", old])
+        assert exc.value.code == 2
+
+    @pytest.mark.parametrize("flag", ["-C", "--copy"])
+    def test_copy_flag(self, flag: str) -> None:
+        assert make_parser().parse_args(["uuid", flag]).copy is True

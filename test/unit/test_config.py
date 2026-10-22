@@ -43,7 +43,7 @@ class TestDefaultConfigWhenFileNotFound:
         assert config.hotkeys.prefix == "ctrl+alt+k"
         assert config.sql_in.quote_char == "'"
         assert config.sql_in.wrap is False
-        assert config.trim.both is True
+        assert config.trim.trailing is False
         assert config.ui.startup_notification is True
         assert config.ui.hold_icon is True
         # Errors only: a mistyped hotkey sequence must say so, a success stays quiet.
@@ -90,7 +90,7 @@ class TestFullConfig:
         assert "shift+z" in config.hotkeys.bindings  # default key preserved
         assert config.sql_in.quote_char == '"'
         assert config.sql_in.wrap is True
-        assert config.trim.both is True
+        assert config.trim.trailing is False
         assert config.dictionary.files == ("%APPDATA%/press/dict/custom.tsv",)
         assert config.ui.startup_notification is False
         assert config.ui.hold_icon is False
@@ -228,7 +228,7 @@ class TestBindingsMerge:
 
         assert config.hotkeys.bindings["j"] == "sort"
         assert config.hotkeys.bindings["shift+z"] == "undo"  # default preserved
-        assert config.hotkeys.bindings["shift+d"] == "dict_reverse"  # default preserved
+        assert config.hotkeys.bindings["shift+d"] == "dict-reverse"  # default preserved
         assert len(config.hotkeys.bindings) > 1
 
     def test_partial_bindings_override_default_key(self, tmp_path: Path) -> None:
@@ -254,7 +254,7 @@ class TestBindingsMerge:
         config = load_config(cfg_file)
 
         assert config.hotkeys.bindings["shift+z"] == "undo"
-        assert config.hotkeys.bindings["shift+d"] == "dict_reverse"
+        assert config.hotkeys.bindings["shift+d"] == "dict-reverse"
 
     def test_unknown_notify_level_falls_back_to_the_default(self, tmp_path: Path) -> None:
         cfg_file = tmp_path / "config.toml"
@@ -445,7 +445,7 @@ class TestSectionRegistry:
         assert set(SECTION_NAMES) == config_fields
 
     def test_matches_the_reset_choices_offered_by_the_cli(self) -> None:
-        """``press config reset --key`` must offer exactly the resettable sections.
+        """``press config reset --section`` must offer exactly the resettable sections.
 
         The CLI spells the list out literally instead of importing this module:
         ``_register_config_commands`` runs on *every* press invocation, and
@@ -462,10 +462,11 @@ class TestSectionRegistry:
         root = argparse.ArgumentParser()
         _register_config_commands(root.add_subparsers())
         reset_parser = subparsers_of(subparsers_of(root).choices["config"]).choices["reset"]
-        key_option = next(a for a in reset_parser._actions if a.dest == "key")
+        section_option = next(a for a in reset_parser._actions if a.dest == "section")
 
-        assert key_option.choices is not None
-        assert tuple(key_option.choices) == SECTION_NAMES
+        assert section_option.option_strings == ["--section"]
+        assert section_option.choices is not None
+        assert tuple(section_option.choices) == SECTION_NAMES
 
     def test_every_section_is_individually_resettable(self, tmp_path: Path) -> None:
         """Each registry row must round-trip through config_reset(key=...)."""
@@ -685,10 +686,10 @@ class TestConfigReset:
 
     def test_partial_reset_key_trim(self, tmp_path: Path) -> None:
         cfg_file = tmp_path / "config.toml"
-        cfg_file.write_text("[trim]\nboth = false\n[sql_in]\nwrap = true\n", encoding="utf-8")
+        cfg_file.write_text("[trim]\ntrailing = true\n[sql_in]\nwrap = true\n", encoding="utf-8")
         config_reset(cfg_file, key="trim")
         reloaded = load_config(cfg_file)
-        assert reloaded.trim.both is True  # reset
+        assert reloaded.trim.trailing is False  # reset
         assert reloaded.sql_in.wrap is True  # other section untouched
 
     def test_partial_reset_key_ui(self, tmp_path: Path) -> None:

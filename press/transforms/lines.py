@@ -7,9 +7,14 @@ Line endings are normalised to LF on entry; trailing newline is preserved.
 from __future__ import annotations
 
 import locale
+import re
 import unicodedata
 
 from press.transforms.lineending import to_lf
+
+# GNU sort -n's number: leading blanks, optional minus, digits with at most one
+# decimal point.  "1e3" reads as 1 and "inf" as no number (that is sort -g).
+_LEADING_NUMBER_RE = re.compile(r"[ \t]*(-?(?:\d+\.?\d*|\.\d+))")
 
 
 def _normalise(text: str) -> tuple[list[str], bool]:
@@ -27,11 +32,11 @@ def _join(lines: list[str], trailing: bool) -> str:
     return result + "\n" if trailing else result
 
 
-def trim_lines(text: str, *, both: bool = True) -> str:
-    """Strip both-sided (or, with ``both=False``, trailing) whitespace from each line."""
-    lines, trailing = _normalise(text)
-    fn = str.strip if both else str.rstrip
-    return _join([fn(line) for line in lines], trailing)
+def trim_lines(text: str, *, trailing: bool = False) -> str:
+    """Strip whitespace from both ends of each line (only the end with *trailing*)."""
+    lines, ends_with_newline = _normalise(text)
+    fn = str.rstrip if trailing else str.strip
+    return _join([fn(line) for line in lines], ends_with_newline)
 
 
 def dedupe_lines(text: str, *, ignore_case: bool = False, adjacent: bool = False) -> str:
@@ -61,10 +66,12 @@ def dedupe_lines(text: str, *, ignore_case: bool = False, adjacent: bool = False
     return _join(result, trailing)
 
 
-def number_lines(text: str, *, start: int = 1, sep: str = "\t") -> str:
-    """Prefix each line with its line number, joined by *sep*."""
+def number_lines(text: str, *, starting_line_number: int = 1, number_separator: str = "\t") -> str:
+    """Prefix each line with its line number, joined by *number_separator*."""
     lines, trailing = _normalise(text)
-    numbered = [f"{i}{sep}{line}" for i, line in enumerate(lines, start)]
+    numbered = [
+        f"{i}{number_separator}{line}" for i, line in enumerate(lines, starting_line_number)
+    ]
     return _join(numbered, trailing)
 
 
@@ -81,24 +88,28 @@ def sort_lines(
     numeric: bool = False,
     ignore_case: bool = False,
 ) -> str:
-    """Sort lines using locale-aware collation (strxfrm); main() must call setlocale first."""
+    """Sort lines using locale-aware collation (strxfrm); main() must call setlocale first.
+
+    *numeric* follows GNU ``sort -n``: lines compare by their leading number
+    (optional blanks and ``-``, digits, one decimal point — no exponent, no
+    ``inf``), a line without one counts as 0, and ties fall back to comparing
+    the whole line.
+    """
     lines, trailing = _normalise(text)
+
+    def _strxfrm_key(line: str) -> str:
+        k = line.casefold() if ignore_case else line
+        return locale.strxfrm(k)
 
     if numeric:
 
-        def _num_key(line: str) -> tuple[int, float, str]:
-            try:
-                return (0, float(line.strip()), line)
-            except ValueError:
-                return (1, 0.0, line)
+        def _num_key(line: str) -> tuple[float, str]:
+            match = _LEADING_NUMBER_RE.match(line)
+            number = float(match.group(1)) if match else 0.0
+            return (number, _strxfrm_key(line))
 
         sorted_lines = sorted(lines, key=_num_key, reverse=reverse)
     else:
-
-        def _strxfrm_key(line: str) -> str:
-            k = line.casefold() if ignore_case else line
-            return locale.strxfrm(k)
-
         sorted_lines = sorted(lines, key=_strxfrm_key, reverse=reverse)
 
     return _join(sorted_lines, trailing)

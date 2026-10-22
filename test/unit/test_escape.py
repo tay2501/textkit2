@@ -3,86 +3,86 @@
 import pytest
 
 from press.transforms.escape import (
-    decode_html_entities,
-    decode_unicode_escape,
-    encode_html_entities,
-    encode_unicode_escape,
+    html_escape,
+    html_unescape,
+    unicode_escape,
+    unicode_unescape,
 )
 
 
 class TestEncodeUnicodeEscape:
     def test_japanese(self) -> None:
-        assert encode_unicode_escape("テスト") == r"\u30c6\u30b9\u30c8"
+        assert unicode_escape("テスト") == r"\u30c6\u30b9\u30c8"
 
     def test_ascii_unchanged(self) -> None:
         # ASCII chars are represented as-is (not escaped)
-        result = encode_unicode_escape("ABC")
+        result = unicode_escape("ABC")
         assert result == "ABC"
 
     def test_empty(self) -> None:
-        assert encode_unicode_escape("") == ""
+        assert unicode_escape("") == ""
 
     def test_mixed(self) -> None:
-        result = encode_unicode_escape("A テ")
+        result = unicode_escape("A テ")
         assert r"\u30c6" in result
         assert "A" in result
 
 
 class TestDecodeUnicodeEscape:
     def test_basic(self) -> None:
-        assert decode_unicode_escape(r"\u30c6\u30b9\u30c8") == "テスト"
+        assert unicode_unescape(r"\u30c6\u30b9\u30c8") == "テスト"
 
     def test_ascii_passthrough(self) -> None:
-        assert decode_unicode_escape("ABC") == "ABC"
+        assert unicode_unescape("ABC") == "ABC"
 
     def test_empty(self) -> None:
-        assert decode_unicode_escape("") == ""
+        assert unicode_unescape("") == ""
 
     def test_invalid_raises(self) -> None:
         with pytest.raises((ValueError, UnicodeDecodeError)):
-            decode_unicode_escape(r"\uZZZZ")
+            unicode_unescape(r"\uZZZZ")
 
     def test_roundtrip(self) -> None:
         original = "テスト ABC 123"
-        assert decode_unicode_escape(encode_unicode_escape(original)) == original
+        assert unicode_unescape(unicode_escape(original)) == original
 
 
 class TestDecodeHtmlEntities:
     def test_lt_gt(self) -> None:
-        assert decode_html_entities("&lt;div&gt;") == "<div>"
+        assert html_unescape("&lt;div&gt;") == "<div>"
 
     def test_amp(self) -> None:
-        assert decode_html_entities("&amp;") == "&"
+        assert html_unescape("&amp;") == "&"
 
     def test_numeric_hex(self) -> None:
-        assert decode_html_entities("&#x3042;") == "あ"
+        assert html_unescape("&#x3042;") == "あ"
 
     def test_numeric_decimal(self) -> None:
-        assert decode_html_entities("&#12354;") == "あ"
+        assert html_unescape("&#12354;") == "あ"
 
     def test_no_entities(self) -> None:
-        assert decode_html_entities("plain text") == "plain text"
+        assert html_unescape("plain text") == "plain text"
 
     def test_empty(self) -> None:
-        assert decode_html_entities("") == ""
+        assert html_unescape("") == ""
 
 
 class TestEncodeHtmlEntities:
     def test_lt_gt(self) -> None:
-        assert encode_html_entities("<div>") == "&lt;div&gt;"
+        assert html_escape("<div>") == "&lt;div&gt;"
 
     def test_amp(self) -> None:
-        assert encode_html_entities("a & b") == "a &amp; b"
+        assert html_escape("a & b") == "a &amp; b"
 
     def test_quotes(self) -> None:
-        assert encode_html_entities("\"x\" 'y'") == "&quot;x&quot; &#x27;y&#x27;"
+        assert html_escape("\"x\" 'y'") == "&quot;x&quot; &#x27;y&#x27;"
 
     def test_roundtrip(self) -> None:
         original = "<a href=\"?q=1&r=2\">'link'</a>"
-        assert decode_html_entities(encode_html_entities(original)) == original
+        assert html_unescape(html_escape(original)) == original
 
     def test_plain_unchanged(self) -> None:
-        assert encode_html_entities("plain テキスト") == "plain テキスト"
+        assert html_escape("plain テキスト") == "plain テキスト"
 
     def test_empty(self) -> None:
-        assert encode_html_entities("") == ""
+        assert html_escape("") == ""

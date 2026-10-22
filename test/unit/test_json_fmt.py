@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from press.transforms.json_fmt import json_compress, json_format
+from press.transforms.json_fmt import json_compact, json_format
 
 
 class TestJsonFormat:
@@ -51,36 +51,36 @@ class TestJsonFormat:
 
 class TestJsonCompress:
     def test_simple_object(self) -> None:
-        result = json_compress('{ "a": 1, "b": 2 }')
+        result = json_compact('{ "a": 1, "b": 2 }')
         assert result == '{"a":1,"b":2}'
 
     def test_simple_array(self) -> None:
-        result = json_compress("[ 1 , 2 , 3 ]")
+        result = json_compact("[ 1 , 2 , 3 ]")
         assert result == "[1,2,3]"
 
     def test_already_compact(self) -> None:
         compact = '{"a":1,"b":2}'
-        assert json_compress(compact) == compact
+        assert json_compact(compact) == compact
 
     def test_japanese_not_escaped(self) -> None:
-        result = json_compress('{"key": "日本語"}')
+        result = json_compact('{"key": "日本語"}')
         assert "日本語" in result
         assert result == '{"key":"日本語"}'
 
     def test_nested(self) -> None:
-        result = json_compress('{"a": {"b": 1}}')
+        result = json_compact('{"a": {"b": 1}}')
         assert result == '{"a":{"b":1}}'
 
     def test_invalid_raises_value_error(self) -> None:
         with pytest.raises(ValueError, match="Invalid JSON"):
-            json_compress("not json")
+            json_compact("not json")
 
     def test_empty_object(self) -> None:
-        assert json_compress("{}") == "{}"
+        assert json_compact("{}") == "{}"
 
     def test_empty_array(self) -> None:
-        assert json_compress("[]") == "[]"
+        assert json_compact("[]") == "[]"
 
     def test_whitespace_removed(self) -> None:
-        result = json_compress('{"a" :  1}')
+        result = json_compact('{"a" :  1}')
         assert " " not in result

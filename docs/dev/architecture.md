@@ -272,7 +272,7 @@ All figures are for 1 000 calls; typical clipboard input is 1–20 lines (< 1 ms
 | `sort_lines` | 3 000 lines | 1.6 ms |
 | `dedupe_lines` | 3 000 lines | 0.3 ms |
 | `trim_lines` | 3 000 lines | 0.15 ms |
-| `normalize_whitespace` | 100 lines | 0.054 ms |
+| `collapse_whitespace` | 100 lines | 0.054 ms |
 | `to_crlf` | 100 lines | 0.014 ms |
 | `base64_encode` / `json_format` | 100 lines | < 0.01 ms |
 

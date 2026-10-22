@@ -2,7 +2,7 @@
 
 Supported operations:
     F-21  json_format   — parse JSON and re-emit with indentation (pretty-print)
-    F-22  json_compress — parse JSON and re-emit without whitespace (compact)
+    F-22  json_compact — parse JSON and re-emit without whitespace (compact)
 """
 
 from __future__ import annotations
@@ -24,6 +24,6 @@ def json_format(text: str, *, indent: int = 2) -> str:
     return json.dumps(_load_json(text), indent=indent, ensure_ascii=False)
 
 
-def json_compress(text: str) -> str:
+def json_compact(text: str) -> str:
     """Compress JSON to a single compact line (ensure_ascii=False)."""
     return json.dumps(_load_json(text), separators=(",", ":"), ensure_ascii=False)

@@ -139,20 +139,24 @@ class TestFullwidth:
 
 
 # ---------------------------------------------------------------------------
-# normalize / norm
+# collapse-whitespace
 # ---------------------------------------------------------------------------
 
 
-class TestNormalize:
+class TestCollapseWhitespace:
     def test_collapses_spaces(self) -> None:
-        result = _run("normalize", input_text="hello   world")
+        result = _run("collapse-whitespace", input_text="hello   world")
         assert result.returncode == 0
         assert result.stdout.strip() == "hello world"
 
-    def test_alias_norm(self) -> None:
-        result = _run("norm", input_text="  a  b  ")
+    def test_drops_blank_lines(self) -> None:
+        result = _run("collapse-whitespace", input_text="  a  b  \n\n   \nc")
         assert result.returncode == 0
-        assert result.stdout.strip() == "a b"
+        assert result.stdout == "a b\nc"
+
+    @pytest.mark.parametrize("old", ["normalize", "norm"])
+    def test_old_names_are_gone(self, old: str) -> None:
+        assert _run(old, input_text="a").returncode == 2
 
 
 # ---------------------------------------------------------------------------
@@ -189,6 +193,12 @@ class TestLineEndings:
         assert result.returncode == 0
         assert result.stdout == b"ab"
 
+    @pytest.mark.parametrize("name", ["dos2unix", "unix2dos"])
+    def test_no_dos2unix_aliases(self, name: str) -> None:
+        # dos2unix strips a BOM and leaves lone CR alone; lf/crlf do neither,
+        # so borrowing the tool's name would promise behaviour press lacks.
+        assert _run(name, input_text="a").returncode == 2
+
 
 # ---------------------------------------------------------------------------
 # underscore / hyphen
@@ -206,15 +216,9 @@ class TestSeparators:
         assert result.returncode == 0
         assert result.stdout.strip() == "a_b"
 
-    def test_alias_underbar(self) -> None:
-        result = _run("underbar", input_text="a-b")
-        assert result.returncode == 0
-        assert result.stdout.strip() == "a_b"
-
-    def test_alias_ub(self) -> None:
-        result = _run("ub", input_text="a-b")
-        assert result.returncode == 0
-        assert result.stdout.strip() == "a_b"
+    @pytest.mark.parametrize("old", ["underbar", "ub"])
+    def test_old_aliases_are_gone(self, old: str) -> None:
+        assert _run(old, input_text="a-b").returncode == 2
 
     def test_hyphen(self) -> None:
         result = _run("hyphen", input_text="foo_bar_baz")
@@ -263,23 +267,23 @@ class TestSqlIn:
 
 
 # ---------------------------------------------------------------------------
-# unicode-decode / unicode-encode
+# unicode-unescape / unicode-escape
 # ---------------------------------------------------------------------------
 
 
 class TestUnicodeEscape:
-    def test_decode(self) -> None:
-        result = _run("unicode-decode", input_text=r"\u3053\u3093\u306b\u3061\u306f")
+    def test_unescape(self) -> None:
+        result = _run("unicode-unescape", input_text=r"\u3053\u3093\u306b\u3061\u306f")
         assert result.returncode == 0
         assert result.stdout.strip() == "こんにちは"
 
-    def test_alias_ud(self) -> None:
-        result = _run("ud", input_text=r"\u0041")
+    def test_alias_uu(self) -> None:
+        result = _run("uu", input_text=r"\u0041")
         assert result.returncode == 0
         assert result.stdout.strip() == "A"
 
-    def test_encode(self) -> None:
-        result = _run("unicode-encode", input_text="こ")
+    def test_escape(self) -> None:
+        result = _run("unicode-escape", input_text="こ")
         assert result.returncode == 0
         assert "\\u3053" in result.stdout
 
@@ -288,31 +292,44 @@ class TestUnicodeEscape:
         assert result.returncode == 0
         assert "A" in result.stdout  # ASCII preserved as-is
 
-    def test_decode_failure_returns_exit_1(self) -> None:
-        result = _run("unicode-decode", input_text="\\uXXXX")
+    def test_unescape_failure_returns_exit_1(self) -> None:
+        result = _run("unicode-unescape", input_text="\\uXXXX")
         assert result.returncode == 1
 
-    def test_decode_failure_with_fallback(self) -> None:
-        result = _run("unicode-decode", "--fallback", input_text="\\uXXXX")
+    def test_unescape_failure_with_fallback(self) -> None:
+        result = _run("unicode-unescape", "--fallback", input_text="\\uXXXX")
         assert result.returncode == 0
         assert "\\uXXXX" in result.stdout
 
 
 # ---------------------------------------------------------------------------
-# html-decode / hd
+# html-unescape / html-escape
 # ---------------------------------------------------------------------------
 
 
-class TestHtmlDecode:
+class TestHtmlEscape:
     def test_basic(self) -> None:
-        result = _run("html-decode", input_text="&lt;div&gt;&amp;")
+        result = _run("html-unescape", input_text="&lt;div&gt;&amp;")
         assert result.returncode == 0
         assert result.stdout.strip() == "<div>&"
 
-    def test_alias_hd(self) -> None:
-        result = _run("hd", input_text="&amp;")
+    def test_alias_hu(self) -> None:
+        result = _run("hu", input_text="&amp;")
         assert result.returncode == 0
         assert result.stdout.strip() == "&"
+
+    def test_escape_alias_he(self) -> None:
+        result = _run("he", input_text="<a>")
+        assert result.returncode == 0
+        assert result.stdout == "&lt;a&gt;"
+
+    @pytest.mark.parametrize(
+        "old", ["html-decode", "html-encode", "hd", "unicode-decode", "unicode-encode", "ud"]
+    )
+    def test_old_names_are_gone(self, old: str) -> None:
+        # hd is util-linux's `hexdump -C`; an alias named after a known tool
+        # must mean what that tool does.
+        assert _run(old, input_text="&amp;").returncode == 2
 
 
 # ---------------------------------------------------------------------------
@@ -337,10 +354,14 @@ class TestTrim:
         assert result.returncode == 0
         assert result.stdout == "hello\nworld"
 
-    def test_both_flag(self) -> None:
-        result = _run("trim", "--both", input_text="  hello  ")
-        assert result.returncode == 0
-        assert result.stdout.strip() == "hello"
+    def test_both_flag_is_gone(self) -> None:
+        # Stripping both sides is the default; only --trailing changes it.
+        assert _run("trim", "--both", input_text="  hello  ").returncode == 2
+
+    def test_long_option_prefixes_are_rejected(self) -> None:
+        # allow_abbrev=False: `--trail` must not silently mean --trailing,
+        # or adding a new --trail… option later would change old scripts.
+        assert _run("trim", "--trail", input_text="  hello  ").returncode == 2
 
     @pytest.mark.parametrize("flag", ["--trailing", "-t"])
     def test_trailing_flag_keeps_leading_whitespace(self, flag: str) -> None:
@@ -364,13 +385,12 @@ class TestDedupe:
         assert result.returncode == 0
         assert result.stdout.strip() == "a\nb\nc"
 
-    def test_alias_dq(self) -> None:
-        result = _run("dq", input_text="a\na\nb")
-        assert result.returncode == 0
-        assert result.stdout.strip() == "a\nb"
+    def test_alias_dq_is_gone(self) -> None:
+        assert _run("dq", input_text="a\na\nb").returncode == 2
 
-    def test_ignore_case(self) -> None:
-        result = _run("dedupe", "--ignore-case", input_text="Hello\nhello\nWorld")
+    @pytest.mark.parametrize("flag", ["--ignore-case", "-i"])
+    def test_ignore_case(self, flag: str) -> None:
+        result = _run("dedupe", flag, input_text="Hello\nhello\nWorld")
         assert result.returncode == 0
         assert result.stdout.strip() == "Hello\nWorld"
 
@@ -378,6 +398,9 @@ class TestDedupe:
         result = _run("dedupe", "--adjacent", input_text="a\na\nb\na")
         assert result.returncode == 0
         assert result.stdout.strip() == "a\nb\na"
+
+    def test_adjacent_has_no_short_flag(self) -> None:
+        assert _run("dedupe", "-a", input_text="a").returncode == 2
 
     def test_empty_input(self) -> None:
         result = _run("dedupe", input_text="")
@@ -401,27 +424,33 @@ class TestSort:
         assert result.returncode == 0
         assert result.stdout.strip() == "a\nb"
 
-    def test_reverse(self) -> None:
-        result = _run("sort", "--reverse", input_text="a\nb\nc")
+    @pytest.mark.parametrize("flag", ["--reverse", "-r"])
+    def test_reverse(self, flag: str) -> None:
+        result = _run("sort", flag, input_text="a\nb\nc")
         assert result.returncode == 0
         assert result.stdout.strip() == "c\nb\na"
 
-    def test_numeric(self) -> None:
-        result = _run("sort", "--numeric", input_text="10\n2\n1")
+    @pytest.mark.parametrize("flag", ["--numeric-sort", "-n"])
+    def test_numeric(self, flag: str) -> None:
+        result = _run("sort", flag, input_text="10\n2\n1")
         assert result.returncode == 0
         assert result.stdout.strip() == "1\n2\n10"
 
-    def test_numeric_non_numeric_at_end(self) -> None:
-        result = _run("sort", "--numeric", input_text="2\napple\n1")
+    def test_numeric_uses_leading_number_like_gnu_sort(self) -> None:
+        # GNU sort -n: a line without a leading number compares as 0.
+        result = _run("sort", "-n", input_text="10 apples\n2 pears\napple\n1")
         assert result.returncode == 0
-        lines = result.stdout.strip().split("\n")
-        assert lines[-1] == "apple"
+        assert result.stdout == "apple\n1\n2 pears\n10 apples"
 
-    def test_ignore_case(self) -> None:
-        result = _run("sort", "--ignore-case", input_text="banana\nApple")
+    @pytest.mark.parametrize("flag", ["--ignore-case", "-f"])
+    def test_ignore_case(self, flag: str) -> None:
+        result = _run("sort", flag, input_text="banana\nApple")
         assert result.returncode == 0
         lines = result.stdout.strip().split("\n")
         assert lines[0].lower() == "apple"
+
+    def test_old_numeric_flag_is_gone(self) -> None:
+        assert _run("sort", "--numeric", input_text="1").returncode == 2
 
     def test_empty_input(self) -> None:
         result = _run("sort", input_text="")
@@ -519,3 +548,104 @@ class TestDaemonStatus:
         assert "not running" in result.stdout.lower()
         if sys.platform == "win32":
             assert not pid_file.exists()
+
+
+# ---------------------------------------------------------------------------
+# De facto flag and alias spellings (GNU coreutils, grep/ripgrep, jq, Python)
+# ---------------------------------------------------------------------------
+
+
+class TestDeFactoSpellings:
+    def test_replace_grep_style_flags(self) -> None:
+        result = _run("replace", "-e", "a", "-e", "c", "-r", "_", input_text="abc")
+        assert result.returncode == 0
+        assert result.stdout == "_b_"
+
+    def test_replace_long_flags(self) -> None:
+        result = _run(
+            "replace",
+            "--regexp",
+            "1.5",
+            "--replace",
+            "9",
+            "--fixed-strings",
+            "--ignore-case",
+            input_text="1.5 125",
+        )
+        assert result.returncode == 0
+        assert result.stdout == "9 125"
+
+    def test_replace_without_pattern_is_a_usage_error(self) -> None:
+        result = _run("replace", "-r", "x", input_text="abc")
+        assert result.returncode == 2
+        assert "--regexp" in result.stderr
+
+    @pytest.mark.parametrize("old", ["--pattern", "-p", "--repl", "--fixed"])
+    def test_replace_old_flags_are_gone(self, old: str) -> None:
+        assert _run("replace", "-e", "a", old, "b", input_text="a").returncode == 2
+
+    def test_number_lines_gnu_nl_flags(self) -> None:
+        result = _run(
+            "number-lines",
+            "--starting-line-number",
+            "5",
+            "-s",
+            ": ",
+            input_text="a\nb",
+        )
+        assert result.returncode == 0
+        assert result.stdout == "5: a\n6: b"
+
+    @pytest.mark.parametrize("old", ["--start", "--sep"])
+    def test_number_lines_old_flags_are_gone(self, old: str) -> None:
+        assert _run("number-lines", old, "1", input_text="a").returncode == 2
+
+    @pytest.mark.parametrize("flag", ["-a", "--algorithm"])
+    def test_hash_algorithm_flag(self, flag: str) -> None:
+        result = _run("hash", flag, "md5", input_text="abc")
+        assert result.returncode == 0
+        assert result.stdout == "900150983cd24fb0d6963f7d28e17f72"
+
+    def test_hash_old_flag_is_gone(self) -> None:
+        assert _run("hash", "--algo", "md5", input_text="abc").returncode == 2
+
+    @pytest.mark.parametrize("flag", ["-u", "--utc"])
+    def test_unix_to_date_utc(self, flag: str) -> None:
+        result = _run("unix-to-date", flag, input_text="0")
+        assert result.returncode == 0
+        assert result.stdout.startswith("1970-01-01T00:00:00")
+
+    def test_unix_to_date_alias_ut(self) -> None:
+        assert _run("ut", "-u", input_text="0").returncode == 0
+
+    @pytest.mark.parametrize("old", ["u2d", "d2u"])
+    def test_time_aliases_named_like_dos2unix_are_gone(self, old: str) -> None:
+        # cygutils' u2d/d2u are unix2dos/dos2unix.
+        assert _run(old, input_text="0").returncode == 2
+
+    def test_json_compact_alias_jc(self) -> None:
+        result = _run("jc", input_text='{ "a": 1 }')
+        assert result.returncode == 0
+        assert result.stdout == '{"a":1}'
+
+    def test_json_compress_is_gone(self) -> None:
+        assert _run("json-compress", input_text="{}").returncode == 2
+
+    @pytest.mark.parametrize("indent", ["-1", "8"])
+    def test_json_format_indent_is_bounded_like_jq(self, indent: str) -> None:
+        assert _run("json-format", "--indent", indent, input_text="{}").returncode == 2
+
+    def test_strip_commas_alias_scm(self) -> None:
+        result = _run("scm", input_text="1,234")
+        assert result.returncode == 0
+        assert result.stdout == "1234"
+
+    def test_strip_commas_alias_sc_is_gone(self) -> None:
+        # sc is Windows' built-in service-control tool.
+        assert _run("sc", input_text="1,234").returncode == 2
+
+    @pytest.mark.parametrize("alias", ["tac", "rl"])
+    def test_reverse_lines_aliases(self, alias: str) -> None:
+        result = _run(alias, input_text="a\nb")
+        assert result.returncode == 0
+        assert result.stdout == "b\na"

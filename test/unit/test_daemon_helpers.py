@@ -236,9 +236,9 @@ class TestParametricCommandRegistry:
 
         cmd = PARAMETRIC_COMMAND_INDEX["trim"]
         assert cmd.daemon_kwargs is not None
-        assert cmd.daemon_kwargs(PressConfig()) == {"both": True}
-        cfg = PressConfig(trim=TrimConfig(both=False))
-        assert cmd.daemon_kwargs(cfg) == {"both": False}
+        assert cmd.daemon_kwargs(PressConfig()) == {"trailing": False}
+        cfg = PressConfig(trim=TrimConfig(trailing=True))
+        assert cmd.daemon_kwargs(cfg) == {"trailing": True}
 
     def test_other_commands_have_no_daemon_kwargs(self) -> None:
         from press.commands import PARAMETRIC_COMMAND_INDEX
@@ -319,7 +319,7 @@ class TestSpecialCommandsRegistry:
             "undo",
             "type",
             "dict",
-            "dict_reverse",
+            "dict-reverse",
             "notify-off",
             "notify-on",
         }

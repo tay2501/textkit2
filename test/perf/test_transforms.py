@@ -34,7 +34,7 @@ _DATE_TEXT = "\n".join(f"2025-07-17T00:{i // 60:02d}:{i % 60:02d}+00:00" for i i
 
 _SPECIAL_INPUTS: dict[str, str] = {
     "json-format": _JSON_TEXT,
-    "json-compress": _JSON_TEXT,
+    "json-compact": _JSON_TEXT,
     "base64-decode": base64.b64encode(_BASE_TEXT.encode("utf-8")).decode("ascii"),
     "fix-encoding": _MOJIBAKE_TEXT,
     "unix-to-date": _UNIX_TEXT,
@@ -44,6 +44,7 @@ _SPECIAL_INPUTS: dict[str, str] = {
 # Kwargs needed for a deterministic success path
 _SPECIAL_KWARGS: dict[str, dict[str, Any]] = {
     "fix-encoding": {"confidence_threshold": 0.0},
+    "replace": {"patterns": ["e"], "repl": "E"},
 }
 
 _ALL_COMMANDS = [(cmd.name, cmd.module, cmd.fn) for cmd in (*SIMPLE_COMMANDS, *PARAMETRIC_COMMANDS)]

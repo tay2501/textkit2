@@ -35,7 +35,7 @@ class TestSequenceResolution:
             ("count", "count"),  # full name
             ("up", "upper"),  # exact match whose only extension is the same command
             ("hal", "halfwidth"),  # unique prefix fires before the name is complete
-            ("html-e", "html-encode"),  # hyphenated names are typeable
+            ("html-e", "html-escape"),  # hyphenated names are typeable
             ("ty", "type"),  # keystroke paste — two strokes, ahead of trim/title/tt
             ("nn", "strip-newlines"),  # newline removal — free two-key alias
         ],

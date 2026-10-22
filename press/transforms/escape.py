@@ -3,13 +3,13 @@
 import html
 
 
-def encode_unicode_escape(text: str) -> str:
+def unicode_escape(text: str) -> str:
     r"""Encode via the unicode_escape codec (control chars like \n are also escaped;
     non-ASCII below U+0100 becomes \xXX, not \uXXXX)."""
     return text.encode("unicode_escape").decode("ascii")
 
 
-def decode_unicode_escape(text: str) -> str:
+def unicode_unescape(text: str) -> str:
     r"""Decode \uXXXX escape sequences to readable Unicode characters."""
     try:
         return text.encode("raw_unicode_escape").decode("unicode_escape")
@@ -17,11 +17,11 @@ def decode_unicode_escape(text: str) -> str:
         raise ValueError(f"Failed to decode Unicode escapes: {exc}") from exc
 
 
-def decode_html_entities(text: str) -> str:
+def html_unescape(text: str) -> str:
     """Decode HTML entities (&amp;, &lt;, &#x3042;, etc.) to Unicode characters."""
     return html.unescape(text)
 
 
-def encode_html_entities(text: str) -> str:
+def html_escape(text: str) -> str:
     """Escape HTML special characters (& < > \" ') to entities."""
     return html.escape(text)

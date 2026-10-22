@@ -33,7 +33,7 @@ class SequenceResolver:
        against *candidates* — the same names and aliases the CLI accepts
        (``press tm`` ⇔ prefix + ``t m``).  The buffer dispatches the moment
        every candidate still reachable from it resolves to the same command
-       (``ha`` → halfwidth, ``html-e`` completes to html-encode).  An exact
+       (``ha`` → halfwidth, ``html-e`` completes to html-escape).  An exact
        match that longer names still extend (``cr`` vs ``crlf``) is held
        *pending*: :meth:`confirm` or :meth:`on_timeout` commits it, while
        further typing continues toward the longer name.

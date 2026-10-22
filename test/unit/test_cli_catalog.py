@@ -53,11 +53,11 @@ class TestFormatCatalog:
         assert text == "  Case\n    lower, upper (up)"
 
     def test_never_breaks_inside_an_entry(self) -> None:
-        entries = ["base64-decode (bd)", "html-decode (hd)", "url-decode (urld)"]
+        entries = ["base64-decode (bd)", "html-unescape (hu)", "url-decode (urld)"]
         lines = _wrap_entries(entries, width=30)
         assert lines == [
             "    base64-decode (bd),",
-            "    html-decode (hd),",
+            "    html-unescape (hu),",
             "    url-decode (urld)",
         ]
 

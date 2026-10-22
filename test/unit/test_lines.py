@@ -18,10 +18,10 @@ class TestNumberLines:
         assert number_lines("a\nb\nc") == "1\ta\n2\tb\n3\tc"
 
     def test_custom_start(self) -> None:
-        assert number_lines("a\nb", start=10) == "10\ta\n11\tb"
+        assert number_lines("a\nb", starting_line_number=10) == "10\ta\n11\tb"
 
     def test_custom_separator(self) -> None:
-        assert number_lines("a\nb", sep=": ") == "1: a\n2: b"
+        assert number_lines("a\nb", number_separator=": ") == "1: a\n2: b"
 
     def test_trailing_newline_preserved(self) -> None:
         assert number_lines("a\nb\n") == "1\ta\n2\tb\n"
@@ -66,13 +66,13 @@ class TestTrimLines:
         assert trim_lines("  hello  ") == "hello"
 
     def test_both_false_keeps_leading_spaces(self) -> None:
-        assert trim_lines("  hello  ", both=False) == "  hello"
+        assert trim_lines("  hello  ", trailing=True) == "  hello"
 
     def test_both_strips_leading_and_trailing(self) -> None:
-        assert trim_lines("  hello  ", both=True) == "hello"
+        assert trim_lines("  hello  ", trailing=False) == "hello"
 
     def test_both_empty_line_stays_empty(self) -> None:
-        assert trim_lines("  ", both=True) == ""
+        assert trim_lines("  ", trailing=False) == ""
 
     def test_multiline_each_line_trimmed(self) -> None:
         assert trim_lines("foo  \nbar  \nbaz  ") == "foo\nbar\nbaz"
@@ -81,10 +81,10 @@ class TestTrimLines:
         assert trim_lines("foo  \n\nbar  ") == "foo\n\nbar"
 
     def test_multiline_both(self) -> None:
-        assert trim_lines("  foo  \n  bar  ", both=True) == "foo\nbar"
+        assert trim_lines("  foo  \n  bar  ", trailing=False) == "foo\nbar"
 
     def test_multiline_trailing_only_keeps_indentation(self) -> None:
-        assert trim_lines("  foo  \n    bar  ", both=False) == "  foo\n    bar"
+        assert trim_lines("  foo  \n    bar  ", trailing=True) == "  foo\n    bar"
 
     def test_trailing_newline_preserved(self) -> None:
         assert trim_lines("hello  \n") == "hello\n"
@@ -214,12 +214,20 @@ class TestSortLines:
     def test_numeric_sort(self) -> None:
         assert sort_lines("10\n2\n1\n20", numeric=True) == "1\n2\n10\n20"
 
-    def test_numeric_non_numeric_lines_at_end(self) -> None:
-        result = sort_lines("10\napple\n2", numeric=True)
-        lines = result.split("\n")
-        assert lines[0] == "2"
-        assert lines[1] == "10"
-        assert lines[2] == "apple"
+    def test_numeric_line_without_number_is_zero(self) -> None:
+        # GNU sort -n: no leading number compares as 0.
+        assert sort_lines("10\napple\n2\n-1", numeric=True) == "-1\napple\n2\n10"
+
+    def test_numeric_uses_the_leading_number(self) -> None:
+        result = sort_lines("10 apples\n2 pears\n  3 figs", numeric=True)
+        assert result == "2 pears\n  3 figs\n10 apples"
+
+    def test_numeric_has_no_exponents_or_inf(self) -> None:
+        # Exponents are sort -g territory; -n reads "1e3" as 1 and "inf" as 0.
+        assert sort_lines("1e3\n2\ninf", numeric=True) == "inf\n1e3\n2"
+
+    def test_numeric_ties_fall_back_to_the_whole_line(self) -> None:
+        assert sort_lines("1 b\n1 a\n0 z", numeric=True) == "0 z\n1 a\n1 b"
 
     def test_numeric_floats(self) -> None:
         assert sort_lines("10.5\n2.1\n-1.0", numeric=True) == "-1.0\n2.1\n10.5"

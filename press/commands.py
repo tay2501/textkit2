@@ -52,23 +52,25 @@ class CliArg(NamedTuple):
     flags: tuple[str, ...]
     kwarg: str
     help: str
-    action: str | None = None  # "store_true" for boolean flags; None = value option
+    action: str | None = None  # "store_true"/"append"/...; None = single-value option
     type: Callable[[str], Any] | None = None
     default: Any = None
     metavar: str | None = None
+    required: bool = False
 
 
 def _check_cli_args(commands: Iterable[ParametricCommand]) -> None:
     """Reject any ``CliArg`` that mixes an argparse action with value fields.
 
-    Actions like ``"store_true"`` supply their own default and take no value,
-    so combining them with ``type``/``default``/``metavar`` would be silently
-    ignored during registration.  Called on :data:`PARAMETRIC_COMMANDS` at
-    import time so the mistake fails fast (the job ``__post_init__`` did while
-    these were dataclasses).
+    Flag actions like ``"store_true"`` supply their own default and take no
+    value, so combining them with ``type``/``default``/``metavar`` would be
+    silently ignored during registration.  ``"append"`` takes values, so it is
+    exempt.  Called on :data:`PARAMETRIC_COMMANDS` at import time so the
+    mistake fails fast (the job ``__post_init__`` did while these were
+    dataclasses).
     """
     for arg in (arg for cmd in commands for arg in cmd.cli_args):
-        if arg.action is not None and (
+        if arg.action not in (None, "append") and (
             arg.type is not None or arg.default is not None or arg.metavar is not None
         ):
             raise ValueError(
@@ -104,22 +106,22 @@ SIMPLE_COMMANDS: tuple[SimpleCommand, ...] = (
     SimpleCommand("fullwidth",      "press.transforms.width",      "to_fullwidth",          ("fw",),   "Convert half-width characters to full-width"),
     SimpleCommand("enlarge-kana",   "press.transforms.width",      "to_enlarge_smallkana",  ("ek",),   "Expand small kana to normal size (ぁ→あ, ァ→ア)"),
     # --- whitespace ---
-    SimpleCommand("normalize",      "press.transforms.whitespace", "normalize_whitespace",  ("norm",), "Normalize whitespace and blank lines"),
+    SimpleCommand("collapse-whitespace", "press.transforms.whitespace", "collapse_whitespace", (), "Collapse runs of spaces/tabs to one space, strip each line, drop blank lines"),
     # --- line endings ---
     SimpleCommand("crlf",           "press.transforms.lineending", "to_crlf",               (),        r"Convert line endings to CRLF (\r\n)"),
     SimpleCommand("lf",             "press.transforms.lineending", "to_lf",                 (),        r"Convert line endings to LF (\n)"),
     SimpleCommand("cr",             "press.transforms.lineending", "to_cr",                 (),        r"Convert line endings to CR (\r)"),
     SimpleCommand("strip-newlines", "press.transforms.lineending", "strip_newlines",        ("nn",),   "Remove all line endings, leaving one line (inserts nothing)"),
     # --- separator ---
-    SimpleCommand("underscore",     "press.transforms.separator",  "hyphen_to_underscore",  ("us", "underbar", "ub"), "Convert hyphens to underscores"),
+    SimpleCommand("underscore",     "press.transforms.separator",  "hyphen_to_underscore",  ("us",),   "Convert hyphens to underscores"),
     SimpleCommand("hyphen",         "press.transforms.separator",  "underscore_to_hyphen",  ("hy",),   "Convert underscores to hyphens"),
-    SimpleCommand("strip-commas",   "press.transforms.separator",  "strip_commas",          ("sc",),   "Remove commas from text (e.g. 1,234 → 1234)"),
+    SimpleCommand("strip-commas",   "press.transforms.separator",  "strip_commas",          ("scm",),  "Remove commas from text (e.g. 1,234 → 1234)"),
     SimpleCommand("digits-only",    "press.transforms.separator",  "digits_only",           ("dg",),   "Keep only digit characters, removing everything else (e.g. ¥1,234 → 1234)"),
     # --- escape ---
-    SimpleCommand("unicode-decode", "press.transforms.escape",     "decode_unicode_escape", ("ud",),   r"Decode \uXXXX escape sequences to text"),
-    SimpleCommand("unicode-encode", "press.transforms.escape",     "encode_unicode_escape", ("ue",),   r"Encode text to \uXXXX escape sequences"),
-    SimpleCommand("html-decode",    "press.transforms.escape",     "decode_html_entities",  ("hd",),   "Decode HTML entities (e.g. &amp; → &)"),
-    SimpleCommand("html-encode",    "press.transforms.escape",     "encode_html_entities",  ("he",),   "Escape HTML special characters (e.g. & → &amp;)"),
+    SimpleCommand("unicode-unescape", "press.transforms.escape",   "unicode_unescape",      ("uu",),   r"Decode \uXXXX escape sequences to text"),
+    SimpleCommand("unicode-escape", "press.transforms.escape",     "unicode_escape",        ("ue",),   r"Encode text to \uXXXX escape sequences"),
+    SimpleCommand("html-unescape",  "press.transforms.escape",     "html_unescape",         ("hu",),   "Decode HTML entities (e.g. &amp; → &)"),
+    SimpleCommand("html-escape",    "press.transforms.escape",     "html_escape",           ("he",),   "Escape HTML special characters (e.g. & → &amp;)"),
     # --- kana ---
     SimpleCommand("katakana",       "press.transforms.kana",       "to_katakana",           ("kata",), "Convert hiragana to katakana (ひらがな → カタカナ)"),
     SimpleCommand("hiragana",       "press.transforms.kana",       "to_hiragana",           ("hira",), "Convert katakana to hiragana (カタカナ → ひらがな)"),
@@ -145,9 +147,9 @@ SIMPLE_COMMANDS: tuple[SimpleCommand, ...] = (
     SimpleCommand("nfkd",           "press.transforms.unicode_norm", "to_nfkd",             (),        "Normalize to NFKD (compatibility decomposition)"),
     SimpleCommand("check-norm",     "press.transforms.unicode_norm", "check_norm",          ("cn",),   "Report which Unicode normalization forms (NFC/NFD/NFKC/NFKD) the text satisfies"),
     # --- json ---
-    SimpleCommand("json-compress",  "press.transforms.json_fmt",   "json_compress",         ("jc",),   "Compress JSON to single line"),
+    SimpleCommand("json-compact",   "press.transforms.json_fmt",   "json_compact",          ("jc",),   "Print JSON on one line (jq -c)"),
     # --- lines (no-arg) ---
-    SimpleCommand("reverse-lines",  "press.transforms.lines",      "reverse_lines",         ("rl",),   "Reverse the order of lines"),
+    SimpleCommand("reverse-lines",  "press.transforms.lines",      "reverse_lines",         ("tac", "rl"), "Reverse the order of lines"),
     # --- stats ---
     SimpleCommand("count",          "press.transforms.stats",      "count_text",            ("wc",),   "Count characters, words, lines, and UTF-8 bytes"),
     # --- table ---
@@ -170,8 +172,18 @@ def _sql_in_daemon_kwargs(cfg: PressConfig) -> dict[str, Any]:
     return {"quote_char": cfg.sql_in.quote_char, "wrap": cfg.sql_in.wrap}
 
 
+def _indent_width(value: str) -> int:
+    """argparse ``type`` for ``json-format --indent``: jq's range, 0 to 7."""
+    import argparse
+
+    width = int(value)
+    if not 0 <= width <= 7:
+        raise argparse.ArgumentTypeError(f"indent must be 0-7 (as in jq), got {width}")
+    return width
+
+
 def _trim_daemon_kwargs(cfg: PressConfig) -> dict[str, Any]:
-    return {"both": cfg.trim.both}
+    return {"trailing": cfg.trim.trailing}
 
 
 PARAMETRIC_COMMANDS: tuple[ParametricCommand, ...] = (
@@ -181,21 +193,11 @@ PARAMETRIC_COMMANDS: tuple[ParametricCommand, ...] = (
         "trim_lines",
         ("tm",),
         "Strip leading and trailing whitespace from each line",
-        # Both flags share dest "both".  argparse takes a shared dest's default
-        # from the FIRST action registered, so --trailing (store_false, default
-        # True) must stay first or `press trim` silently becomes trailing-only
-        # and disagrees with the hotkey.  test_cli.TestTrim pins the default.
         cli_args=(
             CliArg(
                 ("--trailing", "-t"),
-                "both",
+                "trailing",
                 "Strip trailing whitespace only, keeping indentation (str.rstrip())",
-                action="store_false",
-            ),
-            CliArg(
-                ("--both", "-b"),
-                "both",
-                "Strip leading and trailing whitespace (the default; kept for scripts)",
                 action="store_true",
             ),
         ),
@@ -205,17 +207,19 @@ PARAMETRIC_COMMANDS: tuple[ParametricCommand, ...] = (
         "dedupe",
         "press.transforms.lines",
         "dedupe_lines",
-        ("dq",),
-        "Remove duplicate lines",
+        (),
+        "Remove duplicate lines, keeping the first of each",
+        # Deliberately no `uniq` alias: GNU uniq drops only *adjacent*
+        # repeats, which is --adjacent here, not the default.
         cli_args=(
             CliArg(
                 ("--ignore-case", "-i"),
                 "ignore_case",
-                "Case-insensitive comparison",
+                "Case-insensitive comparison (uniq -i)",
                 action="store_true",
             ),
             CliArg(
-                ("--adjacent", "-a"),
+                ("--adjacent",),
                 "adjacent",
                 "Remove only adjacent duplicates (like GNU uniq)",
                 action="store_true",
@@ -228,16 +232,17 @@ PARAMETRIC_COMMANDS: tuple[ParametricCommand, ...] = (
         "sort_lines",
         ("st",),
         "Sort lines",
+        # Flag letters follow GNU sort: -r, -n, and -f (not -i) for case folding.
         cli_args=(
             CliArg(("--reverse", "-r"), "reverse", "Reverse sort order", action="store_true"),
             CliArg(
-                ("--numeric", "-n"),
+                ("--numeric-sort", "-n"),
                 "numeric",
-                "Numeric sort; non-numeric lines go last",
+                "Sort by each line's leading number; no number counts as 0 (GNU sort -n)",
                 action="store_true",
             ),
             CliArg(
-                ("--ignore-case", "-i"),
+                ("--ignore-case", "-f"),
                 "ignore_case",
                 "Case-insensitive sort",
                 action="store_true",
@@ -289,8 +294,8 @@ PARAMETRIC_COMMANDS: tuple[ParametricCommand, ...] = (
             CliArg(
                 ("--indent",),
                 "indent",
-                "Indentation spaces (default: 2)",
-                type=int,
+                "Indentation spaces, 0-7 as in jq (default: 2)",
+                type=_indent_width,
                 default=2,
                 metavar="N",
             ),
@@ -304,9 +309,9 @@ PARAMETRIC_COMMANDS: tuple[ParametricCommand, ...] = (
         "Compute a hex digest of the text (default: SHA-256)",
         cli_args=(
             CliArg(
-                ("--algo", "-a"),
+                ("--algorithm", "-a"),
                 "algo",
-                "Hash algorithm: sha256, sha1, sha512, md5, ... (default: sha256)",
+                "Python hashlib name: sha256, sha1, sha512, sha3_256, md5, ... (default: sha256)",
                 default="sha256",
                 metavar="NAME",
             ),
@@ -318,18 +323,21 @@ PARAMETRIC_COMMANDS: tuple[ParametricCommand, ...] = (
         "regex_replace",
         ("rp",),
         "Regex (or fixed-string) search & replace",
+        # Flags follow grep/ripgrep: -e (repeatable), -r, -i, -F.
         cli_args=(
             CliArg(
-                ("--pattern", "-p"),
-                "pattern",
-                "Regex pattern to search (empty = no-op)",
-                default="",
-                metavar="REGEX",
+                ("--regexp", "-e"),
+                "patterns",
+                "Pattern to search; repeat to replace any of several",
+                action="append",
+                metavar="PATTERN",
+                required=True,
             ),
             CliArg(
-                ("--repl", "-r"),
+                ("--replace", "-r"),
                 "repl",
-                r"Replacement text; \1 group refs allowed (default: delete matches)",
+                r"Replacement text; Python/sed group refs \1, \g<name> "
+                "(not ripgrep's $1); default: delete matches",
                 default="",
                 metavar="TEXT",
             ),
@@ -340,9 +348,9 @@ PARAMETRIC_COMMANDS: tuple[ParametricCommand, ...] = (
                 action="store_true",
             ),
             CliArg(
-                ("--fixed", "-F"),
+                ("--fixed-strings", "-F"),
                 "fixed",
-                "Treat pattern and replacement as literal strings",
+                "Treat patterns and replacement as literal strings",
                 action="store_true",
             ),
         ),
@@ -353,21 +361,23 @@ PARAMETRIC_COMMANDS: tuple[ParametricCommand, ...] = (
         "number_lines",
         ("nl",),
         "Prefix each line with its line number",
+        # GNU nl's long names.  nl's -v is left out: press uses -v for --verbose.
+        # Unlike nl, every line is numbered (blank ones too) without padding.
         cli_args=(
             CliArg(
-                ("--start",),
-                "start",
+                ("--starting-line-number",),
+                "starting_line_number",
                 "First line number (default: 1)",
                 type=int,
                 default=1,
                 metavar="N",
             ),
             CliArg(
-                ("--sep",),
-                "sep",
-                "Separator between number and line (default: TAB)",
+                ("--number-separator", "-s"),
+                "number_separator",
+                "Text between the number and the line (default: TAB)",
                 default="\t",
-                metavar="SEP",
+                metavar="STRING",
             ),
         ),
     ),
@@ -375,11 +385,11 @@ PARAMETRIC_COMMANDS: tuple[ParametricCommand, ...] = (
         "unix-to-date",
         "press.transforms.timestamp",
         "unix_to_date",
-        ("u2d",),
+        ("ut",),
         "Convert Unix time (seconds or ms, per line) to ISO 8601 date",
         cli_args=(
             CliArg(
-                ("--utc",),
+                ("--utc", "-u"),
                 "utc",
                 "Output in UTC instead of local time",
                 action="store_true",
@@ -390,7 +400,7 @@ PARAMETRIC_COMMANDS: tuple[ParametricCommand, ...] = (
         "date-to-unix",
         "press.transforms.timestamp",
         "date_to_unix",
-        ("d2u",),
+        (),
         "Convert ISO 8601 date (per line) to Unix time in seconds",
         cli_args=(
             CliArg(
@@ -487,7 +497,7 @@ SPECIAL_COMMANDS: tuple[SpecialCommand, ...] = (
     SpecialCommand("hold", (), hotkey=True),
     SpecialCommand("undo", (), hotkey=True),
     SpecialCommand("dict", (), hotkey=True),
-    SpecialCommand("dict_reverse", (), hotkey=True),  # daemon-only; no CLI parser
+    SpecialCommand("dict-reverse", (), hotkey=True),  # daemon-only; no CLI parser
     # Types the clipboard into the focused window instead of pasting it.
     # Daemon-only by nature: run from a shell it would type into that shell.
     # "ty" resolves in two keystrokes; "type" itself stays typeable.
@@ -502,7 +512,7 @@ SPECIAL_COMMANDS: tuple[SpecialCommand, ...] = (
     # CLI-only.  Each exclusion is deliberate:
     # - genpass writes with sensitive=True, which suppresses the undo snapshot
     #   by design — a mistyped sequence would destroy the clipboard with no way
-    #   back, and notify_level defaults to "off" so it would pass unnoticed.
+    #   back, and a success is not notified (notify_level defaults to "error").
     # - uuid ignores its input (a generator, not a transform); making it
     #   hotkey-reachable is a feature decision, not a refactoring one.
     # - chain needs a pipeline name as an argument, which a hotkey cannot

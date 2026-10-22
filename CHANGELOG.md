@@ -77,6 +77,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Reliable `GetLastError` via ctypes**: Win32 helpers now load kernel32 with `WinDLL(use_last_error=True)` and read `ctypes.get_last_error()` per the official ctypes guidance, and declare `CreateMutexW`/HANDLE return types as `c_void_p` so 64-bit handles are not truncated
 
 ### Changed
+- **BREAKING — command names, aliases and flags follow de facto tools.** press has no production users yet, so the old spellings are removed rather than deprecated. Every name now borrows the spelling of the widely used tool that does the same job, and an alias that equals a well-known tool's name must mean what that tool does. Review record: `internal note 20261021_232556_コマンド設計レビュー.md (unpublished)`.
+  - **Renamed commands:**
+    - `normalize`/`norm` → `collapse-whitespace`.
+    - `json-compress` → `json-compact` (jq `-c/--compact-output`; alias `jc` kept).
+    - `html-encode`/`html-decode` → `html-escape`/`html-unescape`, aliases `he`/`hu` (Python `html.escape`/`unescape`).
+    - `unicode-encode`/`unicode-decode` → `unicode-escape`/`unicode-unescape`, aliases `ue`/`uu` (Python's `unicode_escape` codec).
+    - The daemon-only `dict_reverse` → `dict-reverse` (the `shift+d` default binding follows).
+  - **Removed aliases:**
+    - `hd`: util-linux `hexdump -C`.
+    - `sc`: Windows `sc.exe`; strip-commas is now `scm`.
+    - `u2d`/`d2u`: cygutils' unix2dos/dos2unix; unix-to-date is now `ut`.
+    - `dq` and `underbar`/`ub`.
+    - `dedupe` deliberately gets no `uniq` alias, because GNU uniq removes only adjacent repeats. `lf`/`crlf` get no `dos2unix`/`unix2dos` alias, because dos2unix also strips a BOM and leaves a lone CR. `reverse-lines` gains `tac`.
+  - **Clipboard I/O flags:**
+    - `-c/--clip-in` → `--from-clipboard` (no short flag; a terminal already reads the clipboard by default).
+    - `-C/--clip-out` → `-C/--copy` (pbcopy/wl-copy wording, and no more `-c`/`-C` pair that differs only by case).
+  - **`replace`** (grep/ripgrep):
+    - `-p/--pattern` → `-e/--regexp`, required and repeatable; several patterns replace any of them.
+    - `--repl` → `-r/--replace`.
+    - `--fixed` → `-F/--fixed-strings`.
+    - A missing pattern now fails on every path: the CLI exits 2, and the hotkey and a `chain`/pipeline step report an error. Before, it silently returned the text unchanged.
+  - **`sort`** (GNU sort): `--numeric` → `-n/--numeric-sort`, and `-i` → `-f/--ignore-case`. `-n` now behaves like GNU `sort -n`: it compares each line's leading number, a line without one counts as 0 instead of going last, there are no exponents or `inf`, and ties compare the whole line.
+  - **Other flags:**
+    - `dedupe`: `-a/--adjacent` → `--adjacent`.
+    - `number-lines`: `--start`/`--sep` → `--starting-line-number`/`-s/--number-separator` (GNU nl; nl's `-v` is left out because press uses it for `--verbose`).
+    - `hash`: `--algo` → `-a/--algorithm` (GNU cksum).
+    - `unix-to-date`: gains `-u` for `--utc` (GNU date).
+    - `json-format --indent` accepts 0-7, as jq does.
+    - `trim`: `--both/-b` is removed (it was the default), and the `[trim]` config key `both = true` becomes `trailing = false` to match `--trailing`.
+    - `genpass`: `-n/--length` → `-L/--length` (keepassxc-cli). `-s/--symbols` → `-y/--symbols` (pwgen; keepassxc-cli's `-s` means *only* special characters). `-N/--no-clip` → `--no-copy`, beside `-C/--copy`.
+    - `uuid`: `-n/--count` and `-U/--upper` become long-only, because uuidgen's `-C/--count` collides with `--copy`.
+    - `config reset --key` → `--section`.
+  - **Abbreviated long options are rejected everywhere** (`allow_abbrev=False` on every subparser), so `--trail` no longer means `--trailing`.
+  - **Pipe protocol version 2.** A CLI from this release never delegates to a daemon started from an older install; it transforms locally until the daemon is restarted.
+  - **Pipeline names can now collide with new aliases.** A `[pipelines]` entry named `tac`, `scm`, `hu`, `uu`, `ut` or `json-compact` now shadows a command, and `press config validate` reports it.
 - **`[ui] notify_level` defaults to `"error"`** (was `"off"`), so a failed transform or a mistyped hotkey sequence is reported while successes stay quiet. An unknown `notify_level` value now falls back to this default instead of `"off"`. Set `notify_level = "off"` to restore the old silence permanently, or `press notify off` to mute temporarily
 - **The default hotkey prefix is now `Ctrl+Alt+K`** (breaking), replacing `Ctrl+Shift+0`, which Windows can claim as an input-language switch key. Checked against PowerToys v0.101, VS Code's default keybindings and Sakura Editor's defaults: none bind it. `Ctrl+Alt+Space` was tried first and rejected — Claude Desktop opens its quick-entry box on it (observed on real hardware, both fired) and the VS Code extension Continue binds it; `Ctrl+Alt+P` opens Sakura Editor's page-setup dialog. The prefix chord is not suppressed and still reaches the focused application, so these collisions matter; see `docs/user/hotkeys.md`. `_to_pynput_hotkey` now wraps every multi-character key name in `<>` (`space` → `<space>`, also `tab`, `enter`, …) — pynput's `HotKey.parse` raised `ValueError` on a bare `space`, so no Space-based prefix could start the daemon before. **Who is affected:** anyone relying on the default. A `config.toml` that sets `prefix` keeps its value — including one written by `press config reset`, which spells out `ctrl+shift+0`; edit it to adopt the new chord, or set `prefix = "ctrl+shift+0"` to keep the old one
 - **Python 3.15 is fully supported, and the release `.exe` is built on it.** The 3.15 CI lane is no longer allow-failure: 3.15.0 final (2026-10-09) passed ruff, mypy and the full suite on Ubuntu and Windows, every daemon dependency ships a 3.15 Windows wheel (pywin32 312 and Pillow 12.3.0 `cp315`, psutil `abi3`, pystray/pynput pure Python), PyInstaller supports 3.15 since 6.21.0, and a 3.15 `--onedir` build was checked on real hardware (CLI transforms, daemon start/quit, a hotkey transform, pipe delegation). `release.yml` now installs 3.15 instead of 3.13; 3.13 and 3.14 stay supported
