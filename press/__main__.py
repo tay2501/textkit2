@@ -92,7 +92,8 @@ def _register_transform_command(sub: _SubParsers, cmd: SimpleCommand | Parametri
         # so this checks the marker the same way daemon_pid_path() does.
         from press._pipe import trace_marker_path
 
-        tracing = os.path.exists(trace_marker_path())  # noqa: PTH110
+        # -q promises no stderr at all, so it skips the timing as well.
+        tracing = not a.quiet and os.path.exists(trace_marker_path())  # noqa: PTH110
         phases: dict[str, float] = {}
 
         def _apply(text: str, **kw: Any) -> str:
