@@ -37,7 +37,7 @@ def format_catalog(catalog: CommandCatalog, width: int) -> str:
 def _wrap_entries(entries: list[str], width: int) -> list[str]:
     """Pack comma-separated *entries* into indented lines of at most *width*.
 
-    Unlike ``textwrap``, never breaks inside an entry, so ``html-decode (hd)``
+    Unlike ``textwrap``, never breaks inside an entry, so ``html-unescape (hu)``
     stays on one line.  An entry longer than *width* gets a line of its own.
     """
     lines: list[str] = []

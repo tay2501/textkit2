@@ -30,7 +30,10 @@ import os
 import sys
 from typing import Any
 
-PROTOCOL_VERSION = 1
+# Bump whenever a command name or a transform keyword changes.  The pipe name
+# embeds it, so a new CLI never reaches a daemon started from an older install
+# (it would answer "unknown command") and transforms locally instead.
+PROTOCOL_VERSION = 2
 
 # Response deadline.  Transforms finish in single-digit milliseconds; a wedged
 # daemon must never hang the CLI, so we give up and transform locally instead.

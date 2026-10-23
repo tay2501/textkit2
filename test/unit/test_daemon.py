@@ -543,7 +543,7 @@ class TestLeaderKeySequences:
     def test_hyphenated_name_typed(self) -> None:
         ll, q = self._make_listener()
         self._type(ll, "html-e")
-        assert q.get_nowait() == ("dispatch", "html-encode")
+        assert q.get_nowait() == ("dispatch", "html-escape")
 
     def test_pipeline_name_dispatchable(self) -> None:
         from press.commands import hotkey_sequence_candidates

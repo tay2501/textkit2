@@ -30,7 +30,7 @@ def _register_config_commands(sub: _SubParsers) -> None:
     # would put tomllib and pathlib on the startup path.  The list is pinned to
     # the registry by test_config.TestSectionRegistry instead.
     rst_p.add_argument(
-        "--key",
+        "--section",
         choices=["hotkeys", "sql_in", "trim", "dictionary", "ui", "hold", "type", "pipelines"],
         default=None,
         metavar="SECTION",
@@ -73,7 +73,7 @@ def _handle_config(args: argparse.Namespace) -> int:
                 print(f"press config validate: warning: {warning}", file=sys.stderr)
             return 0 if ok else 1
         case "reset":
-            key: str | None = getattr(args, "key", None)
+            key: str | None = getattr(args, "section", None)
             try:
                 backed_up = config_reset(cfg_path, key=key)
                 if backed_up:

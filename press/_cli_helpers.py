@@ -61,7 +61,7 @@ def report_error(cmd: str, exc: BaseException, *, quiet: bool = False) -> int:
 
 def _read_input(args: argparse.Namespace) -> str:
     """Read input: clipboard (TTY default), positional arg, stdin pipe, or '-' sentinel."""
-    if getattr(args, "clip_in", False):
+    if getattr(args, "from_clipboard", False):
         from press.clipboard import get_clipboard_text
 
         return get_clipboard_text()
@@ -81,7 +81,7 @@ def _write_output(text: str, args: argparse.Namespace) -> None:
     """Write output to stdout and optionally to clipboard."""
     sys.stdout.write(text)
     sys.stdout.flush()
-    if getattr(args, "clip_out", False):
+    if getattr(args, "copy", False):
         from press.clipboard import set_clipboard_text
 
         _snapshot_clipboard_for_undo()
@@ -179,12 +179,18 @@ def _add_io_args(parser: argparse.ArgumentParser, *, positional: bool = True) ->
     Pass ``positional=False`` for commands that do not accept inline text input
     (e.g. ``dict``, which always reads from clipboard or a pipeline).
     """
-    parser.add_argument("-c", "--clip-in", action="store_true", help="Read input from clipboard")
+    # pbcopy/pbpaste wording.  Reading has no short flag: a TTY already reads
+    # the clipboard by default, so it is only needed when stdin is not a TTY.
+    parser.add_argument(
+        "--from-clipboard",
+        action="store_true",
+        help="Read input from the clipboard even when stdin is not a TTY",
+    )
     parser.add_argument(
         "-C",
-        "--clip-out",
+        "--copy",
         action="store_true",
-        help="Write output to clipboard (also prints to stdout)",
+        help="Also copy the output to the clipboard",
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="Show before/after on stderr")
     parser.add_argument("-q", "--quiet", action="store_true", help="Suppress all stderr output")

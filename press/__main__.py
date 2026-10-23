@@ -8,7 +8,7 @@ import locale
 import os
 import sys
 from functools import partial
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, Any, cast, override
 
 from press._cli_helpers import (
     _add_io_args,
@@ -26,6 +26,21 @@ if TYPE_CHECKING:
 
 # category -> the commands in it, each as [name, *aliases]
 type CommandCatalog = dict[str, list[list[str]]]
+
+
+class _Parser(argparse.ArgumentParser):
+    """ArgumentParser that rejects abbreviated long options.
+
+    ``allow_abbrev`` is a constructor argument that ``add_parser`` does not
+    inherit, but ``add_subparsers`` builds every subparser with
+    ``type(self)`` — so setting the default here reaches every subcommand.
+    Without it ``press trim --trail`` meant ``--trailing``, and adding any
+    option sharing that prefix would silently change what old scripts do.
+    """
+
+    def __init__(self, **kwargs: Any) -> None:
+        kwargs.setdefault("allow_abbrev", False)
+        super().__init__(**kwargs)
 
 
 class _LazyVersionAction(argparse.Action):
@@ -72,7 +87,13 @@ def _register_transform_command(sub: _SubParsers, cmd: SimpleCommand | Parametri
     _add_io_args(p)
     for arg in cli_args:
         kwargs: dict[str, Any] = {"dest": arg.kwarg, "help": arg.help}
-        if arg.action is not None:
+        if arg.required:
+            kwargs["required"] = True
+        if arg.action == "append":
+            kwargs["action"] = arg.action
+            if arg.metavar is not None:
+                kwargs["metavar"] = arg.metavar
+        elif arg.action is not None:
             kwargs["action"] = arg.action
         else:
             kwargs["default"] = arg.default
@@ -186,8 +207,10 @@ def _register_genpass_command(sub: _SubParsers) -> None:
         aliases=special_aliases("genpass"),
         help="Generate a secure random password",
     )
+    # -L/--length as in keepassxc-cli generate; -y/--symbols as in pwgen, whose
+    # meaning ("also include") matches — keepassxc-cli's -s means "only".
     p.add_argument(
-        "-n",
+        "-L",
         "--length",
         type=bounded_int(1, "length"),
         default=20,
@@ -195,17 +218,18 @@ def _register_genpass_command(sub: _SubParsers) -> None:
         help="Password length (default: 20)",
     )
     p.add_argument(
-        "-s",
+        "-y",
         "--symbols",
         action="store_true",
-        help="Include ASCII punctuation characters",
+        help="Also include ASCII punctuation characters",
     )
-    p.add_argument("-C", "--clip-out", action="store_true", help="Write output to clipboard")
+    # None = automatic: copy when stdout is a terminal.
     p.add_argument(
-        "-N",
-        "--no-clip",
-        action="store_true",
-        help="Do NOT write to clipboard even on a TTY (prevents accidental overwrite)",
+        "-C",
+        "--copy",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Copy the password to the clipboard (default: only when stdout is a terminal)",
     )
     p.add_argument("-q", "--quiet", action="store_true", help="Suppress all stderr output")
     p.add_argument(
@@ -225,10 +249,11 @@ def _register_genpass_command(sub: _SubParsers) -> None:
         password = generate_password(length=a.length, symbols=a.symbols)
         sys.stdout.write(password)
         sys.stdout.flush()
-        # On a TTY, auto-write to clipboard so the password is immediately pasteable.
-        # --no-clip (-N) suppresses this to avoid overwriting an existing clipboard value.
+        # On a TTY, auto-copy so the password is immediately pasteable;
+        # --no-copy keeps an existing clipboard value.
         wrote_clipboard = False
-        if (a.clip_out or sys.stdout.isatty()) and not a.no_clip:
+        copy = sys.stdout.isatty() if a.copy is None else a.copy
+        if copy:
             # sensitive=True keeps the password out of the Win+V clipboard
             # history and Cloud Clipboard sync (KeePassXC-style exclusion).
             wrote_clipboard = write_clipboard_or_warn(
@@ -249,20 +274,20 @@ def _register_genpass_command(sub: _SubParsers) -> None:
 
 def _register_uuid_command(sub: _SubParsers) -> None:
     p = sub.add_parser("uuid", help="Generate random UUIDs (version 4)")
+    # Long-only: uuidgen spells the count -C/--count, but -C is --copy here.
     p.add_argument(
-        "-n",
         "--count",
         type=bounded_int(1, "count"),
         default=1,
         metavar="N",
         help="Number of UUIDs to generate, one per line (default: 1)",
     )
-    p.add_argument("-U", "--upper", action="store_true", help="Uppercase output")
+    p.add_argument("--upper", action="store_true", help="Uppercase output")
     p.add_argument(
         "-C",
-        "--clip-out",
+        "--copy",
         action="store_true",
-        help="Write output to clipboard (also prints to stdout)",
+        help="Also copy the output to the clipboard",
     )
     p.add_argument("-q", "--quiet", action="store_true", help="Suppress all stderr output")
 
@@ -274,7 +299,7 @@ def _register_uuid_command(sub: _SubParsers) -> None:
             values = values.upper()
         sys.stdout.write(values + "\n")
         sys.stdout.flush()
-        if a.clip_out:
+        if a.copy:
             # Mirrors genpass: stdout already delivered the value, so a
             # clipboard failure is a warning, not a command failure.
             write_clipboard_or_warn(values, cmd="uuid", quiet=a.quiet)
@@ -409,7 +434,7 @@ def _build_parser() -> tuple[argparse.ArgumentParser, CommandCatalog]:
     from press._cli_trace import _register_trace_commands
     from press.commands import PARAMETRIC_COMMANDS, SIMPLE_COMMANDS, TRANSFORM_CATEGORIES
 
-    parser = argparse.ArgumentParser(
+    parser = _Parser(
         prog="press",
         description="Clipboard text transformation tool",
     )
@@ -419,7 +444,9 @@ def _build_parser() -> tuple[argparse.ArgumentParser, CommandCatalog]:
         nargs=0,
         help="show program's version number and exit",
     )
-    sub = parser.add_subparsers(dest="command", metavar="COMMAND")
+    # The action builds _Parser instances; the registration helpers only need
+    # ArgumentParser, and _SubParsersAction is invariant in its parser type.
+    sub = cast("_SubParsers", parser.add_subparsers(dest="command", metavar="COMMAND"))
 
     # (category, first command name, registration step).  Transform parsers
     # and handlers are generated from the registry; each special-purpose

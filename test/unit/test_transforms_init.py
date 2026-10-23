@@ -30,9 +30,9 @@ class TestLazyLoading:
         """Lazy-loaded to_halfwidth should produce correct output."""
         assert _t.to_halfwidth("ａｂｃ１２３") == "abc123"
 
-    def test_normalize_whitespace_works(self) -> None:
-        """Lazy-loaded normalize_whitespace should produce correct output."""
-        assert _t.normalize_whitespace("hello   world") == "hello world"
+    def test_collapse_whitespace_works(self) -> None:
+        """Lazy-loaded collapse_whitespace should produce correct output."""
+        assert _t.collapse_whitespace("hello   world") == "hello world"
 
     def test_to_sql_in_works(self) -> None:
         """Lazy-loaded to_sql_in should produce correct output."""

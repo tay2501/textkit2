@@ -24,7 +24,7 @@
 Add the `press config` subcommand family.
 
 - [x] `press config validate` — parse `config.toml` and report errors without starting the daemon
-- [x] `press config reset [--key SECTION]` — overwrite with defaults (creates `.toml.bak` backup); `--key` limits to one section
+- [x] `press config reset [--section SECTION]` — overwrite with defaults (creates `.toml.bak` backup); `--section` limits to one section
 - [x] `schema_version` field in `PressConfig` + forward-compatible detection (validate fails for unknown future versions)
 
 ---

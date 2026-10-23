@@ -172,7 +172,7 @@ than typing a name for the handful you use constantly. Three defaults ship:
 
 | Key after prefix | Command | Why a binding |
 |---|---|---|
-| `Shift+D` | dict_reverse | reverse lookup has no CLI name to type |
+| `Shift+D` | dict-reverse | reverse lookup has no CLI name to type |
 | `Shift+M` | notify-off | a screen share can start without warning |
 | `Shift+Z` | undo | a panic key deserves a single stroke |
 

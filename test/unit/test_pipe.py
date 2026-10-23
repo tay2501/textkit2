@@ -10,17 +10,19 @@ from unittest.mock import patch
 
 import pytest
 
+from press._pipe import PROTOCOL_VERSION
+
 
 class TestProtocolEncoding:
     def test_request_round_trips_through_json(self) -> None:
         from press._pipe import PROTOCOL_VERSION, encode_request
 
-        payload = json.loads(encode_request("trim", "  a  ", {"both": True}).decode("utf-8"))
+        payload = json.loads(encode_request("trim", "  a  ", {"trailing": True}).decode("utf-8"))
         assert payload == {
             "v": PROTOCOL_VERSION,
             "cmd": "trim",
             "text": "  a  ",
-            "kwargs": {"both": True},
+            "kwargs": {"trailing": True},
         }
 
     def test_success_response_carries_text(self) -> None:
@@ -246,8 +248,8 @@ class TestHandleRequest:
         from press.daemon._pipe import handle_request
 
         d = _FakeDispatcher(result="a")
-        handle_request(d, self._request("trim", "a  ", {"both": True}))
-        assert d.calls[0][2] == {"both": True}
+        handle_request(d, self._request("trim", "a  ", {"trailing": True}))
+        assert d.calls[0][2] == {"trailing": True}
 
     def test_parametric_alias_resolves(self) -> None:
         from press.daemon._pipe import handle_request
@@ -270,7 +272,7 @@ class TestHandleRequest:
         from press.daemon._pipe import handle_request
 
         d = _FakeDispatcher()
-        for cmd in ("hold", "clear", "dict", "dict_reverse"):
+        for cmd in ("hold", "clear", "dict", "dict-reverse"):
             reply = json.loads(handle_request(d, self._request(cmd)))
             assert reply["ok"] is False, cmd
         assert d.calls == []
@@ -309,7 +311,9 @@ class TestHandleRequest:
     def test_bad_text_type_is_rejected(self) -> None:
         from press.daemon._pipe import handle_request
 
-        raw = json.dumps({"v": 1, "cmd": "halfwidth", "text": 42, "kwargs": {}}).encode()
+        raw = json.dumps(
+            {"v": PROTOCOL_VERSION, "cmd": "halfwidth", "text": 42, "kwargs": {}}
+        ).encode()
         reply = json.loads(handle_request(_FakeDispatcher(), raw))
         assert reply["ok"] is False
 
@@ -332,7 +336,9 @@ class TestHandleRequestTimed:
         monkeypatch.setattr(dpipe, "timed", fake_timed)
 
         d = _FakeDispatcher(result="ABC")
-        raw = json.dumps({"v": 1, "cmd": "halfwidth", "text": "x", "kwargs": {}}).encode()
+        raw = json.dumps(
+            {"v": PROTOCOL_VERSION, "cmd": "halfwidth", "text": "x", "kwargs": {}}
+        ).encode()
         dpipe.handle_request(d, raw)
 
         assert calls == [("pipe.transform", {})]
@@ -351,7 +357,9 @@ class TestHandleRequestTimed:
 
         monkeypatch.setattr(dpipe, "timed", fake_timed)
 
-        raw = json.dumps({"v": 1, "cmd": "rm-rf", "text": "x", "kwargs": {}}).encode()
+        raw = json.dumps(
+            {"v": PROTOCOL_VERSION, "cmd": "rm-rf", "text": "x", "kwargs": {}}
+        ).encode()
         dpipe.handle_request(_FakeDispatcher(), raw)
 
         assert calls == []
@@ -504,9 +512,9 @@ class TestCliDelegation:
     ) -> None:
         """CLI flags must win over the daemon's config defaults."""
         with patch("press._pipe.try_delegate", return_value="a") as td:
-            assert _run_cli(["trim", "--both", "  a  "]) == 0
+            assert _run_cli(["trim", "--trailing", "  a  "]) == 0
         assert td.call_args.args[0] == "trim"
-        assert td.call_args.args[2] == {"both": True}
+        assert td.call_args.args[2] == {"trailing": True}
         assert capsys.readouterr().out == "a"
 
     def test_daemon_error_is_reported_like_a_local_error(

@@ -13,7 +13,7 @@ def _clean_line(line: str) -> str:
     return line.strip()
 
 
-def normalize_whitespace(text: str) -> str:
+def collapse_whitespace(text: str) -> str:
     """Normalize whitespace: collapse runs, strip leading/trailing, remove blank lines."""
     normalized = to_lf(text)
     return "\n".join(cleaned for line in normalized.split("\n") if (cleaned := _clean_line(line)))

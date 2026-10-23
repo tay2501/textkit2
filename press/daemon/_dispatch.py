@@ -114,7 +114,7 @@ class CommandDispatcher:
         match command:
             case "dict":
                 return self._run_dict(text, reverse=False)
-            case "dict_reverse":
+            case "dict-reverse":
                 return self._run_dict(text, reverse=True)
             case _:
                 pipeline = self._config.pipelines.get(command)

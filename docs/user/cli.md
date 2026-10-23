@@ -8,20 +8,22 @@
 |---|---|
 | Positional argument | `press upper "hello"` |
 | stdin | piped or redirected (`echo hi \| press upper`), or `-` as the argument |
-| Clipboard | `-c`, **or** run from a terminal with no argument and no pipe |
+| Clipboard | run from a terminal with no argument and no pipe, **or** `--from-clipboard` |
 
-Output always goes to **stdout**. `-C` also writes it to the clipboard — and
+Output always goes to **stdout**. `-C` also copies it to the clipboard — and
 first saves the text it overwrites, so `press undo` can put it back.
 
 | Flag | Meaning |
 |---|---|
-| `-c` / `--clip-in` | Read from the clipboard |
-| `-C` / `--clip-out` | Also write the result to the clipboard |
+| `-C` / `--copy` | Also copy the result to the clipboard (as `pbcopy` / `wl-copy` would) |
+| `--from-clipboard` | Read the clipboard even when stdin is not a terminal (scripts, Task Scheduler) |
 | `-v` / `--verbose` | Show before/after on stderr |
 | `-q` / `--quiet` | No stderr output |
 | `--fallback` | On a transform error, print the input unchanged and exit 0 |
 
-Errors print as `press <command>: error: <message>` and exit 1.
+Errors print as `press <command>: error: <message>` and exit 1; a usage error
+(unknown flag, missing required option) exits 2. Long options must be spelled
+out in full — `--trail` is not accepted for `--trailing`.
 
 ```{tip}
 When the daemon is running, transforms are delegated to it over a named pipe,
@@ -63,11 +65,15 @@ something that cannot be undone.
 
 ```bash
 press genpass                  # 20 chars → stdout, and the clipboard on a TTY
-press genpass -n 32 -s         # 32 chars with ASCII punctuation
-press genpass -N               # never touch the clipboard
+press genpass -L 32 -y         # 32 chars with ASCII punctuation
+press genpass --no-copy        # never touch the clipboard
 press genpass --clear-after 12 # clear after 12 s if the clipboard still holds it
-press uuid -n 5 -U -C          # five uppercase UUID v4s, also to the clipboard
+press uuid --count 5 --upper -C  # five uppercase UUID v4s, also to the clipboard
 ```
+
+`-L/--length` follows `keepassxc-cli generate` and `-y/--symbols` follows
+`pwgen` (both add to the character set). `uuid` has no short flags: `uuidgen`
+spells the count `-C`, which is `--copy` in press.
 
 `genpass` uses `secrets` and writes with the Windows sensitive-content formats,
 so the password stays out of Win+V history and Cloud Clipboard sync.
@@ -88,7 +94,7 @@ File format and location: {doc}`dictionary`.
 
 | Command | Purpose |
 |---|---|
-| `press config validate` / `reset [--key SECTION]` | Check or restore `config.toml` ({doc}`config`) |
+| `press config validate` / `reset [--section SECTION]` | Check or restore `config.toml` ({doc}`config`) |
 | `press notify off` / `on` / `status` | Mute the daemon's tray notifications, e.g. for screen sharing; `off` is not a toggle ({doc}`hotkeys`) |
 | `press trace on` / `off` / `status` | Timing diagnostics ({doc}`edr-environments`) |
 | `press daemon …` | Start/stop the daemon ({doc}`daemon`) |

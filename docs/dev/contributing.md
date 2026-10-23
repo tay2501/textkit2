@@ -61,7 +61,7 @@ dispatch, lazy exports) derives from the registry entry.
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
-feat(transforms): add unicode-encode command
+feat(transforms): add unicode-escape command
 fix(clipboard): handle empty clipboard on hold activation
 docs(user): add dictionary reload instructions
 ```

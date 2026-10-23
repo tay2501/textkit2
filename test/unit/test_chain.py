@@ -191,7 +191,7 @@ class TestDispatcherPipelines:
 
         # a non-default [trim] value from config must apply inside a pipeline too
         config = PressConfig(
-            trim=TrimConfig(both=False),
+            trim=TrimConfig(trailing=True),
             pipelines={"cleanup": ("trim",)},
         )
         d = CommandDispatcher(config)

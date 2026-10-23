@@ -115,7 +115,7 @@ class TestGenpassCLI:
         assert len(result.stdout) == DEFAULT_LENGTH
 
     def test_custom_length_flag(self) -> None:
-        result = _run("-n", "12")
+        result = _run("-L", "12")
         assert result.returncode == 0
         assert len(result.stdout) == 12
 
@@ -135,14 +135,14 @@ class TestGenpassCLI:
         assert len(result.stdout) == DEFAULT_LENGTH
 
     def test_default_output_alphanumeric_only(self) -> None:
-        result = _run("-n", "60")
+        result = _run("-L", "60")
         pw = result.stdout
         valid = set(string.ascii_letters + string.digits)
         assert all(c in valid for c in pw), f"unexpected char: {pw!r}"
 
     def test_symbols_flag_allows_punctuation(self) -> None:
         # Run with length 60 so at least one symbol is statistically certain
-        result = _run("-n", "60", "-s")
+        result = _run("-L", "60", "-y")
         assert result.returncode == 0
         pw = result.stdout
         assert len(pw) == 60
@@ -150,10 +150,10 @@ class TestGenpassCLI:
         assert all(c in extended for c in pw)
 
     def test_length_zero_exits_nonzero(self) -> None:
-        assert _run("-n", "0").returncode != 0
+        assert _run("-L", "0").returncode != 0
 
     def test_length_negative_exits_nonzero(self) -> None:
-        assert _run("-n", "-1").returncode != 0
+        assert _run("-L", "-1").returncode != 0
 
     def test_quiet_suppresses_stderr(self) -> None:
         result = _run("-q")
@@ -162,20 +162,50 @@ class TestGenpassCLI:
 
     def test_no_trailing_newline(self) -> None:
         # Output is raw password only — no newline added (piping-friendly)
-        result = _run("-n", "10")
+        result = _run("-L", "10")
         assert "\n" not in result.stdout
         assert len(result.stdout) == 10
 
-    def test_no_clip_flag_exits_zero(self) -> None:
-        # --no-clip suppresses auto-clipboard write; stdout output is unaffected
-        result = _run("-N")
+    def test_no_copy_flag_exits_zero(self) -> None:
+        # --no-copy suppresses auto-clipboard write; stdout output is unaffected
+        result = _run("--no-copy")
         assert result.returncode == 0
         assert len(result.stdout) == DEFAULT_LENGTH
 
-    def test_no_clip_long_form(self) -> None:
-        result = _run("--no-clip", "-n", "8")
+    def test_no_copy_with_length(self) -> None:
+        result = _run("--no-copy", "-L", "8")
         assert result.returncode == 0
         assert len(result.stdout) == 8
+
+    def test_long_symbols_flag(self) -> None:
+        result = _run("--symbols", "-L", "8")
+        assert result.returncode == 0
+        assert len(result.stdout) == 8
+
+    @pytest.mark.parametrize("old", ["-n", "-N", "-s", "--no-clip", "--clip-out"])
+    def test_old_flags_are_gone(self, old: str) -> None:
+        # -n/-s were not pwgen/KeePassXC spellings; -s in keepassxc-cli means
+        # "only special characters", the opposite of press's additive flag.
+        assert _run(old, "8").returncode == 2
+
+
+class TestGenpassCopyFlag:
+    """``-C/--copy`` and ``--no-copy`` override the TTY auto-copy; unset = auto."""
+
+    def _parse(self, *argv: str) -> object:
+        from press.__main__ import make_parser
+
+        return make_parser().parse_args(["genpass", *argv]).copy
+
+    def test_default_is_auto(self) -> None:
+        assert self._parse() is None
+
+    @pytest.mark.parametrize("flag", ["-C", "--copy"])
+    def test_copy(self, flag: str) -> None:
+        assert self._parse(flag) is True
+
+    def test_no_copy(self) -> None:
+        assert self._parse("--no-copy") is False
 
 
 # ---------------------------------------------------------------------------
@@ -192,7 +222,7 @@ class TestGenpassSensitiveClipboard:
         from press.__main__ import make_parser
 
         with patch("press.clipboard.set_clipboard_text") as set_text:
-            args = make_parser().parse_args(["genpass", "-C", "-n", "12"])
+            args = make_parser().parse_args(["genpass", "-C", "-L", "12"])
             assert args.func(args) == 0
 
         assert set_text.call_args.kwargs.get("sensitive") is True
@@ -218,7 +248,7 @@ class TestGenpassClearAfter:
             patch("press.clipboard.clear_clipboard_if_unchanged", return_value=True) as clear,
             patch("time.sleep") as sleep,
         ):
-            args = make_parser().parse_args(["genpass", "-C", "-n", "8", "--clear-after", "5"])
+            args = make_parser().parse_args(["genpass", "-C", "-L", "8", "--clear-after", "5"])
             assert args.func(args) == 0
 
         sleep.assert_called_once_with(5)
@@ -238,7 +268,7 @@ class TestGenpassClearAfter:
             patch("press.clipboard.clear_clipboard_if_unchanged", return_value=False),
             patch("time.sleep"),
         ):
-            args = make_parser().parse_args(["genpass", "-C", "-n", "8", "--clear-after", "5"])
+            args = make_parser().parse_args(["genpass", "-C", "-L", "8", "--clear-after", "5"])
             assert args.func(args) == 0
 
         assert "not cleared" in capsys.readouterr().err
@@ -255,7 +285,7 @@ class TestGenpassClearAfter:
             patch("time.sleep"),
         ):
             args = make_parser().parse_args(
-                ["genpass", "-C", "-q", "-n", "8", "--clear-after", "5"]
+                ["genpass", "-C", "-q", "-L", "8", "--clear-after", "5"]
             )
             assert args.func(args) == 0
 
@@ -266,7 +296,7 @@ class TestGenpassClearAfter:
     ) -> None:
         from press.__main__ import make_parser
 
-        args = make_parser().parse_args(["genpass", "-N", "-n", "8", "--clear-after", "5"])
+        args = make_parser().parse_args(["genpass", "--no-copy", "-L", "8", "--clear-after", "5"])
         assert args.func(args) == 0
         assert "--clear-after ignored" in capsys.readouterr().err
 
@@ -286,7 +316,7 @@ class TestGenpassClearAfter:
             ),
             patch("time.sleep"),
         ):
-            args = make_parser().parse_args(["genpass", "-C", "-n", "8", "--clear-after", "5"])
+            args = make_parser().parse_args(["genpass", "-C", "-L", "8", "--clear-after", "5"])
             assert args.func(args) == 0
 
         assert "clipboard clear failed" in capsys.readouterr().err
@@ -303,7 +333,7 @@ class TestGenpassClearAfter:
             patch("press.clipboard.set_clipboard_text"),
             patch("time.sleep") as sleep,
         ):
-            args = make_parser().parse_args(["genpass", "-C", "-n", "8"])
+            args = make_parser().parse_args(["genpass", "-C", "-L", "8"])
             assert args.func(args) == 0
 
         sleep.assert_not_called()

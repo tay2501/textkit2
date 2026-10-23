@@ -46,13 +46,13 @@ CURRENT_SCHEMA_VERSION: int = 1
 # alias typed after the prefix (prefix + "t","m" = trim, same as `press tm`),
 # so per-command default bindings are gone.  Only shift+<key> chords remain:
 # they can never shadow a typed sequence (sequences are plain characters),
-# and they cover the cases a sequence serves poorly — dict_reverse has no CLI
+# and they cover the cases a sequence serves poorly — dict-reverse has no CLI
 # alias to type, while undo and notify-off are panic keys (a bad transform,
 # a call that suddenly turns into a screen share) that deserve one stroke.
 # Single-letter user bindings still work but hide every sequence starting
 # with that letter (checked first); `press config validate` warns about it.
 _DEFAULT_BINDINGS: dict[str, str] = {
-    "shift+d": "dict_reverse",
+    "shift+d": "dict-reverse",
     "shift+m": "notify-off",
     "shift+z": "undo",
 }
@@ -83,14 +83,14 @@ class SqlInConfig:
 class TrimConfig:
     """Options for the ``trim`` transform when dispatched by the daemon."""
 
-    both: bool = True  # False: trailing whitespace only (CLI --trailing)
+    trailing: bool = False  # True: strip line ends only, keep indentation (CLI --trailing)
 
 
 @dataclass(frozen=True, slots=True)
 class DictionaryConfig:
     """Dictionary lookup configuration.
 
-    Only ``files[0]`` is read (by the daemon's ``dict``/``dict_reverse``); the
+    Only ``files[0]`` is read (by the daemon's ``dict``/``dict-reverse``); the
     CLI ``press dict`` uses ``--file`` or :func:`press.dictionary.default_dict_path`
     instead.  Documented as such in ``docs/user/config.md``.
     """
@@ -180,7 +180,7 @@ def _parse_sql_in(data: dict[str, Any]) -> SqlInConfig:
 
 def _parse_trim(data: dict[str, Any]) -> TrimConfig:
     default = TrimConfig()
-    return TrimConfig(both=data.get("both", default.both))
+    return TrimConfig(trailing=data.get("trailing", default.trailing))
 
 
 def _parse_dictionary(data: dict[str, Any]) -> DictionaryConfig:
@@ -361,7 +361,7 @@ _SECTIONS: tuple[_Section, ...] = (
 
 _SECTION_INDEX: dict[str, _Section] = {section.key: section for section in _SECTIONS}
 
-#: Resettable section names, in file order.  ``press config reset --key`` offers
+#: Resettable section names, in file order.  ``press config reset --section`` offers
 #: exactly these; ``test_config.py`` pins the argparse ``choices`` list against
 #: it rather than importing this module during parser construction, which would
 #: put ``tomllib``/``pathlib`` on every CLI startup's import path.

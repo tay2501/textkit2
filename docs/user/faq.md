@@ -5,7 +5,7 @@
 ## A `press` command sometimes takes 2–3 seconds
 
 Most `press` commands finish in well under a second. If one of them
-**occasionally** takes 2–3 seconds (for example `press tm -c -C`), and
+**occasionally** takes 2–3 seconds (for example `press tm -C`), and
 especially on a slower PC, please collect the measurements below and send
 them to us. The numbers tell us which stage is slow on *your* machine, so we
 can fix the actual cause instead of guessing.
@@ -26,7 +26,7 @@ Run the command that was slow, in the same situation where it was slow
 (for example after the PC has been idle for a while). Repeat it 3–5 times:
 
 ```powershell
-press tm -c -C > $null
+press tm -C > $null
 ```
 
 Each run prints one line like this:
@@ -40,7 +40,7 @@ Copy every `press: trace …` line.
 ### 3. Measure the total time
 
 ```powershell
-(Measure-Command { press tm -c -C *> $null }).TotalMilliseconds
+(Measure-Command { press tm -C *> $null }).TotalMilliseconds
 ```
 
 Run it 3–5 times as well and copy the numbers. The trace line only covers
@@ -52,12 +52,12 @@ the time went into starting the process itself.
 ```powershell
 # Without the daemon (the CLI transforms the text itself)
 $env:PRESS_NO_DAEMON = "1"
-(Measure-Command { press tm -c -C *> $null }).TotalMilliseconds
+(Measure-Command { press tm -C *> $null }).TotalMilliseconds
 Remove-Item Env:PRESS_NO_DAEMON
 
 # Without the undo snapshot that -C saves before overwriting the clipboard
 $env:PRESS_NO_UNDO = "1"
-(Measure-Command { press tm -c -C *> $null }).TotalMilliseconds
+(Measure-Command { press tm -C *> $null }).TotalMilliseconds
 Remove-Item Env:PRESS_NO_UNDO
 ```
 

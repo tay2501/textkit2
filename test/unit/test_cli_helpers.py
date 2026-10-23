@@ -13,8 +13,8 @@ from press._cli_helpers import _run_transform
 def _args(**overrides: object) -> argparse.Namespace:
     defaults: dict[str, object] = {
         "command": "upper",
-        "clip_in": False,
-        "clip_out": True,
+        "from_clipboard": False,
+        "copy": True,
         "input": "abc",
         "quiet": False,
         "verbose": False,
@@ -22,6 +22,39 @@ def _args(**overrides: object) -> argparse.Namespace:
     }
     defaults.update(overrides)
     return argparse.Namespace(**defaults)
+
+
+class TestIoFlags:
+    """Clipboard flags follow pbcopy/pbpaste wording, not a case-only pair."""
+
+    def _parse(self, *argv: str) -> argparse.Namespace:
+        from press.__main__ import make_parser
+
+        return make_parser().parse_args(["upper", *argv])
+
+    @pytest.mark.parametrize("flag", ["-C", "--copy"])
+    def test_copy_writes_the_clipboard(self, flag: str) -> None:
+        assert self._parse(flag).copy is True
+
+    def test_from_clipboard_reads_the_clipboard(self) -> None:
+        assert self._parse("--from-clipboard").from_clipboard is True
+
+    @pytest.mark.parametrize("old", ["-c", "--clip-in", "--clip-out"])
+    def test_old_flags_are_gone(self, old: str) -> None:
+        with pytest.raises(SystemExit) as exc:
+            self._parse(old)
+        assert exc.value.code == 2
+
+    def test_long_option_prefixes_are_rejected_in_subcommands(self) -> None:
+        # allow_abbrev must reach every subparser, not only the root one.
+        with pytest.raises(SystemExit) as exc:
+            self._parse("--cop")
+        assert exc.value.code == 2
+
+    def test_short_flags_still_combine(self) -> None:
+        args = self._parse("-Cq")
+        assert args.copy is True
+        assert args.quiet is True
 
 
 class TestClipboardWriteFailure:

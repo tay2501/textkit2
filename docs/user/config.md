@@ -8,7 +8,7 @@
 If the file does not exist, all defaults apply. No configuration is required to start using `press`.
 
 Use `press config validate` to check the file and `press config reset` to restore defaults
-(optionally per section with `--key hotkeys | sql_in | trim | dictionary | ui | hold | type | pipelines`).
+(optionally per section with `--section hotkeys | sql_in | trim | dictionary | ui | hold | type | pipelines`).
 
 ## Full example
 
@@ -19,7 +19,7 @@ schema_version = 1
 prefix = "ctrl+alt+k"
 
 [hotkeys.bindings]
-"shift+d" = "dict_reverse"
+"shift+d" = "dict-reverse"
 "shift+z" = "undo"
 
 [sql_in]
@@ -27,7 +27,7 @@ quote_char = "'"
 wrap       = false
 
 [trim]
-both = true
+trailing = false
 
 [dictionary]
 files = ["%APPDATA%/press/dict/default.tsv"]
@@ -67,8 +67,9 @@ are **merged with** the defaults — only specify what you want to add or change
 
 Bindings are optional. After the prefix you can always **type a command name or
 alias** instead (`Ctrl+Alt+K`, then `t`, `m` runs trim, exactly like
-`press tm`), so only two bindings ship by default: `shift+d` for `dict_reverse`
-(no CLI name to type) and `shift+z` for `undo` (a panic key).
+`press tm`), so only three bindings ship by default: `shift+d` for `dict-reverse`
+(no CLI name to type), `shift+m` for `notify-off` (a screen share can start
+without warning) and `shift+z` for `undo` (a panic key).
 
 ```{warning}
 A **single-character** binding fires on the first keypress and therefore hides
@@ -97,13 +98,13 @@ the same result.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `both` | bool | `true` | `true`: strip leading and trailing whitespace; `false`: trailing only, keeping indentation (like CLI `trim --trailing`) |
+| `trailing` | bool | `false` | `false`: strip leading and trailing whitespace; `true`: trailing only, keeping indentation (same as CLI `trim --trailing`) |
 
 ### `[dictionary]` *(daemon)*
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `files` | list of strings | `["%APPDATA%/press/dict/default.tsv"]` | Dictionary file used by the daemon hotkeys (`dict` / `dict_reverse`). Only the **first** entry is read today; further entries are ignored |
+| `files` | list of strings | `["%APPDATA%/press/dict/default.tsv"]` | Dictionary file used by the daemon hotkeys (`dict` / `dict-reverse`). Only the **first** entry is read today; further entries are ignored |
 
 > The CLI `press dict` does not read this setting: it uses `--file PATH`, or
 > `%APPDATA%\press\dict\default.tsv` (Windows) / `~/.config/press/dict/default.tsv`
