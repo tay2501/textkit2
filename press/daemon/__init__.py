@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from press.daemon._dispatch import CommandDispatcher
 from press.daemon._hotkeys import HotkeyManager, LeaderKeyListener
-from press.daemon._lifecycle import daemon_status, stop_daemon
+from press.daemon._lifecycle import daemon_status, start_daemon, stop_daemon
 from press.daemon._logs import daemon_logs
 from press.daemon._service import run_daemon
 
@@ -34,5 +34,6 @@ __all__ = [
     "daemon_logs",
     "daemon_status",
     "run_daemon",
+    "start_daemon",
     "stop_daemon",
 ]

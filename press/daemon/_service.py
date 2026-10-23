@@ -20,6 +20,12 @@ if TYPE_CHECKING:
     from press.daemon._pipe import PipeServer
 
 
+# A `status`/`stop` probe owns the singleton mutex for microseconds; waiting
+# this long lets a daemon starting next to one take it over instead of
+# reporting "another instance".
+_MUTEX_WAIT_MS = 1000
+
+
 def run_daemon(config_path: Path | None = None) -> None:
     """Start the press daemon (blocking until quit from the tray menu).
 
@@ -43,7 +49,7 @@ def run_daemon(config_path: Path | None = None) -> None:
     with _logs.timed("startup.config_load"):
         config = load_config(config_path)
 
-    mutex_handle = _lifecycle._acquire_mutex()
+    mutex_handle = _lifecycle._acquire_mutex(timeout_ms=_MUTEX_WAIT_MS)
     if mutex_handle is None:
         print(
             "press daemon: error: another instance is already running",
@@ -54,8 +60,6 @@ def run_daemon(config_path: Path | None = None) -> None:
     from datetime import datetime
 
     pid_path = _lifecycle._PID_PATH
-    pid_path.parent.mkdir(parents=True, exist_ok=True)
-    pid_path.write_text(str(os.getpid()), encoding="utf-8")
 
     from press._version import press_version
 
@@ -90,6 +94,11 @@ def run_daemon(config_path: Path | None = None) -> None:
         dispatcher.set_icon(icon)
         hm.start()
         worker.start()
+        # The PID file is the readiness signal `press daemon start` waits for,
+        # so it appears only once the tray and hotkeys are up — never before
+        # the pystray/pynput imports that fail without the daemon extra.
+        pid_path.parent.mkdir(parents=True, exist_ok=True)
+        pid_path.write_text(str(os.getpid()), encoding="utf-8")
         dispatcher.notify_startup()
 
     def _on_quit() -> None:

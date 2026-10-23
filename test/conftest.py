@@ -1,6 +1,7 @@
 """Shared pytest fixtures and markers."""
 
 import sys
+from collections.abc import Iterator
 
 import pytest
 
@@ -25,6 +26,40 @@ def notifications_open(
     marker = tmp_path_factory.mktemp("notify") / "notify-off"
     monkeypatch.setattr("press._paths.notify_off_path", lambda: marker)
     monkeypatch.setattr(gate, "windows_accepts_notifications", lambda: True)
+
+
+@pytest.fixture
+def held_daemon_mutex() -> Iterator[None]:
+    """Hold the daemon singleton mutex from another thread, like a live daemon.
+
+    A Win32 mutex is recursive for its owning thread, so acquiring it in the
+    test's own thread would not look "held" to code running in that thread.
+    """
+    import threading
+
+    from press.daemon._lifecycle import _acquire_mutex, _release_mutex
+
+    acquired = threading.Event()
+    done = threading.Event()
+    handles: list[int | None] = []
+
+    def _hold() -> None:
+        handle = _acquire_mutex()
+        handles.append(handle)
+        acquired.set()
+        done.wait(10)
+        if handle is not None:
+            _release_mutex(handle)
+
+    holder = threading.Thread(target=_hold, daemon=True)
+    holder.start()
+    acquired.wait(10)
+    assert handles[0] is not None, "the daemon mutex is already held (is a daemon running?)"
+    try:
+        yield
+    finally:
+        done.set()
+        holder.join(10)
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:

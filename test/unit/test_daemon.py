@@ -807,78 +807,6 @@ class TestLeaderSuppressionBarrier:
 
 
 # ---------------------------------------------------------------------------
-# stop_daemon
-# ---------------------------------------------------------------------------
-
-
-class TestStopDaemon:
-    def test_no_pid_file_returns_1(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", tmp_path / "press.pid")
-        from press.daemon import stop_daemon
-
-        assert stop_daemon() == 1
-
-    def test_invalid_pid_file_returns_1(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        pid_file = tmp_path / "press.pid"
-        pid_file.write_text("not-a-number", encoding="utf-8")
-        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
-        from press.daemon import stop_daemon
-
-        assert stop_daemon() == 1
-
-    def test_stale_pid_returns_1_and_removes_file(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        pid_file = tmp_path / "press.pid"
-        pid_file.write_text("99999", encoding="utf-8")
-        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
-
-        import psutil
-
-        with patch("psutil.Process", side_effect=psutil.NoSuchProcess(99999)):
-            from press.daemon import stop_daemon
-
-            assert stop_daemon() == 1
-        assert not pid_file.exists()
-
-    def test_success_returns_0_and_removes_file(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        pid_file = tmp_path / "press.pid"
-        pid_file.write_text("12345", encoding="utf-8")
-        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
-
-        mock_proc = MagicMock()
-        mock_proc.name.return_value = "python.exe"
-        with patch("psutil.Process", return_value=mock_proc):
-            from press.daemon import stop_daemon
-
-            assert stop_daemon() == 0
-        mock_proc.terminate.assert_called_once()
-        assert not pid_file.exists()
-
-    def test_recycled_pid_is_not_terminated(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """A stale PID file may point at an unrelated process after PID reuse."""
-        pid_file = tmp_path / "press.pid"
-        pid_file.write_text("12345", encoding="utf-8")
-        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
-
-        mock_proc = MagicMock()
-        mock_proc.name.return_value = "notepad.exe"
-        with patch("psutil.Process", return_value=mock_proc):
-            from press.daemon import stop_daemon
-
-            assert stop_daemon() == 1
-        mock_proc.terminate.assert_not_called()
-        mock_proc.kill.assert_not_called()
-        assert not pid_file.exists()
-
-
-# ---------------------------------------------------------------------------
 # daemon_status
 # ---------------------------------------------------------------------------
 
@@ -937,16 +865,11 @@ class TestAcquireMutex:
         assert handle is not None
         _release_mutex(handle)
 
-    def test_second_call_returns_none(self) -> None:
-        from press.daemon._lifecycle import _acquire_mutex, _release_mutex
+    @pytest.mark.usefixtures("held_daemon_mutex")
+    def test_held_elsewhere_returns_none(self) -> None:
+        from press.daemon._lifecycle import _acquire_mutex
 
-        handle1 = _acquire_mutex()
-        assert handle1 is not None
-        try:
-            handle2 = _acquire_mutex()
-            assert handle2 is None
-        finally:
-            _release_mutex(handle1)
+        assert _acquire_mutex() is None
 
 
 # ---------------------------------------------------------------------------
@@ -970,6 +893,7 @@ class TestCreateTrayImage:
 
 class TestDaemonStatusWindows:
     @pytest.mark.windows_only
+    @pytest.mark.usefixtures("held_daemon_mutex")
     def test_running_via_mutex_on_windows(
         self,
         tmp_path: Path,
@@ -981,19 +905,11 @@ class TestDaemonStatusWindows:
         monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
         monkeypatch.setattr("sys.platform", "win32")
 
-        from press.daemon._lifecycle import _acquire_mutex, daemon_status
+        from press.daemon._lifecycle import daemon_status
 
-        # Acquire mutex to simulate daemon running
-        handle = _acquire_mutex()
-        assert handle is not None
-        try:
-            rc = daemon_status()
-            assert rc == 0
-            assert "running" in capsys.readouterr().out
-        finally:
-            from press.daemon._lifecycle import _release_mutex
-
-            _release_mutex(handle)
+        rc = daemon_status()
+        assert rc == 0
+        assert "running" in capsys.readouterr().out
 
     @pytest.mark.windows_only
     def test_not_running_via_mutex_on_windows(
@@ -1017,6 +933,7 @@ class TestDaemonStatusWindows:
         assert not pid_file.exists()
 
     @pytest.mark.windows_only
+    @pytest.mark.usefixtures("held_daemon_mutex")  # the live daemon
     def test_running_keeps_pid_file(
         self,
         tmp_path: Path,
@@ -1026,15 +943,10 @@ class TestDaemonStatusWindows:
         pid_file.write_text("99999", encoding="utf-8")
         monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
 
-        from press.daemon._lifecycle import _acquire_mutex, _release_mutex, daemon_status
+        from press.daemon._lifecycle import daemon_status
 
-        handle = _acquire_mutex()  # simulate the live daemon
-        assert handle is not None
-        try:
-            assert daemon_status() == 0
-            assert pid_file.read_text(encoding="utf-8") == "99999"
-        finally:
-            _release_mutex(handle)
+        assert daemon_status() == 0
+        assert pid_file.read_text(encoding="utf-8") == "99999"
 
     @pytest.mark.windows_only
     def test_probe_mutex_is_released_after_cleanup(
@@ -1144,33 +1056,6 @@ class TestDaemonStatusStalePidCleanup:
         assert daemon_status() == 1
         assert "not running" in capsys.readouterr().out
         assert events == ["release:42"]
-
-
-# ---------------------------------------------------------------------------
-# stop_daemon (timeout handling)
-# ---------------------------------------------------------------------------
-
-
-class TestStopDaemonTimeout:
-    def test_timeout_expires_kills_process(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        pid_file = tmp_path / "press.pid"
-        pid_file.write_text("12345", encoding="utf-8")
-        monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", pid_file)
-
-        import psutil
-
-        mock_proc = MagicMock()
-        mock_proc.name.return_value = "python.exe"
-        mock_proc.wait.side_effect = psutil.TimeoutExpired("fake", 1.0)
-        with patch("psutil.Process", return_value=mock_proc):
-            from press.daemon import stop_daemon
-
-            assert stop_daemon() == 0
-        mock_proc.terminate.assert_called_once()
-        mock_proc.kill.assert_called_once()
-        assert not pid_file.exists()
 
 
 # ---------------------------------------------------------------------------

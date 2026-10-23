@@ -291,6 +291,10 @@ def _load_kernel32() -> Any:
     # kernel32 prototypes in one place (see CLAUDE.md).
     k32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.wintypes.BOOL, ctypes.c_wchar_p]
     k32.CreateMutexW.restype = ctypes.c_void_p
+    k32.ReleaseMutex.argtypes = [ctypes.c_void_p]
+    k32.ReleaseMutex.restype = ctypes.wintypes.BOOL
+    k32.WaitForSingleObject.argtypes = [ctypes.c_void_p, ctypes.wintypes.DWORD]
+    k32.WaitForSingleObject.restype = ctypes.wintypes.DWORD
     # Server side (press.daemon._pipe) — free to declare here, unused by the CLI.
     k32.CreateNamedPipeW.argtypes = [
         ctypes.c_wchar_p,
