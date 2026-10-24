@@ -44,7 +44,11 @@ toll per process launch and per file open; the daemon pays it once:
 
 ```console
 $ press daemon start
+press daemon: started (pid=12345)
 ```
+
+On a heavily monitored PC the first start can take several seconds while the
+agent inspects every imported file; `start` waits up to 15 s.
 
 Then use hotkeys (`Ctrl+Alt+K`, then type the command name) for transforms.
 

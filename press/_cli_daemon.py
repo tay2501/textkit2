@@ -51,9 +51,11 @@ def _register_daemon_commands(sub: _SubParsers) -> None:
 
     daemon_sub.add_parser(
         "start",
-        help="Start the tray icon + hotkey daemon",
+        help="Start the daemon in the background",
         description=(
-            "Start the press background daemon.\n\n"
+            "Start the press daemon in the background and return once its tray\n"
+            "icon and hotkeys are up (waits up to 15 s). Does nothing and exits 0\n"
+            "when it is already running.\n\n"
             "Registers a system-tray icon and a two-step global hotkey sequence:\n"
             "  Step 1 — press the prefix chord simultaneously (default: Ctrl+Alt+K)\n"
             "  Step 2 — release, then type the command name or alias\n\n"
@@ -63,13 +65,25 @@ def _register_daemon_commands(sub: _SubParsers) -> None:
             "  and Ctrl+V / Shift+Insert are intercepted before the OS dispatches\n"
             "  them (Layer 2: 0 ms gap). The tray icon turns red while active.\n"
             "  Repeat the sequence to release.\n\n"
-            "Runs in the foreground until 'press daemon stop' (from another\n"
-            "terminal) or the tray menu's Quit."
+            "The daemon inherits this shell's environment (e.g. PRESS_NO_UNDO).\n"
+            "Stop it with 'press daemon stop' or the tray menu's Quit."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    daemon_sub.add_parser("stop", help="Stop the running daemon")
-    daemon_sub.add_parser("restart", help="Stop and restart the daemon")
+    daemon_sub.add_parser(
+        "run",
+        help="Run the daemon in the foreground",
+        description=(
+            "Run the press daemon in this process until 'press daemon stop' (from\n"
+            "another terminal) or the tray menu's Quit.\n\n"
+            "For debugging (start-up errors print here) and for Task Scheduler or\n"
+            "service wrappers that supervise the process themselves. Exits 1 when\n"
+            "another instance is already running."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    daemon_sub.add_parser("stop", help="Stop the daemon (exits 0 if it is not running)")
+    daemon_sub.add_parser("restart", help="Stop, then start the daemon in the background")
 
     p_status = daemon_sub.add_parser("status", help="Show running status")
     p_status.add_argument(
@@ -125,11 +139,15 @@ def _handle_daemon(args: argparse.Namespace) -> int:
         args.print_help()
         return 0
     match action:
-        case "start":
+        case "run":
             from press.daemon import run_daemon
 
             run_daemon()
             return 0
+        case "start":
+            from press.daemon import start_daemon
+
+            return start_daemon()
         case "stop":
             from press.daemon import stop_daemon
 
@@ -139,11 +157,12 @@ def _handle_daemon(args: argparse.Namespace) -> int:
 
             return daemon_status(as_json=getattr(args, "as_json", False))
         case "restart":
-            from press.daemon import run_daemon, stop_daemon
+            from press.daemon import start_daemon, stop_daemon
 
-            stop_daemon()
-            run_daemon()
-            return 0
+            # A daemon that could not be stopped must not be reported as restarted.
+            if (code := stop_daemon()) != 0:
+                return code
+            return start_daemon()
         case "logs":
             from press.daemon import daemon_logs
 

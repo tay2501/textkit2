@@ -33,7 +33,7 @@ class TestRunDaemonStartupTimed:
         monkeypatch.setattr("press.daemon._logs.timed", fake_timed)
         monkeypatch.setattr("press.daemon._logs._setup_logging", lambda: None)
         monkeypatch.setattr("press.config.load_config", lambda path=None: PressConfig())
-        monkeypatch.setattr("press.daemon._lifecycle._acquire_mutex", lambda: 12345)
+        monkeypatch.setattr("press.daemon._lifecycle._acquire_mutex", lambda timeout_ms=0: 12345)
         monkeypatch.setattr("press.daemon._lifecycle._release_mutex", lambda handle: None)
         monkeypatch.setattr("press.daemon._lifecycle._write_status_file", lambda data: None)
         monkeypatch.setattr("press.daemon._lifecycle._PID_PATH", tmp_path / "press.pid")

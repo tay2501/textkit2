@@ -9,19 +9,32 @@ The daemon adds a tray icon and global hotkeys, so every transform in
 ## Start, stop, status
 
 ```bash
-press daemon start      # runs in the foreground of this terminal until stopped
+press daemon start      # start in the background; returns once the tray icon is up
 press daemon status     # "running" / "not running"; exit 0 / 1 (--json for details)
-press daemon stop       # from another terminal — or tray icon → Quit
+press daemon stop       # or tray icon → Quit
 press daemon restart    # stop, then start (re-reads config.toml)
 press daemon logs       # last 50 lines; -f to follow, --level debug, --json
+press daemon run        # run in the foreground of this terminal (debugging)
 ```
 
-Only one daemon runs per user. `config.toml` is read at start-up, so restart
-after editing it. The dictionary is re-read on every lookup — no restart
-needed after editing a TSV file.
+`start` and `stop` are idempotent: starting a running daemon or stopping a
+stopped one exits 0. Only one daemon runs per user. `config.toml` is read at
+start-up, so restart after editing it. The dictionary is re-read on every
+lookup — no restart needed after editing a TSV file.
+
+The daemon inherits the environment of the shell that started it, so variables
+such as `PRESS_NO_UNDO` or `PRESS_NO_DAEMON` set there apply to it too.
+
+**If `start` fails**, it prints the daemon's last error output; the full text
+is in `%APPDATA%\press\daemon-stderr.log`. `press daemon run` shows start-up
+errors directly in the terminal.
 
 **Start with Windows:** `Win+R` → `shell:startup`, create a shortcut with target
-`press daemon start` and set *Run* to **Minimized**.
+`press daemon start` and set *Run* to **Minimized** (the shortcut's own console
+closes as soon as the daemon is up). With Task Scheduler, use
+`press daemon run` as the action instead — the task then supervises the daemon
+process itself — and clear *Stop the task if it runs longer than* (3 days by
+default), or the scheduler ends the daemon after three days.
 
 ## Hotkeys
 
