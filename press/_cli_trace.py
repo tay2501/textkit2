@@ -22,9 +22,9 @@ def _register_trace_commands(sub: _SubParsers) -> None:
     """Register the ``trace`` subcommand family."""
     trace_p = sub.add_parser(
         "trace",
-        help="Toggle diagnostic trace logging (for diagnosing slow PCs)",
+        help="Turn diagnostic trace logging on or off (for diagnosing slow PCs)",
         description=(
-            "Toggle diagnostic DEBUG-level timing logs.\n\n"
+            "Turn diagnostic DEBUG-level timing logs on or off.\n\n"
             "'press trace on' creates a marker file; the running daemon picks it\n"
             "up on the next dispatched action (no restart needed), and future\n"
             "CLI-standalone invocations print timing to stderr.\n"

@@ -1,8 +1,8 @@
 """Undo — restore the clipboard text press overwrote.
 
 File-based single-slot snapshot used by the CLI.  The daemon keeps its own
-in-memory slot (``CommandDispatcher``) — the same dual-layer design as hold.
-The snapshot file shares hold's on-disk format (DPAPI-encrypted on Windows).
+in-memory slot (``CommandDispatcher``).
+The snapshot file shares the stash on-disk format (DPAPI-encrypted on Windows).
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ import os
 from typing import TYPE_CHECKING
 
 from press._paths import press_dir
-from press.transforms.hold import _read_hold_file, _write_hold_file
+from press.transforms.stash import read_slot_file, write_slot_file
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -59,7 +59,7 @@ def save_snapshot(text: str) -> None:
     """Persist *text* as the undo slot (DPAPI-encrypted on Windows)."""
     path = undo_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    _write_hold_file(path, text)
+    write_slot_file(path, text)
 
 
 def swap_undo(get_text: Callable[[], str], set_text: Callable[[str], None]) -> None:
@@ -80,7 +80,7 @@ def swap_undo(get_text: Callable[[], str], set_text: Callable[[str], None]) -> N
             user-scoped) or the clipboard write fails.
     """
     path = undo_path()
-    saved = _read_hold_file(path)
+    saved, _ = read_slot_file(path)
     keep_current = snapshot_allowed()
     try:
         current = get_text()
@@ -89,6 +89,6 @@ def swap_undo(get_text: Callable[[], str], set_text: Callable[[str], None]) -> N
         current = ""
     set_text(saved)
     if keep_current:
-        _write_hold_file(path, current)
+        write_slot_file(path, current)
     else:
         path.unlink(missing_ok=True)

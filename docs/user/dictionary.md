@@ -25,18 +25,18 @@ USER-ID	USER_ID
 
 | Front end | File |
 |---|---|
-| CLI | `--file PATH`, else `%APPDATA%\press\dict\default.tsv` (`~/.config/press/dict/default.tsv` off Windows) |
-| Daemon | The **first** entry of `[dictionary] files` in `config.toml` (default: the same `default.tsv`) |
+| CLI | `--file PATH`, else the same file as the daemon |
+| Daemon | The **first** entry of `[dictionary] files` in `config.toml` (default: `%APPDATA%\press\dict\default.tsv`) |
 
 The daemon re-reads the file on every lookup, so edits apply immediately.
 
 ## Managing entries
 
 ```bash
-press dict list                          # all entries
-press dict add FOOBER01 TABLE_HOGEHOGE   # add
+press dict list                          # all entries (alias: ls); none yet → no output
+press dict add FOOBER01 TABLE_HOGEHOGE   # add (creates the file)
 press dict remove FOOBER01               # remove (alias: rm)
-press dict list --file ~/my.tsv          # any command accepts --file
+press dict list --file ~/my.tsv          # any command accepts --file, before or after the action
 ```
 
 ## Reverse lookup

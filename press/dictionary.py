@@ -1,12 +1,24 @@
 """Dictionary file management for press (F-08, F-09)."""
 
+from __future__ import annotations
+
 import os
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from press.transforms.dictionary import load_tsv
 
-__all__ = ["add_entry", "default_dict_path", "list_entries", "remove_entry"]
+if TYPE_CHECKING:
+    from press.config import DictionaryConfig
+
+__all__ = [
+    "add_entry",
+    "configured_dict_path",
+    "default_dict_path",
+    "list_entries",
+    "remove_entry",
+]
 
 
 def default_dict_path() -> Path:
@@ -29,6 +41,17 @@ def default_dict_path() -> Path:
         xdg = os.environ.get("XDG_CONFIG_HOME", "")
         base = Path(xdg) if xdg else Path.home() / ".config"
     return base / "press" / "dict" / "default.tsv"
+
+
+def configured_dict_path(config: DictionaryConfig) -> Path:
+    """Return the dictionary file press reads: ``[dictionary] files[0]``.
+
+    The single answer for the CLI (``press dict`` without ``--file``) and the
+    daemon (``dict`` / ``dict-reverse`` hotkeys), so both look up the same
+    file.  Falls back to :func:`default_dict_path` when ``files`` is empty.
+    """
+    paths = config.resolved_paths()
+    return paths[0] if paths else default_dict_path()
 
 
 def list_entries(path: Path) -> list[tuple[str, str]]:

@@ -228,17 +228,19 @@ claiming the pipe name to harvest clipboard text):
   server cannot `ImpersonateNamedPipeClient` to borrow the caller's token.
 - **Remote clients rejected** via `PIPE_REJECT_REMOTE_CLIENTS`.
 
-## Clipboard HOLD
+## Clipboard stash and hold
 
-Two independent hold implementations coexist:
+Two features with different jobs, deliberately under different names:
 
-| Context | Storage | Trigger |
-|---------|---------|---------|
-| CLI (`press hold`) | File: `%APPDATA%\press\hold` | `toggle_hold_file()` in `transforms/hold.py` |
-| Daemon (hotkey `h`) | In-memory: `ClipboardGuard` | `_toggle_hold()` in `daemon/_dispatch.py` |
+| Feature | Front end | Storage | Code |
+|---------|-----------|---------|------|
+| Stash — save now, restore later | CLI `press stash push/pop/drop/list` | File: `%APPDATA%\press\stash.txt` (DPAPI) | `transforms/stash.py`, `_cli_stash.py` |
+| Hold — block overwrites until released | Daemon hotkey `h`,`o` (toggle) | In-memory: `ClipboardGuard` | `_toggle_hold()` in `daemon/_dispatch.py` |
 
-Both update the tray icon to red when holding. The file-based approach survives
-process restarts; the in-memory approach is faster and needs no disk access.
+Only the hold turns the tray icon red. The stash survives process restarts and
+keeps one slot (`push` refuses to replace it); its file format, shared with
+`undo.txt`, records whether the text carried the sensitive-exclusion formats so
+`pop` can restore them.
 
 ## Performance characteristics
 
@@ -311,7 +313,7 @@ press/
     ├── encode.py        base64 / URL encode-decode
     ├── encoding_repair.py  mojibake repair (charset-normalizer)
     ├── escape.py        unicode-escape / HTML entities
-    ├── hold.py          file-based HOLD toggle
+    ├── stash.py         file-based stash (one slot)
     ├── json_fmt.py      JSON format / compress
     ├── lineending.py    CRLF / LF / CR conversion
     ├── separator.py     underscore ↔ hyphen
@@ -334,6 +336,7 @@ test/
     ├── test_encoding_repair.py
     ├── test_escape.py
     ├── test_hold.py
+    ├── test_stash.py
     ├── test_json_fmt.py
     ├── test_lineending.py
     ├── test_separator.py

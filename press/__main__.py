@@ -308,17 +308,11 @@ def _register_uuid_command(sub: _SubParsers) -> None:
     p.set_defaults(func=_uuid)
 
 
-def _register_clipboard_util_commands(sub: _SubParsers) -> None:
+def _register_clear_command(sub: _SubParsers) -> None:
     from press.commands import special_aliases
 
     p = sub.add_parser("clear", aliases=special_aliases("clear"), help="Clear the clipboard")
     p.add_argument("-q", "--quiet", action="store_true", help="Suppress all stderr output")
-    p.add_argument(
-        "--hold",
-        dest="discard_hold",
-        action="store_true",
-        help="Also discard the saved 'press hold' file without restoring it",
-    )
 
     def _cl(a: argparse.Namespace) -> int:
         from press._cli_helpers import _snapshot_clipboard_for_undo
@@ -331,61 +325,18 @@ def _register_clipboard_util_commands(sub: _SubParsers) -> None:
         # for a failed Win32 call.  Anything else is a bug, not a user error.
         except (OSError, RuntimeError) as exc:
             return report_error("clear", exc, quiet=a.quiet)
-        if a.discard_hold:
-            from press.transforms.hold import hold_path
-
-            hold_path().unlink(missing_ok=True)
         return 0
 
     p.set_defaults(func=_cl)
 
-    p = sub.add_parser(
-        "hold",
-        help="Save clipboard text; call again to restore it",
-        description=(
-            "File-based clipboard hold toggle.\n\n"
-            "First call: saves the current clipboard text to "
-            "%APPDATA%\\press\\hold.txt and prints 'press hold: held'.\n"
-            "Second call: restores the saved text to the clipboard and prints "
-            "'press hold: released'.\n\n"
-            "For real-time protection that survives any application overwriting\n"
-            "the clipboard, use the daemon hotkey instead:\n\n"
-            "  press daemon start          # start the daemon\n"
-            "  Ctrl+Alt+K, then h,o        # engage ClipboardGuard\n\n"
-            "The daemon hold uses a dual-layer guard:\n"
-            "  Layer 1 — WM_CLIPBOARDUPDATE monitor restores on any clipboard\n"
-            "            change (< 1 ms reaction time).\n"
-            "  Layer 2 — WH_KEYBOARD_LL hook intercepts Ctrl+V / Shift+Insert\n"
-            "            before the OS dispatches the keystroke (0 ms gap).\n"
-            "The tray icon turns red while protection is active."
-        ),
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    p.add_argument("-q", "--quiet", action="store_true", help="Suppress all stderr output")
 
-    def _hold(a: argparse.Namespace) -> int:
-        from press.clipboard import get_clipboard_text, set_clipboard_text
-        from press.transforms.hold import hold_path, toggle_hold_file
-
-        try:
-            held = toggle_hold_file(hold_path(), get_clipboard_text, set_clipboard_text)
-            if not a.quiet:
-                status = "held" if held else "released"
-                print(f"press hold: {status}", file=sys.stderr)
-        # toggle_hold_file only surfaces clipboard (OSError/RuntimeError),
-        # file (OSError) and DPAPI (RuntimeError) failures.
-        except (OSError, RuntimeError) as exc:
-            return report_error("hold", exc, quiet=a.quiet)
-        return 0
-
-    p.set_defaults(func=_hold)
-
+def _register_undo_command(sub: _SubParsers) -> None:
     p = sub.add_parser(
         "undo",
         help="Restore the clipboard text the last press command overwrote",
         description=(
             "Swap the clipboard with the snapshot taken before the last "
-            "clipboard-writing press command (-C transform or clear). "
+            "clipboard-writing press command (-C transform, clear, or stash pop). "
             "Running undo again swaps back (redo)."
         ),
     )
@@ -431,6 +382,7 @@ def _build_parser() -> tuple[argparse.ArgumentParser, CommandCatalog]:
     from press._cli_daemon import _register_daemon_commands
     from press._cli_dict import _register_dict_commands
     from press._cli_notify import _register_notify_commands
+    from press._cli_stash import _register_stash_commands
     from press._cli_trace import _register_trace_commands
     from press.commands import PARAMETRIC_COMMANDS, SIMPLE_COMMANDS, TRANSFORM_CATEGORIES
 
@@ -450,7 +402,7 @@ def _build_parser() -> tuple[argparse.ArgumentParser, CommandCatalog]:
 
     # (category, first command name, registration step).  Transform parsers
     # and handlers are generated from the registry; each special-purpose
-    # step registers the commands of one group (clear/hold/undo together).
+    # step registers one command or command group.
     all_commands: tuple[SimpleCommand | ParametricCommand, ...] = (
         *SIMPLE_COMMANDS,
         *PARAMETRIC_COMMANDS,
@@ -460,7 +412,9 @@ def _build_parser() -> tuple[argparse.ArgumentParser, CommandCatalog]:
         for cmd in all_commands
     ]
     steps += [
-        ("Clipboard", "clear", partial(_register_clipboard_util_commands, sub)),
+        ("Clipboard", "clear", partial(_register_clear_command, sub)),
+        ("Clipboard", "stash", partial(_register_stash_commands, sub)),
+        ("Clipboard", "undo", partial(_register_undo_command, sub)),
         ("Dictionary", "dict", partial(_register_dict_commands, sub)),
         ("Generators", "genpass", partial(_register_genpass_command, sub)),
         ("Generators", "uuid", partial(_register_uuid_command, sub)),

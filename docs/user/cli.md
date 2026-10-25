@@ -48,15 +48,25 @@ failing step aborts before anything is written. Pipelines are defined in
 
 | Command | Effect |
 |---|---|
-| `press clear` (`cl`) | Empty the clipboard (`--hold` also discards the saved hold file) |
-| `press hold` | 1st call: save clipboard text to `hold.txt`. 2nd call: restore it |
-| `press undo` | Swap the clipboard with the text the last `-C` / `clear` overwrote; run again to redo |
+| `press clear` (`cl`) | Empty the clipboard |
+| `press stash push` / `pop` / `drop` / `list` | Save the clipboard text; restore it later (`pop`), discard it (`drop`), or show whether one is saved (`list`) |
+| `press undo` | Swap the clipboard with the text the last `-C` / `clear` / `stash pop` overwrote; run again to redo |
 
-- `hold.txt` and `undo.txt` live in `%APPDATA%\press\` and are DPAPI-encrypted.
+```bash
+press stash push     # save what is on the clipboard now
+# …copy and paste other things…
+press stash pop      # put the saved text back (and delete it)
+```
+
+- The stash has one slot, named after `git stash`: `push` fails while a text is
+  saved (`pop` or `drop` it first), and `pop` / `drop` fail when nothing is
+  saved. `list` prints the length only, never the text.
+- `stash.txt` and `undo.txt` live in `%APPDATA%\press\` and are DPAPI-encrypted.
+  A stashed `genpass` password comes back still excluded from Win+V history.
 - `undo` never snapshots content marked sensitive (a `genpass` password, a
   KeePassXC/Bitwarden copy). `PRESS_NO_UNDO=1` disables the snapshot file.
-- `hold` is a save/restore slot, not protection. To **block** overwrites until
-  you paste, use the daemon's ClipboardGuard ({doc}`daemon`).
+- A stash is a save/restore slot, not protection. To **block** overwrites until
+  you release it, use the daemon's ClipboardGuard ({doc}`daemon`).
 
 ## Generators
 
@@ -84,7 +94,7 @@ so the password stays out of Win+V history and Cloud Clipboard sync.
 ```bash
 press dict -C                     # forward lookup of the clipboard, per line
 press dict -r -C                  # reverse (value → key)
-press dict add FOOBER01 TABLE_X   # list / add / remove (rm) manage entries
+press dict add FOOBER01 TABLE_X   # list (ls) / add / remove (rm) manage entries
 press dict --file ~/my.tsv        # a different TSV file
 ```
 
@@ -94,7 +104,7 @@ File format and location: {doc}`dictionary`.
 
 | Command | Purpose |
 |---|---|
-| `press config validate` / `reset [--section SECTION]` | Check or restore `config.toml` ({doc}`config`) |
+| `press config path` / `list` (`ls`) / `validate` / `reset [--section SECTION] [-y]` | Locate, show, check or restore `config.toml` ({doc}`config`) |
 | `press notify off` / `on` / `status` | Mute the daemon's tray notifications, e.g. for screen sharing; `off` is not a toggle ({doc}`hotkeys`) |
 | `press trace on` / `off` / `status` | Timing diagnostics ({doc}`edr-environments`) |
 | `press daemon …` | Start/stop the daemon ({doc}`daemon`) |

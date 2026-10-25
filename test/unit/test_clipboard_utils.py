@@ -1,9 +1,15 @@
-"""Tests for clipboard utility commands (clear, hold)."""
+"""Tests for clipboard utility commands (clear, stash)."""
+
+from __future__ import annotations
 
 import subprocess
 import sys
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @pytest.mark.windows_only
@@ -38,36 +44,24 @@ class TestClearClipboard:
 
 
 @pytest.mark.windows_only
-class TestHoldCommand:
-    def _seed_clipboard(self, text: str) -> None:
-        """Put *text* into the clipboard so hold has something to save."""
-        result = subprocess.run(
-            [sys.executable, "-c", f"import press.clipboard as c; c.set_clipboard_text({text!r})"],
-            capture_output=True,
-            text=True,
-            env={**__import__("os").environ, "PYTHONUTF8": "1"},
-        )
-        assert result.returncode == 0, result.stderr
+class TestStashCommand:
+    """End-to-end: the real clipboard and a real (isolated) stash file."""
 
-    def test_hold_prints_held_to_stderr(self) -> None:
-        """hold with non-empty clipboard prints 'press hold: held' to stderr."""
-        self._seed_clipboard("test hold content")
-        result = subprocess.run(
-            [sys.executable, "-m", "press", "hold"],
-            capture_output=True,
-            text=True,
-            env={**__import__("os").environ, "PYTHONUTF8": "1"},
+    def _press(self, appdata: str, *argv: str) -> subprocess.CompletedProcess[str]:
+        env = {**__import__("os").environ, "PYTHONUTF8": "1", "APPDATA": appdata}
+        return subprocess.run(
+            [sys.executable, *argv], capture_output=True, text=True, env=env, check=False
         )
-        assert result.returncode == 0
-        assert "press hold:" in result.stderr
 
-    def test_hold_quiet_suppresses_stderr(self) -> None:
-        self._seed_clipboard("test hold quiet")
-        result = subprocess.run(
-            [sys.executable, "-m", "press", "hold", "-q"],
-            capture_output=True,
-            text=True,
-            env={**__import__("os").environ, "PYTHONUTF8": "1"},
-        )
-        assert result.returncode == 0
-        assert result.stderr == ""
+    def test_push_pop_round_trip(self, tmp_path: Path) -> None:
+        appdata = str(tmp_path)
+        seed = "import press.clipboard as c; c.set_clipboard_text('stash e2e')"
+        assert self._press(appdata, "-c", seed).returncode == 0
+
+        pushed = self._press(appdata, "-m", "press", "stash", "push")
+        assert pushed.returncode == 0, pushed.stderr
+        assert "press stash:" in pushed.stderr
+
+        popped = self._press(appdata, "-m", "press", "stash", "pop", "-q")
+        assert popped.returncode == 0, popped.stderr
+        assert popped.stderr == ""

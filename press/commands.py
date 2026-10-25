@@ -494,6 +494,11 @@ class SpecialCommand(NamedTuple):
 SPECIAL_COMMANDS: tuple[SpecialCommand, ...] = (
     # Handled inside CommandDispatcher.dispatch() / .transform().
     SpecialCommand("clear", ("cl",), hotkey=True),
+    # The daemon's ClipboardGuard toggle — a hotkey name only.  Its CLI
+    # neighbour is `press stash` (a save/restore slot, not protection), so
+    # there is no `press hold` to confuse the two.  A toggle, unlike
+    # notify-off/on: pressing it twice leaves the held text on the clipboard,
+    # and the tray icon shows the state.
     SpecialCommand("hold", (), hotkey=True),
     SpecialCommand("undo", (), hotkey=True),
     SpecialCommand("dict", (), hotkey=True),
@@ -521,6 +526,9 @@ SPECIAL_COMMANDS: tuple[SpecialCommand, ...] = (
     SpecialCommand("genpass", ("gp",)),
     SpecialCommand("uuid", ()),
     SpecialCommand("chain", ("ch",)),
+    # - stash keeps its slot in a file the daemon does not own; the hotkey
+    #   counterpart is the in-memory ClipboardGuard (`hold`).
+    SpecialCommand("stash", ()),
 )
 
 SPECIAL_COMMAND_INDEX: dict[str, SpecialCommand] = {cmd.name: cmd for cmd in SPECIAL_COMMANDS}

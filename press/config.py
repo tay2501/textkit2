@@ -29,6 +29,7 @@ __all__ = [
     "TypeConfig",
     "UiConfig",
     "binding_shadow_warnings",
+    "config_list",
     "config_reset",
     "config_validate",
     "default_config_path",
@@ -90,9 +91,9 @@ class TrimConfig:
 class DictionaryConfig:
     """Dictionary lookup configuration.
 
-    Only ``files[0]`` is read (by the daemon's ``dict``/``dict-reverse``); the
-    CLI ``press dict`` uses ``--file`` or :func:`press.dictionary.default_dict_path`
-    instead.  Documented as such in ``docs/user/config.md``.
+    Only ``files[0]`` is read — by the daemon's ``dict``/``dict-reverse`` and by
+    ``press dict`` without ``--file`` alike (:func:`press.dictionary.configured_dict_path`).
+    Documented as such in ``docs/user/config.md``.
     """
 
     files: tuple[str, ...] = ("%APPDATA%/press/dict/default.tsv",)
@@ -391,9 +392,17 @@ def load_config(path: Path | None = None) -> PressConfig:
     except tomllib.TOMLDecodeError as exc:
         raise ValueError(f"Invalid TOML in {path}: {exc}") from exc
 
-    schema_version = int(raw.get("schema_version", CURRENT_SCHEMA_VERSION))
+    schema_version = _schema_version(raw, path)
     sections = {s.key: s.parse(raw.get(s.key, {})) for s in _SECTIONS}
     return PressConfig(schema_version=schema_version, **sections)
+
+
+def _schema_version(raw: dict[str, Any], path: Path) -> int:
+    """Read ``schema_version``, reporting a non-integer as ``ValueError``."""
+    try:
+        return int(raw.get("schema_version", CURRENT_SCHEMA_VERSION))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"schema_version in {path} must be an integer") from exc
 
 
 def config_validate(path: Path) -> tuple[bool, str, list[str]]:
@@ -409,13 +418,16 @@ def config_validate(path: Path) -> tuple[bool, str, list[str]]:
         A missing file is *not* an error — defaults will be used.
     """
     if not path.exists():
-        return True, f"no config file at {path!r} — defaults will be used", []
+        return True, f"no config file at {path} — defaults will be used", []
     try:
         with path.open("rb") as fh:
             raw: dict[str, Any] = tomllib.load(fh)
     except tomllib.TOMLDecodeError as exc:
         return False, f"TOML parse error: {exc}", []
-    schema = int(raw.get("schema_version", CURRENT_SCHEMA_VERSION))
+    try:
+        schema = _schema_version(raw, path)
+    except ValueError as exc:
+        return False, str(exc), []
     if schema > CURRENT_SCHEMA_VERSION:
         return (
             False,
@@ -432,7 +444,7 @@ def config_validate(path: Path) -> tuple[bool, str, list[str]]:
     errors = pipeline_errors(config)
     if errors:
         return False, "; ".join(errors), []
-    return True, f"{path!r}: valid (schema_version={schema})", binding_shadow_warnings(config)
+    return True, f"{path}: valid (schema_version={schema})", binding_shadow_warnings(config)
 
 
 def binding_shadow_warnings(config: PressConfig) -> list[str]:
@@ -480,6 +492,17 @@ def _config_to_toml(config: PressConfig) -> str:
     return "\n".join(lines)
 
 
+def config_list(path: Path) -> str:
+    """Return the effective configuration — defaults merged with *path* — as TOML.
+
+    Keys press does not know are left out, exactly as press ignores them on load.
+
+    Raises:
+        ValueError: When the file is not valid TOML or holds invalid values.
+    """
+    return _config_to_toml(load_config(path))
+
+
 def config_reset(path: Path, *, key: str | None = None) -> bool:
     """Reset config to defaults, creating a ``.toml.bak`` backup first.
 
@@ -491,21 +514,23 @@ def config_reset(path: Path, *, key: str | None = None) -> bool:
 
     Returns:
         ``True`` if a backup was created, ``False`` if no previous file existed.
+
+    Raises:
+        ValueError: When *key* is given and the existing file cannot be read —
+            resetting one section would otherwise wipe all the others.
+            Nothing is written in that case.
     """
+    if key is None:
+        config = PressConfig()
+    else:
+        existing = load_config(path)
+        section = _SECTION_INDEX.get(key)
+        config = existing if section is None else replace(existing, **{key: section.default()})
+
     backed_up = False
     if path.exists():
         path.with_suffix(".toml.bak").write_bytes(path.read_bytes())
         backed_up = True
-
-    if key is None:
-        config = PressConfig()
-    else:
-        try:
-            existing = load_config(path)
-        except (FileNotFoundError, ValueError):
-            existing = PressConfig()
-        section = _SECTION_INDEX.get(key)
-        config = existing if section is None else replace(existing, **{key: section.default()})
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(_config_to_toml(config), encoding="utf-8")

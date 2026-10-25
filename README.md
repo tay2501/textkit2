@@ -76,7 +76,7 @@ for how to read the timings.
 | | |
 |---|---|
 | [Transforms](docs/user/transforms.md) | Every command, alias and option |
-| [CLI](docs/user/cli.md) | Input/output flags, `chain`, `hold`/`undo`, generators |
+| [CLI](docs/user/cli.md) | Input/output flags, `chain`, `stash`/`undo`, generators |
 | [Daemon](docs/user/daemon.md) · [Hotkeys](docs/user/hotkeys.md) | Tray icon, ClipboardGuard, `type`, key bindings |
 | [Configuration](docs/user/config.md) · [Dictionary](docs/user/dictionary.md) | `%APPDATA%\press\` files |
 | [FAQ](docs/user/faq.md) · [EDR / slow PCs](docs/user/edr-environments.md) | Troubleshooting |

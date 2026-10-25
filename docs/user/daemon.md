@@ -81,7 +81,14 @@ Windows has no exclusive clipboard lock, so this is near-absolute rather than
 absolute: an application can still read the other copy in the instant before
 the restore, and a restore that cannot open the clipboard even after retrying
 for ~0.1 s is skipped and recorded in `daemon.log`. It is separate from the
-CLI's file-based `press hold` ({doc}`cli`).
+CLI's `press stash`, which only saves and restores text ({doc}`cli`).
+
+`h`,`o` is a toggle on purpose, unlike `notify-off`/`notify-on`: pressing it
+twice by mistake leaves the held text on the clipboard, and the red tray icon
+shows the state. The release notification appears only with
+`notify_level = "success"` or `"all"`, so with the default (`"error"`), or with
+`[ui] hold_icon = false` or the icon hidden in the tray overflow, check the
+state before relying on it.
 
 ## Undo
 
