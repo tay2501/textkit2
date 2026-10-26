@@ -9,12 +9,11 @@ re-checks the marker once per dispatched action
 
 from __future__ import annotations
 
+import argparse
 import contextlib
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    import argparse
-
     from press._cli_helpers import _SubParsers
 
 
@@ -31,6 +30,7 @@ def _register_trace_commands(sub: _SubParsers) -> None:
             "'press trace off' removes the marker; 'press trace status' reports\n"
             "the current state."
         ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     trace_sub = trace_p.add_subparsers(dest="trace_action", metavar="ACTION")
     # print_help: shown when no ACTION is given (see _handle_trace).

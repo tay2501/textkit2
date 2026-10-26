@@ -9,11 +9,10 @@ every notification, so no restart is needed.
 
 from __future__ import annotations
 
+import argparse
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    import argparse
-
     from press._cli_helpers import _SubParsers
 
 
@@ -31,6 +30,7 @@ def _register_notify_commands(sub: _SubParsers) -> None:
             "for off, 'u n m' (unmute) for on. Type only those letters; extra\n"
             "keys reach the app."
         ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     notify_sub = notify_p.add_subparsers(dest="notify_action", metavar="ACTION")
     # print_help: shown when no ACTION is given (see _handle_notify).
