@@ -330,7 +330,7 @@ class TestSpecialCommandsRegistry:
         from press.commands import DAEMON_SPECIAL_COMMANDS, hotkey_sequence_candidates
 
         candidates = hotkey_sequence_candidates()
-        for name in ("genpass", "gp", "uuid", "chain", "ch"):
+        for name in ("genpass", "gp", "uuid", "chain", "ch", "stash"):
             assert name not in DAEMON_SPECIAL_COMMANDS
             assert name not in candidates
 

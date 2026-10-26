@@ -33,15 +33,16 @@ def _register_daemon_commands(sub: _SubParsers) -> None:
             "  1. Press the prefix chord simultaneously  (default: Ctrl+Alt+K)\n"
             "  2. Release, then type the command name or alias (as on the CLI)\n\n"
             "Key features:\n"
-            "  ClipboardGuard  Ctrl+Alt+K, then h,o   Protect clipboard until pasted\n"
-            "                                          (tray icon turns red while active)\n"
+            "  ClipboardGuard  Ctrl+Alt+K, then h,o   Undo every copy by other apps until\n"
+            "                                          h,o again (tray icon red meanwhile)\n"
             "  transforms      Ctrl+Alt+K, then name  Any command in 'press --help'\n\n"
             "Typical workflow:\n"
             "  press daemon start\n"
             "  press genpass              # generate password → clipboard\n"
             "  Ctrl+Alt+K, then h,o       # engage ClipboardGuard\n"
             "  <navigate to login field>\n"
-            "  Ctrl+V                     # paste — guard auto-releases"
+            "  Ctrl+V                     # paste, as often as needed\n"
+            "  Ctrl+Alt+K, then h,o       # release ClipboardGuard"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )

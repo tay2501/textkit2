@@ -149,13 +149,10 @@ class CommandDispatcher:
     # Internal
 
     def _run_dict(self, text: str, *, reverse: bool) -> str:
-        from press.dictionary import default_dict_path
+        from press.dictionary import configured_dict_path
         from press.transforms.dictionary import dict_forward, dict_reverse, load_tsv
 
-        cfg = self._config.dictionary
-        paths = cfg.resolved_paths()
-        path = paths[0] if paths else default_dict_path()
-        table = load_tsv(path)
+        table = load_tsv(configured_dict_path(self._config.dictionary))
         return dict_reverse(text, table=table) if reverse else dict_forward(text, table=table)
 
     def _notify_success(self, command: str, _result: str) -> None:

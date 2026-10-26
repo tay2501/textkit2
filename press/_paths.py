@@ -5,7 +5,7 @@ All press state (config, hold file, daemon PID/log/status) lives under
 variable (non-Windows CI/test runs), the user's home directory is the base.
 
 These helpers read the environment on each call, but some consumers
-(``press.daemon``, ``press.transforms.hold``) capture the result in
+(``press.daemon``, ``press.transforms.stash``) capture the result in
 module-level constants at import time — tests monkeypatch those constants
 directly rather than ``APPDATA``.
 

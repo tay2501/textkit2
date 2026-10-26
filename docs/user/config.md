@@ -7,8 +7,17 @@
 
 If the file does not exist, all defaults apply. No configuration is required to start using `press`.
 
-Use `press config validate` to check the file and `press config reset` to restore defaults
-(optionally per section with `--section hotkeys | sql_in | trim | dictionary | ui | hold | type | pipelines`).
+```bash
+press config path       # where the file is (printed even if it does not exist yet)
+press config list       # the settings in effect: defaults + your file, as TOML (alias: ls)
+press config validate   # check the file; a missing default file is fine
+press config reset      # back to defaults, with a .toml.bak backup; asks first
+```
+
+`reset` takes `--section hotkeys | sql_in | trim | dictionary | ui | hold | type | pipelines`
+to reset one section, and `-y/--yes` to skip the question (required in a script,
+where stdin is not a terminal). `list` and `validate` also take `--file PATH`,
+which must exist.
 
 ## Full example
 

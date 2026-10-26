@@ -715,13 +715,20 @@ class TestConfigReset:
         reloaded = load_config(cfg_file)
         assert reloaded.dictionary == DictionaryConfig()
 
-    def test_reset_when_existing_file_is_invalid(self, tmp_path: Path) -> None:
+    def test_section_reset_of_an_invalid_file_raises(self, tmp_path: Path) -> None:
+        """Resetting one section must not wipe the others it could not read."""
         cfg_file = tmp_path / "config.toml"
         cfg_file.write_text("not valid ][", encoding="utf-8")
-        config_reset(cfg_file, key="ui")
-        assert cfg_file.exists()
-        reloaded = load_config(cfg_file)
-        assert reloaded.ui == UiConfig()
+        with pytest.raises(ValueError, match="Invalid TOML"):
+            config_reset(cfg_file, key="ui")
+        assert cfg_file.read_text(encoding="utf-8") == "not valid ]["
+        assert not cfg_file.with_suffix(".toml.bak").exists()
+
+    def test_full_reset_of_an_invalid_file_succeeds(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("not valid ][", encoding="utf-8")
+        assert config_reset(cfg_file) is True
+        assert load_config(cfg_file).ui == UiConfig()
 
     def test_hold_config_imported(self) -> None:
         assert HoldConfig().monitor_clipboard is True
