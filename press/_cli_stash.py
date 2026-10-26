@@ -8,11 +8,11 @@ holds one entry, and an implicit push would fail half the time.
 
 from __future__ import annotations
 
+import argparse
 import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    import argparse
     from collections.abc import Callable
     from pathlib import Path
 
@@ -39,6 +39,7 @@ def _register_stash_commands(sub: _SubParsers) -> None:
             "until you release it, use the daemon's ClipboardGuard\n"
             "(Ctrl+Alt+K, then h,o)."
         ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     stash_sub = stash_p.add_subparsers(dest="stash_action", metavar="ACTION")
     # print_help: shown when no ACTION is given (see _handle_stash).
