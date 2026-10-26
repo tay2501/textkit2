@@ -123,8 +123,7 @@ From a hotkey, the quote and parentheses come from
 With the daemon running, `Ctrl+Alt+K` then `h`,`o` makes the clipboard
 read-only: copies made by other applications are undone, so you can paste
 the same text as often as you need. The tray icon turns red; the same keys
-release it. This is a daemon hotkey (ClipboardGuard); the CLI's save/restore
-slot is a separate feature — see [CLI](docs/user/cli.md).
+release it.
 
 ```text
 Ctrl+Alt+K, then h o     # hold on  (tray icon red)
@@ -133,6 +132,16 @@ Ctrl+Alt+K, then h o     # hold off
 ```
 
 See [ClipboardGuard](docs/user/daemon.md#clipboardguard-ho) for how it works.
+
+To set the clipboard aside instead — keep copying other things and bring it
+back later — use `press stash` (CLI, no daemon needed):
+
+```console
+> press stash push                     # save the clipboard text
+> press stash pop                      # put it back (and delete the saved copy)
+```
+
+See [Clipboard tools](docs/user/cli.md#clipboard-tools) for `drop`, `list` and `undo`.
 
 ### More
 
