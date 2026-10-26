@@ -16,12 +16,6 @@ if TYPE_CHECKING:
 
     import psutil
 
-# Per-user, like the pipe name and the PID file: a machine-wide name would let
-# one user's daemon (or a deliberately squatted mutex) block every other
-# user's daemon on a shared machine.  Derivation shared with pipe_name() via
-# press._pipe.user_name(); test_pipe.py pins the two together.
-_MUTEX_NAME = f"Global\\press_daemon_singleton_{user_name()}"
-
 _PID_PATH: Path = press_dir() / "press.pid"
 _STATUS_PATH: Path = press_dir() / "status.json"
 
@@ -53,6 +47,18 @@ _WAIT_OBJECT_0 = 0x0
 _WAIT_ABANDONED = 0x80
 
 
+def _mutex_name() -> str:
+    """Return the per-user name of the daemon singleton mutex.
+
+    Per-user, like the pipe name and the PID file: a machine-wide name would
+    let one user's daemon (or a deliberately squatted mutex) block every other
+    user's daemon on a shared machine.  Derivation shared with
+    :func:`press._pipe.pipe_name` via :func:`press._pipe.user_name` and, like
+    it, resolved per call (test_pipe.py pins the two together).
+    """
+    return f"Global\\press_daemon_singleton_{user_name()}"
+
+
 def _acquire_mutex(timeout_ms: int = 0) -> int | None:
     """Acquire the named singleton mutex and return its HANDLE.
 
@@ -72,7 +78,7 @@ def _acquire_mutex(timeout_ms: int = 0) -> int | None:
     """
     if sys.platform == "win32":
         kernel32 = _load_kernel32()
-        handle = kernel32.CreateMutexW(None, True, _MUTEX_NAME)
+        handle = kernel32.CreateMutexW(None, True, _mutex_name())
         if not handle:
             return None
         if ctypes.get_last_error() != _ERROR_ALREADY_EXISTS:

@@ -1,5 +1,6 @@
 """Shared pytest fixtures and markers."""
 
+import os
 import sys
 from collections.abc import Iterator
 
@@ -9,6 +10,20 @@ import pytest
 def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line("markers", "windows_only: requires Windows (clipboard, hotkey, tray)")
     config.addinivalue_line("markers", "slow: slower integration/system tests")
+    _isolate_daemon_names()
+
+
+def _isolate_daemon_names() -> None:
+    """Scope the daemon's per-user mutex and pipe names to this test process.
+
+    Both derive from ``press._pipe.user_name()`` (``%USERNAME%``) and are
+    machine-wide kernel objects, so ``%APPDATA%`` isolation does not separate
+    them: with the developer's own daemon running, the mutex tests saw it as
+    "held".  Set here, before collection, rather than in a fixture, so the
+    module-level ``{**os.environ}`` copies test modules pass to subprocesses
+    carry it too.
+    """
+    os.environ["USERNAME"] = f"press-test-{os.getpid()}"
 
 
 @pytest.fixture
@@ -54,7 +69,7 @@ def held_daemon_mutex() -> Iterator[None]:
     holder = threading.Thread(target=_hold, daemon=True)
     holder.start()
     acquired.wait(10)
-    assert handles[0] is not None, "the daemon mutex is already held (is a daemon running?)"
+    assert handles[0] is not None, "the daemon mutex is already held"
     try:
         yield
     finally:

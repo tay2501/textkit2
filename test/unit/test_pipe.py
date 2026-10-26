@@ -101,7 +101,30 @@ class TestPerUserScoping:
         from press._pipe import user_name
         from press.daemon import _lifecycle
 
-        assert f"Global\\press_daemon_singleton_{user_name()}" == _lifecycle._MUTEX_NAME
+        assert f"Global\\press_daemon_singleton_{user_name()}" == _lifecycle._mutex_name()
+
+    def test_mutex_name_follows_the_account_at_call_time(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Resolved per call like pipe_name(), so the suite's USERNAME
+        # override (test/conftest.py) keeps the tests' mutex apart
+        # from a real daemon running for the developer.
+        from press.daemon import _lifecycle
+
+        monkeypatch.setenv("USERNAME", "alice")
+        assert _lifecycle._mutex_name().endswith("_alice")
+
+
+class TestSuiteIsolation:
+    """test/conftest.py scopes per-user daemon names to this test process."""
+
+    def test_names_are_not_the_developers(self) -> None:
+        import os
+
+        from press._pipe import pipe_name
+
+        assert os.environ["USERNAME"] == f"press-test-{os.getpid()}"
+        assert pipe_name().endswith(f"-press-test-{os.getpid()}")
 
 
 class _FakeK32:
