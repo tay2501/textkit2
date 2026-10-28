@@ -24,13 +24,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
-          version: "latest"
-          enable-cache: true
+          # Release builds never restore a cache: a cache entry is the one input
+          # here that is not pinned, so a poisoned entry would reach the shipped
+          # artifacts (zizmor `cache-poisoning`).
+          enable-cache: false
 
       - name: Set up Python
         run: uv python install 3.15
@@ -59,12 +62,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
-          version: "latest"
-          enable-cache: true
+          enable-cache: false  # see validate-release
 
       - name: Set up Python
         run: uv python install 3.15
@@ -74,7 +78,7 @@ jobs:
           uv build
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist
           path: dist/
@@ -89,12 +93,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
-          version: "latest"
-          enable-cache: true
+          enable-cache: false  # see validate-release
 
       - name: Set up Python
         run: uv python install 3.15
@@ -120,7 +125,7 @@ jobs:
 
       - name: Upload executable artifact
         id: upload
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-exe
           path: press-windows-x64.zip
@@ -152,7 +157,7 @@ jobs:
           output-artifact-directory: signed
 
       - name: Upload signed executable artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-exe-signed
           path: signed/press-windows-x64.zip
@@ -172,10 +177,16 @@ jobs:
       && needs.sign-windows-exe.result != 'failure'
     permissions:
       contents: write  # create the release and upload its assets
+      # actions/attest: mint the Sigstore signing certificate (OIDC), store the
+      # attestation, and create its artifact storage record.
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       # Untrusted values (the workflow_dispatch `tag` input above all) reach the
@@ -226,13 +237,13 @@ jobs:
           } > changelog.md
 
       - name: Download build artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dist
           path: dist/
 
       - name: Download Windows executable (signed when available)
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: ${{ needs.sign-windows-exe.result == 'success' && 'windows-exe-signed' || 'windows-exe' }}
           path: .
@@ -251,6 +262,19 @@ jobs:
             cat SHA256SUMS.txt
             echo '```'
           } >> changelog.md
+
+      # SLSA build provenance for exactly the files being released (the signed
+      # zip when signing ran).  Verify with:
+      #   gh attestation verify press-windows-x64.zip --repo tay2501/textkit2
+      # attest-build-provenance v4 is only a wrapper; its README directs new
+      # workflows to actions/attest.
+      - name: Attest build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            dist/*.whl
+            dist/*.tar.gz
+            press-windows-x64.zip
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3

@@ -9,10 +9,16 @@ updates:
       time: "03:00"
     commit-message:
       prefix: "ci"
+    # 公開直後の乗っ取りリリースを避ける待機期間。cooldown は version
+    # updates のみに効き、security updates は遅延しない（GitHub Docs:
+    # Dependabot options reference / cooldown）。
+    cooldown:
+      default-days: 7
 
-  # Python 依存関係（pyproject.toml）
-  # Note: uv.lock は Dependabot 非対応のため、PR マージ後に手動で `uv lock` が必要
-  - package-ecosystem: "pip"
+  # Python 依存関係（pyproject.toml + uv.lock）
+  # uv エコシステムは uv.lock も更新する（GitHub Changelog 2025-03-13 GA、
+  # security updates は 2025-12-16 対応。Astral Docs "Using uv with Dependabot"）。
+  - package-ecosystem: "uv"
     directory: "/"
     schedule:
       interval: "weekly"
@@ -20,6 +26,8 @@ updates:
       time: "03:00"
     commit-message:
       prefix: "build"
+    cooldown:
+      default-days: 7
     groups:
       dev-dependencies:
         dependency-type: "development"

@@ -75,6 +75,13 @@ dev = [
 requires      = ["hatchling>=1.32.4"]  # 1.27+ implements PEP 639 license expressions
 build-backend = "hatchling.build"
 
+[tool.uv]
+# The single source of the uv version: setup-uv reads this when its `version`
+# input is omitted (resolution-strategy "highest"), and uv itself refuses to
+# run below it.  The floor is GHSA-hq85-5cpj-mr62 (0.13.4 drops the
+# compromised emSign ECC Root CA - G3 from uv's vendored CA bundle).
+required-version = ">=0.13.4"
+
 [tool.hatch.build.targets.wheel]
 packages = ["press"]
 
