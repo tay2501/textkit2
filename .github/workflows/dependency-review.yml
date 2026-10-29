@@ -14,6 +14,8 @@ jobs:
     steps:
      - name: 'Checkout Repository'
        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+       with:
+         persist-credentials: false
 
      - name: Dependency Review
        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
@@ -29,9 +31,9 @@ jobs:
          # MIT-CMU is Pillow's license_expression on PyPI (a permissive
          # MIT-style license); it went unchecked until a lock bump changed Pillow.
          allow-licenses: MIT, MIT-CMU, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, PSF-2.0
-         # Two packages are excluded from the license check (purl format, and
-         # only ever by exception — both are classification artefacts, not real
-         # copyleft dependencies):
+         # Three packages are excluded from the license check (purl format, and
+         # only ever by exception — all are classification artefacts, not real
+         # copyleft dependencies of the shipped program):
          #   pyinstaller       — PyPI metadata reads "GPLv2-or-later with a
          #                       special exception which allows to use
          #                       PyInstaller to build and distribute non-free
@@ -39,12 +41,20 @@ jobs:
          #                       cannot express that exception, so the graph
          #                       reports plain GPL-2.0.  It is also a
          #                       `build`-group tool, never a runtime import.
+         #   pyinstaller-hooks-contrib — its LICENSE splits by file: the
+         #                       standard hooks are GPL-2.0-or-later and run
+         #                       only at build time inside PyInstaller; the
+         #                       runtime hooks that get bundled into the
+         #                       executable (_pyinstaller_hooks_contrib/rthooks)
+         #                       are Apache-2.0.  The graph merges both into one
+         #                       "Apache-2.0 AND GPL-..." expression.  Also a
+         #                       `build`-group tool.
          #   typing-extensions — its own PyPI `license_expression` is PSF-2.0,
          #                       which is already allowed above; the graph
          #                       derives a composite expression from the bundled
          #                       CPython LICENSE text and reports a stray
          #                       GPL-1.0-or-later term from it.
-         allow-dependencies-licenses: pkg:pypi/pyinstaller, pkg:pypi/typing-extensions
+         allow-dependencies-licenses: pkg:pypi/pyinstaller, pkg:pypi/pyinstaller-hooks-contrib, pkg:pypi/typing-extensions
          # Comment on PR with summary
          comment-summary-in-pr: always
          # Warn on dependencies without licenses
