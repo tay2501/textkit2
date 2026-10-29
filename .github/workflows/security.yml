@@ -87,9 +87,11 @@ jobs:
         # Advisory by design (SAST false-positive rate is high); findings
         # surface in the GitHub Security tab via the SARIF upload below.
         # Pinned (Dependabot does not see uvx specs): bump by hand from
-        # https://pypi.org/project/bandit/.
+        # https://pypi.org/project/bandit/.  The `sarif` extra provides the
+        # SARIF formatter; without it `-f sarif` exits "invalid choice", and
+        # `|| true` plus the hashFiles guard hid that no report was produced.
         run: |
-          uvx --from "bandit[toml]==1.9.4" bandit -r press/ -f sarif -o bandit-report.sarif || true
+          uvx --from "bandit[toml,sarif]==1.9.4" bandit -r press/ -f sarif -o bandit-report.sarif || true
 
       - name: Upload Bandit SARIF to GitHub Security tab
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1

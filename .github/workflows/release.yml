@@ -146,7 +146,7 @@ jobs:
       contents: read
     steps:
       - name: Submit signing request to SignPath
-        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v2
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
@@ -177,11 +177,11 @@ jobs:
       && needs.sign-windows-exe.result != 'failure'
     permissions:
       contents: write  # create the release and upload its assets
-      # actions/attest: mint the Sigstore signing certificate (OIDC), store the
-      # attestation, and create its artifact storage record.
+      # actions/attest: mint the Sigstore signing certificate (OIDC) and store
+      # the attestation.  No artifact-metadata: storage records are only made
+      # with push-to-registry (OCI images) in organization-owned repositories.
       id-token: write
       attestations: write
-      artifact-metadata: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -80,7 +80,17 @@ build-backend = "hatchling.build"
 # input is omitted (resolution-strategy "highest"), and uv itself refuses to
 # run below it.  The floor is GHSA-hq85-5cpj-mr62 (0.13.4 drops the
 # compromised emSign ECC Root CA - G3 from uv's vendored CA bundle).
+# Never raise it past the uv that Dependabot's uv ecosystem runs (0.13.5 in
+# dependabot-core's uv/Dockerfile as of 2026-10-30): an older Dependabot uv
+# refuses this project and every update PR fails.
 required-version = ">=0.13.4"
+# Dependency cooldown, matching `cooldown.default-days: 7` in dependabot.yml
+# (Astral's Dependabot guide pairs the two).  A relative value is stored as a
+# span in uv.lock, so `--locked` does not go stale as the clock moves.  It also
+# holds back fixes younger than 7 days: when pip-audit/OSV turn CI red on such
+# a fix, exempt only that package for the upgrade:
+#   uv lock --upgrade-package <name> --exclude-newer-package <name>=false
+exclude-newer = "7 days"
 
 [tool.hatch.build.targets.wheel]
 packages = ["press"]
