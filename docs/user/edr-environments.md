@@ -141,6 +141,10 @@ slow), the official CPython diagnostic is:
 $ python -X importtime -m press upper
 ```
 
+Developers working on a speed-up: [Performance profiling](../dev/performance-profiling.md)
+covers the full measurement procedure for the CLI and the daemon, including
+sampling profilers and system-level tracing.
+
 ## Why press is built this way
 
 press keeps its CLI dependency-free and imports transform modules lazily —

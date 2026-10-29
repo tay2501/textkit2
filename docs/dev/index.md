@@ -7,6 +7,7 @@ architecture
 contributing
 code-style
 code-signing
+performance-profiling
 api
 changelog
 ```
