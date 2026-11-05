@@ -18,11 +18,17 @@ uv run pytest --lf          # re-run last failures only
 ## Lint and type check
 
 ```bash
-uv run ruff check .
 uv run ruff format .
-uv run mypy press/
+uv run ruff check .
+uv run mypy press/ --num-workers 4
 uv run mypy press/ --platform linux   # CI type-checks on Ubuntu only
 ```
+
+mypy runs in strict mode plus `truthy-bool`, `redundant-expr` and
+`possibly-undefined`. Win32-only function bodies start with
+`if sys.platform != "win32": raise OSError(...)` so the Linux lane prunes them;
+do not add `# type: ignore` for platform code — it becomes an unused-ignore
+error on the other platform.
 
 All of these must pass before opening a pull request.
 
@@ -31,7 +37,7 @@ All of these must pass before opening a pull request.
 ### Simple command (no extra CLI flags)
 
 A "simple" command maps to a pure `fn(text: str) -> str` function with no parameters
-beyond the standard I/O flags (`-c`, `-C`, `-v`, `-q`, `--fallback`).
+beyond the standard I/O flags (`--from-clipboard`, `-C`, `-v`, `-q`, `--fallback`).
 
 1. Add the pure function in `press/transforms/<module>.py`
 2. Add one `SimpleCommand(...)` entry to `SIMPLE_COMMANDS` in `press/commands.py`
@@ -54,7 +60,29 @@ export in `press/transforms/__init__.py` are all wired automatically from
 4. Document the command in `docs/user/transforms.md`
 
 As with simple commands, everything else (CLI registration, aliases, daemon
-dispatch, lazy exports) derives from the registry entry.
+dispatch, pipe delegation, lazy exports) derives from the registry entry.
+
+### Rules that apply to every new or renamed command
+
+- **New transforms module** → add a row to `TRANSFORM_CATEGORIES` in
+  `press/commands.py` (it decides the `press --help` grouping;
+  `test_cli_catalog.py` fails without it).
+- **Renamed command or transform keyword** → bump `PROTOCOL_VERSION` in
+  `press/_pipe.py`, so a new CLI does not delegate to an older running daemon.
+  press has no production users yet: delete the old spelling, do not keep it
+  as a deprecated alias.
+- **Names and flags** borrow the spelling of the de facto tool for the same
+  job (GNU coreutils, grep/ripgrep, jq, Python stdlib). An alias that equals a
+  well-known tool's name must mean what that tool does.
+
+### Non-transform command (`clear`, `stash`, `genpass` class)
+
+Add one `SpecialCommand(...)` row to `SPECIAL_COMMANDS` in `press/commands.py`;
+argparse aliases and daemon names derive from it (never spell an alias in an
+`add_parser` call). A new command group gets its own `press/_cli_<group>.py`
+and a row in the `steps` list of `_build_parser()` in `__main__.py`.
+`hotkey=True` also requires wiring `CommandDispatcher` in
+`press/daemon/_dispatch.py`.
 
 ## Commit style
 
@@ -73,9 +101,15 @@ Run these in order before every commit:
 ```bash
 uv run ruff format .   # MUST be first — CI fails on "Would reformat"
 uv run ruff check .
-uv run mypy press/
+uv run mypy press/ --num-workers 4
 uv run pytest
 ```
+
+CI (`.github/workflows/ci.yml`) runs the same steps on Ubuntu and Windows ×
+Python 3.13 / 3.14 / 3.15; `security.yml` (OSV-Scanner, pip-audit, Bandit,
+Semgrep), `codeql.yml` and `dependency-review.yml` gate the build as well.
+A pip-audit / OSV failure means a locked dependency has a known CVE — run
+`uv lock --upgrade-package <name>`, do not silence the scanner.
 
 Coverage must stay ≥ 76% (`fail_under` in `pyproject.toml`; `pytest-cov` enforces it).
 

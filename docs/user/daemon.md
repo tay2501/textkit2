@@ -13,7 +13,7 @@ press daemon start      # start in the background; returns once the tray icon is
 press daemon status     # "running" / "not running"; exit 0 / 1 (--json for details)
 press daemon stop       # or tray icon → Quit
 press daemon restart    # stop, then start (re-reads config.toml)
-press daemon logs       # last 50 lines; -f to follow, --level debug, --json
+press daemon logs       # last 50 lines; -n N (or all), -f to follow, --level debug, --json
 press daemon run        # run in the foreground of this terminal (debugging)
 ```
 
@@ -69,7 +69,7 @@ Ctrl+Alt+K, then h o        # guard off (tray icon back to normal)
 
 The guard also ends when the daemon exits, and it stands down on its own —
 with a tray notification — if another resident tool (a clipboard history
-manager, a sync agent) keeps rewriting the clipboard: more than 15 restores in
+manager, a sync agent) keeps rewriting the clipboard: 15 restores within
 3 seconds means two tools are fighting, and press gives way rather than loop.
 
 | Layer | Mechanism | Config (`[hold]`) |

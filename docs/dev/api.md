@@ -122,6 +122,48 @@ Auto-generated from source docstrings.
    :members:
 ```
 
+### press.transforms.unicode_norm
+
+```{eval-rst}
+.. automodule:: press.transforms.unicode_norm
+   :members:
+```
+
+### press.transforms.dictionary
+
+```{eval-rst}
+.. automodule:: press.transforms.dictionary
+   :members:
+```
+
+### press.transforms.stash
+
+```{eval-rst}
+.. automodule:: press.transforms.stash
+   :members:
+```
+
+### press.transforms.undo
+
+```{eval-rst}
+.. automodule:: press.transforms.undo
+   :members:
+```
+
+## press.commands
+
+```{eval-rst}
+.. automodule:: press.commands
+   :members:
+```
+
+## press.genpass
+
+```{eval-rst}
+.. automodule:: press.genpass
+   :members:
+```
+
 ## press.dictionary
 
 ```{eval-rst}

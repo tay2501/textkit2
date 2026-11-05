@@ -23,20 +23,27 @@
               ↓ shared
 ┌─────────────────────────────────────┐
 │  press/commands.py                  │
-│  (SIMPLE_COMMANDS registry)         │
+│  SIMPLE_COMMANDS / PARAMETRIC_…     │
+│  SPECIAL_COMMANDS, resolve_spec()   │
 └─────────────────────────────────────┘
               ↓ shared
 ┌─────────────────────────────────────┐
 │  press/transforms/                  │
 │  (pure functions, no I/O)           │
 │                                     │
-│  width.py      whitespace.py        │
-│  lineending.py separator.py         │
-│  sql.py        escape.py            │
+│  width.py      kana.py              │
+│  whitespace.py lineending.py        │
+│  lines.py      separator.py         │
 │  case.py       encode.py            │
-│  json_fmt.py   dictionary.py        │
-│  encoding_repair.py  hold.py        │
-│  lines.py                           │
+│  escape.py     encoding_repair.py   │
+│  unicode_norm.py  json_fmt.py       │
+│  sql.py        table.py             │
+│  replace.py    hashing.py           │
+│  stats.py      slug.py              │
+│  timestamp.py  dictionary.py        │
+│                                     │
+│  stash.py / undo.py — slot files    │
+│  (the only modules here with I/O)   │
 └─────────────────────────────────────┘
 ```
 
@@ -48,20 +55,28 @@ pipe instead of importing the transform module — see
 
 | Module | Responsibility |
 |--------|----------------|
-| `__main__.py` | argparse construction, I/O wiring (`stdin`/`stdout`/clipboard), UTF-8 setup |
-| `commands.py` | Declarative registry of all simple transform commands (`SimpleCommand` + `SIMPLE_COMMANDS` + `SIMPLE_COMMAND_INDEX`); single source of truth shared by CLI and daemon |
-| `clipboard.py` | Win32 ctypes API — `get_clipboard_text`, `set_clipboard_text`, `clear_clipboard` (Windows only) |
-| `keystrokes.py` | Win32 `SendInput` synthesis for the `type` command — pure `plan_keystrokes()` plus a Windows-only sender |
+| `__main__.py` | Top-level argparse (`_Parser`, `allow_abbrev=False`), transform-command registration from the registry, `clear`/`undo`/`genpass`/`uuid` handlers, UTF-8 I/O setup |
+| `_cli_helpers.py` | Shared CLI I/O: `_read_input`, `_write_output`, `_run_transform`, `_add_io_args`, the undo snapshot before a `-C` write |
+| `_cli_chain.py` / `_cli_dict.py` / `_cli_config.py` / `_cli_stash.py` / `_cli_daemon.py` / `_cli_trace.py` / `_cli_notify.py` | One module per command group (`chain`, `dict`, `config`, `stash`, `daemon`, `trace`, `notify`) |
+| `_cli_catalog.py` | Grouped command listing and "did you mean" for an unknown command; imported only on that error path |
+| `commands.py` | Declarative registry: `SimpleCommand` / `ParametricCommand` (+ `CliArg`) transforms, `SpecialCommand` rows for non-transform commands, `TRANSFORM_CATEGORIES` for display order, and `resolve_spec()` as the only name/alias lookup. Single source of truth for the CLI, the daemon, the pipe server and `chain` |
+| `clipboard.py` | Win32 ctypes clipboard API — `get_clipboard_text`, `set_clipboard_text(…, sensitive=)`, `clear_clipboard`, `clipboard_has_sensitive_marks`, and `ClipboardGuard` (hold) |
+| `keystrokes.py` | Win32 `SendInput` synthesis for the `type` command — pure `plan_keystrokes()` plus a Windows-only `type_text()` |
 | `config.py` | TOML loader → frozen `PressConfig` dataclass hierarchy (`slots=True`); the `_SECTIONS` registry drives loading, `config reset`, and serialization from one table |
+| `genpass.py` | `generate_password()` over the stdlib `secrets` module |
+| `_dpapi.py` | User-scoped DPAPI `protect` / `unprotect` for `stash.txt` and `undo.txt` (Windows only) |
+| `_notify.py` | The `notify-off` marker-file switch shared by `press notify` and the daemon |
 | `_paths.py` | Single source for `%APPDATA%\press` locations |
 | `_version.py` | Single source for the installed version string; absorbs both shapes of a damaged install (`PackageNotFoundError`, and 3.15's `MetadataNotFound`) |
-| `_pipe.py` | Named-pipe protocol + CLI client (`try_delegate`); deliberately import-light |
-| `daemon/` | Windows daemon package (see below); public API is `run_daemon`, `stop_daemon`, `daemon_status`, `daemon_logs` |
-| `dictionary.py` | TSV file CRUD — `add_entry`, `remove_entry`, `list_entries` |
-| `transforms/` | Pure `str → str` functions, one module per domain; no I/O or side effects |
-| `transforms/lines.py` | Line-oriented operations: `trim_lines`, `dedupe_lines`, `sort_lines` |
+| `_pipe.py` | Named-pipe protocol + CLI client (`try_delegate`), the single kernel32 loader, and `user_name()` for per-user object names; deliberately import-light |
+| `daemon/` | Windows daemon package (see below); public API is `run_daemon`, `start_daemon`, `stop_daemon`, `daemon_status`, `daemon_logs` |
+| `dictionary.py` | TSV file CRUD — `add_entry`, `remove_entry`, `list_entries` — and `configured_dict_path()`, the one answer to "which file" for both CLI and daemon |
+| `transforms/` | Pure `str → str` functions, one module per domain; no I/O or side effects (`stash.py` / `undo.py` are the file-slot exceptions) |
+| `transforms/lines.py` | Line-oriented operations: `trim_lines`, `dedupe_lines`, `sort_lines`, `number_lines`, `reverse_lines` |
 | `transforms/lineending.py` | CRLF/CR/LF conversion — and the **single definition of what counts as a line ending**; `lines.py`, `timestamp.py`, `sql.py`, `whitespace.py` and `keystrokes.py` all normalise through its `to_lf` |
 | `transforms/unicode_norm.py` | Unicode normalization: `to_nfc`, `to_nfd`, `to_nfkc`, `to_nfkd`, `check_norm` |
+| `transforms/stash.py` | One-slot stash file (`push` / `pop` / `drop` / `stashed`) and the slot-file format shared with undo |
+| `transforms/undo.py` | Undo snapshot (`save_snapshot`, `swap_undo`) and `snapshot_allowed()`, the single rule for when press may keep a copy |
 
 ### The `daemon/` package
 
@@ -71,8 +86,9 @@ pipe instead of importing the transform module — see
 | `_tray.py` | Tray icon image generation (Pillow) |
 | `_hotkeys.py` | Prefix hotkey, leader-key listener lifecycle, `_WorkerThread` |
 | `_sequence.py` | `SequenceResolver` — **pure** typed-sequence rules (stdlib only, no threads) |
-| `_dispatch.py` | `CommandDispatcher` — clipboard transforms and notifications |
-| `_lifecycle.py` | Singleton mutex, PID/status files, `stop_daemon`, `daemon_status` |
+| `_dispatch.py` | `CommandDispatcher` — clipboard transforms, hold toggle, in-memory undo slot, and `_notify()`, the only caller of `icon.notify` |
+| `_notifications.py` | `notifications_allowed()` — the `press notify off` switch plus Windows' `SHQueryUserNotificationState` (busy / presentation / full-screen) |
+| `_lifecycle.py` | Singleton mutex, PID/status files, `start_daemon`, `stop_daemon`, `daemon_status` |
 | `_logs.py` | Rotating log setup, `daemon_logs` |
 | `_pipe.py` | Named-pipe server answering delegated CLI transforms |
 | `_service.py` | `run_daemon` — wires the above together |
@@ -119,6 +135,23 @@ Adding either kind of command:
 2. Add a `SimpleCommand(...)` or `ParametricCommand(...)` entry in `commands.py`
    (parametric: declare options via `cli_args`; use `daemon_kwargs` for
    config-driven arguments during daemon hotkey dispatch)
+3. A new transforms **module** also needs a row in `TRANSFORM_CATEGORIES`,
+   which decides where its commands appear in `press --help`
+
+The lazy exports in `transforms/__init__.py` are built from both registries
+(`_build_lazy()`); only helpers outside them go in `_EXTRA`.
+
+Non-transform commands (`clear`, `stash`, `undo`, `dict`, `genpass`, `uuid`,
+`chain`, and the daemon-only `hold`, `dict-reverse`, `type`, `notify-off`,
+`notify-on`) are one `SpecialCommand` row each in `SPECIAL_COMMANDS`. Their
+argparse aliases, the daemon's typeable names, and `DAEMON_SPECIAL_COMMANDS`
+all derive from that table; `hotkey=True` also requires wiring in
+`CommandDispatcher`.
+
+Every name or alias lookup goes through `commands.resolve_spec()`, so an alias
+added to a registry row works in the CLI, the daemon, the pipe server and
+`chain` at once. Renaming a command or a transform keyword requires bumping
+`_pipe.PROTOCOL_VERSION` (see below).
 
 ## Prefix key state machine
 
@@ -161,8 +194,11 @@ On EDR/DLP-monitored machines, `press <cmd>` is dominated not by the transform
 transform module — each one inspected by the security agent.
 
 When the daemon is running it already holds those modules in memory, so the CLI
-sends it the text over a per-user named pipe (`\\.\pipe\press-daemon-v1-<user>`)
-and never imports the transform module.
+sends it the text over a per-user named pipe
+(`\\.\pipe\press-daemon-v<PROTOCOL_VERSION>-<user>`, currently `v2`) and never
+imports the transform module. The version is part of the name so that a CLI
+from a newer install, whose command names or keywords changed, does not reach
+an older running daemon — it finds no pipe and transforms in-process instead.
 
 ```
 press halfwidth
@@ -202,9 +238,10 @@ command's imports, the more it saves.
 - **CLI flags win over daemon config.** Options travel with the request;
   `CommandDispatcher.transform(..., kwargs=...)` uses them instead of the
   daemon's `daemon_kwargs` config defaults (which serve the hotkey path).
-- **Only registry transforms are reachable.** The server rejects `hold`,
-  `clear`, and `dict`, and rejects any option not declared in that command's
-  `cli_args`.
+- **Only registry transforms are reachable.** The server resolves the name
+  with `resolve_spec()`, so anything that is not a simple or parametric
+  transform (`hold`, `clear`, `dict`, `type`, …) is rejected as an unknown
+  command, and so is any option not declared in that command's `cli_args`.
 
 **Pipe security**, hardened against local pipe-squatting (a rogue process
 claiming the pipe name to harvest clipboard text):
@@ -228,19 +265,33 @@ claiming the pipe name to harvest clipboard text):
   server cannot `ImpersonateNamedPipeClient` to borrow the caller's token.
 - **Remote clients rejected** via `PIPE_REJECT_REMOTE_CLIENTS`.
 
-## Clipboard stash and hold
+## Clipboard stash, hold and undo
 
-Two features with different jobs, deliberately under different names:
+Three features with different jobs, deliberately under different names:
 
 | Feature | Front end | Storage | Code |
 |---------|-----------|---------|------|
 | Stash — save now, restore later | CLI `press stash push/pop/drop/list` | File: `%APPDATA%\press\stash.txt` (DPAPI) | `transforms/stash.py`, `_cli_stash.py` |
-| Hold — block overwrites until released | Daemon hotkey `h`,`o` (toggle) | In-memory: `ClipboardGuard` | `_toggle_hold()` in `daemon/_dispatch.py` |
+| Hold — block overwrites until released | Daemon hotkey `h`,`o` (toggle) | In-memory: `clipboard.ClipboardGuard` | `_toggle_hold()` in `daemon/_dispatch.py` |
+| Undo — swap back what press overwrote | CLI `press undo`; daemon `Shift+Z` | CLI: `%APPDATA%\press\undo.txt` (DPAPI); daemon: in-memory `_undo_text` | `transforms/undo.py`, `_snapshot_clipboard_for_undo()` / `_remember_for_undo()` |
 
 Only the hold turns the tray icon red. The stash survives process restarts and
 keeps one slot (`push` refuses to replace it); its file format, shared with
 `undo.txt`, records whether the text carried the sensitive-exclusion formats so
 `pop` can restore them.
+
+Undo is dual-layer like hold: each front end keeps its own slot. Both ask
+`transforms.undo.snapshot_allowed()` before keeping a copy — it refuses when
+the clipboard carries the sensitive-exclusion formats or `PRESS_NO_UNDO=1` is
+set — and any new code path that overwrites the clipboard must take the
+snapshot first. Snapshots are best-effort and never fail the transform.
+
+`ClipboardGuard` has two layers: a hidden window restores the held text on
+`WM_CLIPBOARDUPDATE`, and a `WH_KEYBOARD_LL` hook re-asserts it on `Ctrl+V` /
+`Shift+Insert`. The guard recognises its own writes by clipboard owner
+(`GetClipboardOwner()` is its window), never by a flag, and stands down on the
+15th restore within 3 s (`_STORM_LIMIT` / `_STORM_WINDOW`: another tool is
+fighting it).
 
 ## Performance characteristics
 
@@ -252,7 +303,7 @@ Measured on Windows 11, Python 3.13, direct `uv run` invocation.
 |-----------|------|-------|
 | `uv run` process spawn | ~150 ms | Irreducible; use PyInstaller `--onedir` build to eliminate |
 | Python interpreter | ~40 ms | Irreducible |
-| `argcomplete` import | ~13 ms | Required for tab completion |
+| `argcomplete` import | ~13 ms | Only when the shell-completion hook calls press (`_ARGCOMPLETE` set); skipped on a normal run |
 | `press` package code | ~7 ms | Dominated by `argparse` + `commands` setup |
 | Any single transform module | 0.4–5 ms | Loaded lazily on first use |
 | `charset_normalizer` (encoding_repair) | ~63 ms | Lazy-loaded; only paid when `fix-encoding` is invoked |
@@ -286,62 +337,71 @@ All figures are for 1 000 calls; typical clipboard input is 1–20 lines (< 1 ms
 ```
 press/
 ├── __init__.py
-├── __main__.py          CLI entry point, argparse, I/O dispatch
-├── commands.py          Central command registry (SimpleCommand)
-├── clipboard.py         Win32 ctypes clipboard API
+├── __main__.py          CLI entry point, top-level argparse, transform registration
+├── _cli_helpers.py      Shared CLI I/O helpers (read/write, -C undo snapshot)
+├── _cli_catalog.py      Unknown-command listing (error path only)
+├── _cli_chain.py        `chain` command
+├── _cli_config.py       `config` command group
+├── _cli_daemon.py       `daemon` command group
+├── _cli_dict.py         `dict` command group
+├── _cli_notify.py       `notify` command group
+├── _cli_stash.py        `stash` command group
+├── _cli_trace.py        `trace` command group
+├── commands.py          Command registry (simple / parametric / special)
+├── clipboard.py         Win32 ctypes clipboard API + ClipboardGuard
 ├── keystrokes.py        Win32 SendInput synthesis (the `type` command)
 ├── config.py            TOML → PressConfig dataclass (_SECTIONS registry)
+├── dictionary.py        TSV dictionary CRUD + configured_dict_path()
+├── genpass.py           Password generator (secrets)
+├── _dpapi.py            DPAPI protect/unprotect (stash.txt, undo.txt)
+├── _notify.py           notify-off marker switch
 ├── _paths.py            %APPDATA%\press path helpers
-├── _version.py          Installed version lookup (CLI + daemon)
 ├── _pipe.py             Named-pipe protocol + CLI client
+├── _version.py          Installed version lookup (CLI + daemon)
 ├── daemon/              pystray + pynput daemon (Windows only)
 │   ├── __init__.py      Public API re-exports
 │   ├── _backends.py     pystray / pynput seam (Protocols)
 │   ├── _tray.py         Tray icon image (Pillow)
 │   ├── _hotkeys.py      Hotkeys, leader listener, worker thread
-│   ├── _sequence.py     SequenceResolver (pure typed-sequence rules)
+│   ├── _sequence.py     SequenceResolver, KeySuppression (pure rules)
 │   ├── _dispatch.py     CommandDispatcher
-│   ├── _lifecycle.py    Mutex, PID/status, stop/status
-│   ├── _logs.py         Rotating log, daemon logs
+│   ├── _notifications.py  Notification gate
+│   ├── _lifecycle.py    Mutex, PID/status, start/stop/status
+│   ├── _logs.py         Rotating log, trace level, daemon logs
 │   ├── _pipe.py         Named-pipe server
 │   └── _service.py      run_daemon
-├── dictionary.py        TSV dictionary CRUD
 └── transforms/
-    ├── __init__.py      PEP 562 lazy loader
-    ├── case.py          snake/camel/pascal/kebab
-    ├── dictionary.py    TSV-based find/replace
-    ├── encode.py        base64 / URL encode-decode
-    ├── encoding_repair.py  mojibake repair (charset-normalizer)
+    ├── __init__.py      PEP 562 lazy loader (built from the registry)
+    ├── case.py          snake/camel/pascal/kebab, upper/lower/title/…
+    ├── dictionary.py    TSV-based lookup (forward / reverse)
+    ├── encode.py        Base64 / URL encode-decode
+    ├── encoding_repair.py  Mojibake repair (charset-normalizer)
     ├── escape.py        unicode-escape / HTML entities
-    ├── stash.py         file-based stash (one slot)
-    ├── json_fmt.py      JSON format / compress
-    ├── lineending.py    CRLF / LF / CR conversion
-    ├── separator.py     underscore ↔ hyphen
+    ├── hashing.py       hashlib hex digest
+    ├── json_fmt.py      JSON format / compact
+    ├── kana.py          hiragana ↔ katakana (jaconv)
+    ├── lineending.py    CRLF / LF / CR, strip-newlines, to_lf
+    ├── lines.py         trim / dedupe / sort / number / reverse
+    ├── replace.py       regex / fixed-string replace
+    ├── separator.py     underscore ↔ hyphen, strip-commas, digits-only
+    ├── slug.py          URL slug
     ├── sql.py           SQL IN clause generator
-    ├── unicode_norm.py  NFC/NFD/NFKC/NFKD normalization + check_norm
-    ├── whitespace.py    whitespace normalisation
-    └── width.py         full-width ↔ half-width (jaconv)
+    ├── stash.py         One-slot stash file + shared slot-file format
+    ├── stats.py         count report
+    ├── table.py         TSV/CSV → Markdown table
+    ├── timestamp.py     Unix time ↔ ISO 8601
+    ├── undo.py          Undo snapshot + snapshot_allowed()
+    ├── unicode_norm.py  NFC/NFD/NFKC/NFKD + check_norm
+    ├── whitespace.py    collapse-whitespace
+    └── width.py         full-width ↔ half-width, enlarge-kana (jaconv)
 
 test/
-├── conftest.py          pytest markers + auto-skip for windows_only
-└── unit/
-    ├── test_case.py
-    ├── test_cli.py
-    ├── test_clipboard_utils.py
-    ├── test_config.py
-    ├── test_daemon.py
-    ├── test_dictionary_mgmt.py
-    ├── test_dictionary_transforms.py
-    ├── test_encode.py
-    ├── test_encoding_repair.py
-    ├── test_escape.py
-    ├── test_hold.py
-    ├── test_stash.py
-    ├── test_json_fmt.py
-    ├── test_lineending.py
-    ├── test_separator.py
-    ├── test_sql.py
-    ├── test_transforms_init.py
-    ├── test_whitespace.py
-    └── test_width.py
+├── conftest.py          Markers, windows_only auto-skip, shared fixtures
+│                        (notifications_open, held_daemon_mutex)
+├── unit/                One test_<module>.py per module (≈50 files), plus
+│                        cross-cutting suites such as test_cli_catalog.py,
+│                        test_daemon_trace_instrumentation.py and
+│                        test_clipboard_win32.py (real Win32, windows_only)
+└── perf/                Startup / file-open budget, transform throughput,
+                         dictionary load (run by the normal pytest job)
 ```

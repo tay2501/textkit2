@@ -94,7 +94,7 @@ output the input unchanged instead.
 | `replace` | `rp` | `-e`/`--regexp PATTERN` (required, repeatable), `-r`/`--replace TEXT`, `-i`/`--ignore-case`, `-F`/`--fixed-strings` | Flags as in grep/ripgrep. Several `-e` replace any of them. The replacement uses Python/sed group references (`\1`, `\g<name>`), not ripgrep's `$1`; omitting `-r` deletes matches; `-F` makes patterns and replacement literal |
 | `hash` | `hs` | `-a`/`--algorithm NAME` | Hex digest of the UTF-8 bytes as-is (default `sha256`). Flag as in GNU `cksum`, but `NAME` is a Python `hashlib` name (`sha256`, `sha3_256`, `md5`, …) |
 | `count` | `wc` | | chars, non-space, words, lines, UTF-8 bytes (`non-space` suits Japanese manuscripts) |
-| `slug` | `sl` | `--unicode` | `Hello, World! Café` → `hello-world-cafe`; `--unicode` keeps Japanese |
+| `slug` | `sl` | `-u`/`--unicode` | `Hello, World! Café` → `hello-world-cafe`; `--unicode` keeps Japanese |
 | `unix-to-date` | `ut` | `-u`/`--utc` | Unix time per line (s/ms auto-detected) → ISO 8601, local time by default |
 | `date-to-unix` | | `--ms` | ISO 8601 per line → Unix seconds; no offset = local time |
 

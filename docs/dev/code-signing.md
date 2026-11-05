@@ -14,8 +14,9 @@ certificate by [SignPath Foundation](https://signpath.org/).
 
 This program will not transfer any information to other networked systems.
 press performs **no network I/O** — all transforms run locally on clipboard,
-stdin, or file input. The only files it writes are its own configuration,
-dictionary, log, and hold-state files under `%APPDATA%\press\`.
+stdin, or file input. The only files it writes are under `%APPDATA%\press\`:
+its configuration, dictionary, daemon log/PID/status files, the DPAPI-encrypted
+`stash.txt` / `undo.txt` slots, and the `trace` / `notify-off` marker files.
 
 ---
 

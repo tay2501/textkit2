@@ -1,6 +1,6 @@
 """Shared filesystem locations for press data files.
 
-All press state (config, hold file, daemon PID/log/status) lives under
+All press state (config, stash/undo slots, marker files, daemon PID/log/status) lives under
 ``%APPDATA%\\press``.  On platforms without an ``APPDATA`` environment
 variable (non-Windows CI/test runs), the user's home directory is the base.
 
