@@ -29,6 +29,7 @@ prefix = "ctrl+alt+k"
 
 [hotkeys.bindings]
 "shift+d" = "dict-reverse"
+"shift+m" = "notify-off"
 "shift+z" = "undo"
 
 [sql_in]
@@ -109,16 +110,16 @@ the same result.
 |---|---|---|---|
 | `trailing` | bool | `false` | `false`: strip leading and trailing whitespace; `true`: trailing only, keeping indentation (same as CLI `trim --trailing`) |
 
-### `[dictionary]` *(daemon)*
+### `[dictionary]` *(both)*
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `files` | list of strings | `["%APPDATA%/press/dict/default.tsv"]` | Dictionary file used by the daemon hotkeys (`dict` / `dict-reverse`). Only the **first** entry is read today; further entries are ignored |
+| `files` | list of strings | `["%APPDATA%/press/dict/default.tsv"]` | Dictionary file used by `press dict` and the daemon hotkeys (`dict` / `dict-reverse`). Only the **first** entry is read today; further entries are ignored. `%APPDATA%` is expanded; other variables and `~` are not |
 
-> The CLI `press dict` does not read this setting: it uses `--file PATH`, or
+> The CLI and the daemon always look up the same file. `press dict --file PATH`
+> overrides it for one command. With an empty `files = []`, both fall back to
 > `%APPDATA%\press\dict\default.tsv` (Windows) / `~/.config/press/dict/default.tsv`
-> (elsewhere) when `--file` is omitted. With the default config both point at
-> the same file on Windows.
+> (elsewhere).
 
 ### `[ui]` *(daemon)*
 

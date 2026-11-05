@@ -1,6 +1,6 @@
 """Line-oriented transforms: trim, dedupe, sort, number, reverse.
 
-All functions are pure: fn(text: str, **kwargs) -> str.
+All functions are pure: ``fn(text: str, **kwargs) -> str``.
 Line endings are normalised to LF on entry; trailing newline is preserved.
 """
 

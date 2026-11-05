@@ -35,7 +35,6 @@ source_suffix = {
 # -- HTML output ---------------------------------------------------------------
 html_theme = "furo"
 html_title = "press"
-html_static_path = ["_static"]
 
 # Furo theme options
 html_theme_options = {
