@@ -322,6 +322,8 @@ class TestSpecialCommandsRegistry:
             "dict-reverse",
             "notify-off",
             "notify-on",
+            "date",
+            "time",
         }
         assert wired == set(DAEMON_SPECIAL_COMMANDS)
 

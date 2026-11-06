@@ -136,6 +136,87 @@ class TestCommandDispatcherHalfwidth:
             mock_set.assert_not_called()
 
 
+class TestCommandDispatcherClock:
+    """``date``/``time`` put the formatted current time on the clipboard."""
+
+    @pytest.mark.parametrize(
+        ("command", "fmt"),
+        [("date", "%Y%m%d"), ("time", "%H%M%S")],
+    )
+    def test_default_formats(self, command: str, fmt: str) -> None:
+        from press.config import PressConfig
+        from press.daemon import CommandDispatcher
+
+        with (
+            patch("press.clock.format_now", return_value="X") as mock_fmt,
+            patch("press.clipboard.get_clipboard_text", return_value="old"),
+            patch("press.clipboard.set_clipboard_text") as mock_set,
+        ):
+            CommandDispatcher(PressConfig()).dispatch(command)
+        assert mock_fmt.call_args.args == (fmt,)
+        mock_set.assert_called_once_with("X")
+
+    def test_config_drives_the_format(self) -> None:
+        from press.config import DateConfig, PressConfig, TimeConfig
+        from press.daemon import CommandDispatcher
+
+        config = PressConfig(date=DateConfig(format="%Y-%m-%d"), time=TimeConfig(format="%H:%M"))
+        with (
+            patch("press.clock.format_now", return_value="X") as mock_fmt,
+            patch("press.clipboard.get_clipboard_text", return_value="old"),
+            patch("press.clipboard.set_clipboard_text"),
+        ):
+            d = CommandDispatcher(config)
+            d.dispatch("date")
+            d.dispatch("time")
+        assert [c.args for c in mock_fmt.call_args_list] == [("%Y-%m-%d",), ("%H:%M",)]
+
+    def test_overwritten_clipboard_is_undoable(self) -> None:
+        from press.config import PressConfig
+        from press.daemon import CommandDispatcher
+
+        with (
+            patch("press.clock.format_now", return_value="20261106"),
+            patch("press.clipboard.get_clipboard_text", return_value="old"),
+            patch("press.clipboard.set_clipboard_text") as mock_set,
+            patch("press.transforms.undo.snapshot_allowed", return_value=True),
+        ):
+            d = CommandDispatcher(PressConfig())
+            d.dispatch("date")
+            d.dispatch("undo")
+        assert mock_set.call_args_list[-1].args == ("old",)
+
+    def test_unusable_format_notifies_and_leaves_the_clipboard_alone(self) -> None:
+        """A bad [date] format fails the one command, never the daemon."""
+        from press.config import DateConfig, PressConfig
+        from press.daemon import CommandDispatcher
+
+        d = CommandDispatcher(PressConfig(date=DateConfig(format="")))
+        with (
+            patch("press.clipboard.get_clipboard_text", return_value="old"),
+            patch("press.clipboard.set_clipboard_text") as mock_set,
+            patch.object(d, "_notify_error") as mock_err,
+        ):
+            d.dispatch("date")
+        mock_set.assert_not_called()
+        command, message = mock_err.call_args.args
+        assert command == "date"
+        assert message.startswith("[date] format in config.toml:")
+
+    def test_empty_clipboard_does_not_block_the_write(self) -> None:
+        """Nothing to snapshot is fine — the date must still be written."""
+        from press.config import PressConfig
+        from press.daemon import CommandDispatcher
+
+        with (
+            patch("press.clock.format_now", return_value="X"),
+            patch("press.clipboard.get_clipboard_text", side_effect=RuntimeError("empty")),
+            patch("press.clipboard.set_clipboard_text") as mock_set,
+        ):
+            CommandDispatcher(PressConfig()).dispatch("time")
+        mock_set.assert_called_once_with("X")
+
+
 class TestCommandDispatcherType:
     """``type`` reads the clipboard and types it — it never writes it back."""
 

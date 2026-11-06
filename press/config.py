@@ -20,15 +20,18 @@ if TYPE_CHECKING:
 __all__ = [
     "CURRENT_SCHEMA_VERSION",
     "SECTION_NAMES",
+    "DateConfig",
     "DictionaryConfig",
     "HoldConfig",
     "HotkeysConfig",
     "PressConfig",
     "SqlInConfig",
+    "TimeConfig",
     "TrimConfig",
     "TypeConfig",
     "UiConfig",
     "binding_shadow_warnings",
+    "clock_format_errors",
     "config_list",
     "config_reset",
     "config_validate",
@@ -141,6 +144,22 @@ class TypeConfig:
     newline: Literal["enter", "unicode", "skip"] = "enter"
 
 
+# Spelled out rather than imported from press.clock for the same reason as
+# TypeConfig.newline; test_config.TestClockConfig pins the two together.
+@dataclass(frozen=True, slots=True)
+class DateConfig:
+    """Output format of the ``date`` command (CLI without ``+FORMAT`` and hotkey)."""
+
+    format: str = "%Y%m%d"  # strftime; "%Y-%m-%d" is YYYY-MM-DD
+
+
+@dataclass(frozen=True, slots=True)
+class TimeConfig:
+    """Output format of the ``time`` command (CLI without ``+FORMAT`` and hotkey)."""
+
+    format: str = "%H%M%S"  # strftime; "%H:%M:%S" is hh:mm:ss
+
+
 @dataclass(frozen=True, slots=True)
 class PressConfig:
     """Top-level configuration object for press."""
@@ -152,6 +171,8 @@ class PressConfig:
     ui: UiConfig = field(default_factory=UiConfig)
     hold: HoldConfig = field(default_factory=HoldConfig)
     type: TypeConfig = field(default_factory=TypeConfig)
+    date: DateConfig = field(default_factory=DateConfig)
+    time: TimeConfig = field(default_factory=TimeConfig)
     # Named transform chains: name -> ordered registry command names.
     # Runnable via `press chain <name>` and bindable to daemon hotkeys.
     pipelines: dict[str, tuple[str, ...]] = field(default_factory=dict)
@@ -211,6 +232,29 @@ def _parse_type(data: dict[str, Any]) -> TypeConfig:
         chunk_delay_ms=int(data.get("chunk_delay_ms", default.chunk_delay_ms)),
         newline=newline,
     )
+
+
+def _parse_clock_format(data: dict[str, Any], default: str) -> str:
+    """Read a ``[date]``/``[time]`` ``format`` without ever raising.
+
+    A string is kept even when it is unusable: loading must not fail, since
+    ``load_config`` failing stops the daemon and with it every hotkey over one
+    key that only ``date``/``time`` use (the ``[type] newline`` rule).  The
+    mistake is still loud, just scoped — ``press config validate`` reports it
+    (:func:`clock_format_errors`) and the command itself fails when used
+    (:func:`press.clock.format_configured`).  A non-string cannot be carried in
+    a ``str`` field, so it falls back to *default*; validate reports that too.
+    """
+    value = data.get("format", default)
+    return value if isinstance(value, str) else default
+
+
+def _parse_date(data: dict[str, Any]) -> DateConfig:
+    return DateConfig(format=_parse_clock_format(data, DateConfig().format))
+
+
+def _parse_time(data: dict[str, Any]) -> TimeConfig:
+    return TimeConfig(format=_parse_clock_format(data, TimeConfig().format))
 
 
 def _parse_pipelines(data: dict[str, Any]) -> dict[str, tuple[str, ...]]:
@@ -357,6 +401,8 @@ _SECTIONS: tuple[_Section, ...] = (
     _Section("ui", _parse_ui, UiConfig),
     _Section("hold", _parse_hold, HoldConfig),
     _Section("type", _parse_type, TypeConfig),
+    _Section("date", _parse_date, DateConfig),
+    _Section("time", _parse_time, TimeConfig),
     _Section("pipelines", _parse_pipelines, dict, _emit_pipelines),
 )
 
@@ -441,7 +487,7 @@ def config_validate(path: Path) -> tuple[bool, str, list[str]]:
         config = load_config(path)
     except ValueError as exc:
         return False, str(exc), []
-    errors = pipeline_errors(config)
+    errors = clock_format_errors(raw) + pipeline_errors(config)
     if errors:
         return False, "; ".join(errors), []
     return True, f"{path}: valid (schema_version={schema})", binding_shadow_warnings(config)
@@ -457,6 +503,27 @@ def binding_shadow_warnings(config: PressConfig) -> list[str]:
     from press.commands import hotkey_binding_shadow_warnings
 
     return hotkey_binding_shadow_warnings(config.hotkeys.bindings, config.pipelines)
+
+
+def clock_format_errors(raw: dict[str, Any]) -> list[str]:
+    """Check the ``[date]``/``[time]`` formats exactly as written in the file.
+
+    Reads the raw TOML rather than :class:`PressConfig`, because the loader
+    replaces a non-string with the default (see ``_parse_clock_format``) and
+    validation must still report it.
+    """
+    from press.clock import check_format
+
+    errors: list[str] = []
+    for section in ("date", "time"):
+        table = raw.get(section)
+        if not isinstance(table, dict) or "format" not in table:
+            continue
+        try:
+            check_format(table["format"])
+        except ValueError as exc:
+            errors.append(f"[{section}] format: {exc}")
+    return errors
 
 
 def pipeline_errors(config: PressConfig) -> list[str]:

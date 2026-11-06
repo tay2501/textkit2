@@ -109,6 +109,19 @@ Tune with `[type]` in `config.toml` (see {doc}`config`).
 If a modifier key is still held when the command fires, `type` refuses rather
 than typing `Ctrl+Enter` where you meant `Enter`. Let go of the prefix chord.
 
+## Inserting today's date or the current time
+
+`Ctrl+Alt+K`, then `d`,`t` puts today's date on the clipboard; `t`,`i`,`m`
+does the same for the current time. Paste with `Ctrl+V` (or `t`,`y` to type
+it). The format is `[date]` / `[time]` in `config.toml` — `20261106` and
+`211428` by default, `2026-11-06` with `format = "%Y-%m-%d"` ({doc}`config`).
+
+- Typing the full `date` waits for `Enter` or the 2 s timeout, because
+  `date-to-unix` starts with the same letters; `dt` fires at once.
+  `date-to-unix` itself is `t`,`u` ("to unix").
+- What the clipboard held is kept for undo (`Shift+Z`), as with any transform.
+- For one keystroke, bind it: `"shift+t" = "date"` under `[hotkeys.bindings]`.
+
 ## Commands that are not available from a hotkey
 
 `genpass`, `uuid`, and `chain` are CLI-only:

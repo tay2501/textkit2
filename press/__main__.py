@@ -378,6 +378,7 @@ def _build_parser() -> tuple[argparse.ArgumentParser, CommandCatalog]:
     cannot drift from what argparse actually accepts.
     """
     from press._cli_chain import _register_chain_commands
+    from press._cli_clock import _register_clock_command
     from press._cli_config import _register_config_commands
     from press._cli_daemon import _register_daemon_commands
     from press._cli_dict import _register_dict_commands
@@ -416,7 +417,9 @@ def _build_parser() -> tuple[argparse.ArgumentParser, CommandCatalog]:
         ("Clipboard", "stash", partial(_register_stash_commands, sub)),
         ("Clipboard", "undo", partial(_register_undo_command, sub)),
         ("Dictionary", "dict", partial(_register_dict_commands, sub)),
+        ("Generators", "date", partial(_register_clock_command, sub, "date")),
         ("Generators", "genpass", partial(_register_genpass_command, sub)),
+        ("Generators", "time", partial(_register_clock_command, sub, "time")),
         ("Generators", "uuid", partial(_register_uuid_command, sub)),
         ("Management", "config", partial(_register_config_commands, sub)),
         ("Management", "daemon", partial(_register_daemon_commands, sub)),

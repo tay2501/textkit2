@@ -96,7 +96,7 @@ output the input unchanged instead.
 | `count` | `wc` | | chars, non-space, words, lines, UTF-8 bytes (`non-space` suits Japanese manuscripts) |
 | `slug` | `sl` | `--unicode` | `Hello, World! Café` → `hello-world-cafe`; `--unicode` keeps Japanese |
 | `unix-to-date` | `ut` | `-u`/`--utc` | Unix time per line (s/ms auto-detected) → ISO 8601, local time by default |
-| `date-to-unix` | | `--ms` | ISO 8601 per line → Unix seconds; no offset = local time |
+| `date-to-unix` | `tu` | `--ms` | ISO 8601 per line → Unix seconds; no offset = local time |
 
 ```bash
 echo "2026-07-17" | press replace -e '(\d+)-(\d+)-(\d+)' -r '\3/\2/\1'   # → 17/07/2026

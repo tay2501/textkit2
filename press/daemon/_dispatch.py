@@ -72,6 +72,8 @@ class CommandDispatcher:
                     self._set_notifications(enabled=False)
                 case "notify-on":
                     self._set_notifications(enabled=True)
+                case "date" | "time":
+                    self._write_now(command)
                 case _:
                     with timed("clipboard.get"):
                         text = get_clipboard_text()
@@ -201,6 +203,27 @@ class CommandDispatcher:
             self._remember_for_undo(get_clipboard_text())
         clear_clipboard()
         self._notify_success("clear", "")
+
+    def _write_now(self, command: str) -> None:
+        """Put the current date or time on the clipboard, ready to paste.
+
+        The format is the one ``press date``/``press time`` print without
+        ``+FORMAT`` (``[date]``/``[time]`` in config.toml).  What the clipboard
+        held is kept for undo, exactly like a transform's input.
+        """
+        from press.clipboard import get_clipboard_text, set_clipboard_text
+        from press.clock import format_configured
+
+        fmt = self._config.date.format if command == "date" else self._config.time.format
+        # An unusable format raises here, before the clipboard is touched;
+        # dispatch() turns it into an error notification naming the key.
+        value = format_configured(command, fmt)
+        # An empty or non-text clipboard has nothing to snapshot; the write
+        # itself must still go ahead (same rule as _clear_clipboard).
+        with contextlib.suppress(OSError, RuntimeError):
+            self._remember_for_undo(get_clipboard_text())
+        set_clipboard_text(value)
+        self._notify_success(command, value)
 
     def _toggle_hold(self) -> None:
         """Toggle dual-layer clipboard guard and update the tray icon."""

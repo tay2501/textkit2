@@ -38,6 +38,10 @@ class TestSequenceResolution:
             ("html-e", "html-escape"),  # hyphenated names are typeable
             ("ty", "type"),  # keystroke paste — two strokes, ahead of trim/title/tt
             ("nn", "strip-newlines"),  # newline removal — free two-key alias
+            ("dt", "date"),  # today's date — two keys; "date" alone is pending
+            ("tim", "time"),  # current time — "ti" is shared with title
+            ("date-", "date-to-unix"),  # the longer name still completes
+            ("tu", "date-to-unix"),  # "to unix" — two keys, as "da" was before date
         ],
     )
     def test_sequence_dispatches(self, typed: str, expected: str) -> None:
@@ -56,6 +60,12 @@ class TestSequenceResolution:
         """Adding ``type``/``ty`` must not push ``tm`` or ``tt`` out to 3 keys."""
         assert _type(_resolver(), "tm") == ("dispatch", "trim")
         assert _type(_resolver(), "tt") == ("dispatch", "title")
+
+    def test_date_is_pending_behind_date_to_unix(self) -> None:
+        """``date`` is an exact match that ``date-to-unix`` extends: Enter commits it."""
+        resolver = _resolver()
+        assert _type(resolver, "date") is None
+        assert resolver.confirm() == ("dispatch", "date")
 
     def test_ambiguous_prefix_keeps_collecting(self) -> None:
         resolver = _resolver()

@@ -764,3 +764,79 @@ class TestConfigValidateEdgeCases:
         assert "simulated validation error" in msg
         assert warnings == []
         monkeypatch.setattr(cfg_mod, "load_config", original_load)
+
+
+# ---------------------------------------------------------------------------
+# [date] / [time]
+# ---------------------------------------------------------------------------
+
+
+class TestClockConfig:
+    def test_defaults_are_yyyymmdd_and_hhmmss(self) -> None:
+        cfg = PressConfig()
+        assert cfg.date.format == "%Y%m%d"
+        assert cfg.time.format == "%H%M%S"
+
+    def test_defaults_match_the_clock_module(self) -> None:
+        """One set of defaults, shared by the CLI and the daemon."""
+        from press.clock import DEFAULT_DATE_FORMAT, DEFAULT_TIME_FORMAT
+
+        cfg = PressConfig()
+        assert (cfg.date.format, cfg.time.format) == (DEFAULT_DATE_FORMAT, DEFAULT_TIME_FORMAT)
+
+    def test_formats_are_read_from_the_file(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(
+            '[date]\nformat = "%Y-%m-%d"\n[time]\nformat = "%H:%M:%S"\n', encoding="utf-8"
+        )
+        cfg = load_config(cfg_file)
+        assert (cfg.date.format, cfg.time.format) == ("%Y-%m-%d", "%H:%M:%S")
+
+    def test_non_ascii_format_round_trips(self, tmp_path: Path) -> None:
+        from press.config import DateConfig
+
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(
+            _config_to_toml(PressConfig(date=DateConfig(format="%Y年%m月%d日"))),
+            encoding="utf-8",
+        )
+        assert load_config(cfg_file).date.format == "%Y年%m月%d日"
+
+    def test_unusable_string_format_is_kept_so_loading_never_fails(self, tmp_path: Path) -> None:
+        """One bad key must not stop the daemon — the command fails when used instead."""
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text('[date]\nformat = ""\n[trim]\ntrailing = true\n', encoding="utf-8")
+        cfg = load_config(cfg_file)
+        assert cfg.date.format == ""
+        assert cfg.trim.trailing is True
+
+    def test_non_string_format_falls_back_to_the_default(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("[time]\nformat = 120000\n", encoding="utf-8")
+        assert load_config(cfg_file).time.format == "%H%M%S"
+
+    @pytest.mark.parametrize(
+        ("body", "expected"),
+        [
+            ('[date]\nformat = ""\n', "[date] format: format is empty"),
+            ("[time]\nformat = 120000\n", "[time] format: format must be a string, got int"),
+            ('[date]\nformat = "a\\u0000b"\n', "[date] format: format contains a NUL character"),
+        ],
+    )
+    def test_validate_reports_an_unusable_format(
+        self, tmp_path: Path, body: str, expected: str
+    ) -> None:
+        """validate reads the raw file, so even the fallen-back non-string is reported."""
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(body, encoding="utf-8")
+        ok, message, _ = config_validate(cfg_file)
+        assert not ok
+        assert message == expected
+
+    def test_validate_accepts_good_formats(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(
+            '[date]\nformat = "%Y-%m-%d"\n[time]\nformat = "%H:%M"\n', encoding="utf-8"
+        )
+        ok, _, _ = config_validate(cfg_file)
+        assert ok
