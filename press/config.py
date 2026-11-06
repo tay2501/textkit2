@@ -20,11 +20,13 @@ if TYPE_CHECKING:
 __all__ = [
     "CURRENT_SCHEMA_VERSION",
     "SECTION_NAMES",
+    "DateConfig",
     "DictionaryConfig",
     "HoldConfig",
     "HotkeysConfig",
     "PressConfig",
     "SqlInConfig",
+    "TimeConfig",
     "TrimConfig",
     "TypeConfig",
     "UiConfig",
@@ -141,6 +143,22 @@ class TypeConfig:
     newline: Literal["enter", "unicode", "skip"] = "enter"
 
 
+# Spelled out rather than imported from press.clock for the same reason as
+# TypeConfig.newline; test_config.TestClockConfig pins the two together.
+@dataclass(frozen=True, slots=True)
+class DateConfig:
+    """Output format of the ``date`` command (CLI without ``+FORMAT`` and hotkey)."""
+
+    format: str = "%Y%m%d"  # strftime; "%Y-%m-%d" is YYYY-MM-DD
+
+
+@dataclass(frozen=True, slots=True)
+class TimeConfig:
+    """Output format of the ``time`` command (CLI without ``+FORMAT`` and hotkey)."""
+
+    format: str = "%H%M%S"  # strftime; "%H:%M:%S" is hh:mm:ss
+
+
 @dataclass(frozen=True, slots=True)
 class PressConfig:
     """Top-level configuration object for press."""
@@ -152,6 +170,8 @@ class PressConfig:
     ui: UiConfig = field(default_factory=UiConfig)
     hold: HoldConfig = field(default_factory=HoldConfig)
     type: TypeConfig = field(default_factory=TypeConfig)
+    date: DateConfig = field(default_factory=DateConfig)
+    time: TimeConfig = field(default_factory=TimeConfig)
     # Named transform chains: name -> ordered registry command names.
     # Runnable via `press chain <name>` and bindable to daemon hotkeys.
     pipelines: dict[str, tuple[str, ...]] = field(default_factory=dict)
@@ -211,6 +231,30 @@ def _parse_type(data: dict[str, Any]) -> TypeConfig:
         chunk_delay_ms=int(data.get("chunk_delay_ms", default.chunk_delay_ms)),
         newline=newline,
     )
+
+
+def _parse_clock_format(section: str, data: dict[str, Any], default: str) -> str:
+    """Read and check a ``[date]``/``[time]`` ``format``.
+
+    Raises ``ValueError`` instead of falling back like ``[type] newline``: the
+    format *is* the output, so silently printing the default after the user
+    wrote one would hide the mistake.  Checked with the platform's real
+    ``strftime`` (:func:`press.clock.check_format`).
+    """
+    from press.clock import check_format
+
+    try:
+        return check_format(data.get("format", default))
+    except ValueError as exc:
+        raise ValueError(f"[{section}] format: {exc}") from exc
+
+
+def _parse_date(data: dict[str, Any]) -> DateConfig:
+    return DateConfig(format=_parse_clock_format("date", data, DateConfig().format))
+
+
+def _parse_time(data: dict[str, Any]) -> TimeConfig:
+    return TimeConfig(format=_parse_clock_format("time", data, TimeConfig().format))
 
 
 def _parse_pipelines(data: dict[str, Any]) -> dict[str, tuple[str, ...]]:
@@ -357,6 +401,8 @@ _SECTIONS: tuple[_Section, ...] = (
     _Section("ui", _parse_ui, UiConfig),
     _Section("hold", _parse_hold, HoldConfig),
     _Section("type", _parse_type, TypeConfig),
+    _Section("date", _parse_date, DateConfig),
+    _Section("time", _parse_time, TimeConfig),
     _Section("pipelines", _parse_pipelines, dict, _emit_pipelines),
 )
 

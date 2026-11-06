@@ -70,6 +70,37 @@ press stash pop      # put the saved text back (and delete it)
 
 ## Generators
 
+### `date` / `time` — today's date and the current time
+
+```bash
+press date            # 20261106   (default %Y%m%d = YYYYMMDD)
+press time            # 211428     (default %H%M%S = hhmmss)
+press date +%Y-%m-%d  # 2026-11-06 — one-off format, as in GNU date
+press time -u +%H:%M  # 12:14      — UTC
+press dt -C           # also copy it to the clipboard (undoable with press undo)
+```
+
+Formats are [strftime](https://docs.python.org/3/library/datetime.html#format-codes)
+strings, the syntax of GNU `date +FORMAT`: what other tools write as
+`YYYY-MM-DD` is `%Y-%m-%d` here. Without `+FORMAT` the format comes from
+`[date]` / `[time]` in `config.toml` ({doc}`config`), which is also what the
+daemon's hotkey inserts — so `press date` always shows what the shortcut will
+paste.
+
+| You want | Format |
+|---|---|
+| `YYYYMMDD` / `YYYY-MM-DD` / `YYYY/MM/DD` | `%Y%m%d` / `%Y-%m-%d` / `%Y/%m/%d` |
+| `2026年11月06日` | `%Y年%m月%d日` |
+| `hhmmss` / `hh:mm:ss` / `hh:mm` | `%H%M%S` / `%H:%M:%S` / `%H:%M` |
+| ISO 8601 with offset | `%Y-%m-%dT%H:%M:%S%z` |
+| No zero padding (`6`, not `06`) | `%#d` on Windows (`%-d` on Linux) |
+| A literal `%` | `%%` |
+
+`%a` / `%b` (weekday and month names) are always English, so the CLI and the
+daemon agree regardless of the Windows display language.
+
+### `genpass` / `uuid`
+
 These are CLI-only — a mistyped hotkey must never replace your clipboard with
 something that cannot be undone.
 

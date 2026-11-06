@@ -56,6 +56,12 @@ chunk_size     = 200
 chunk_delay_ms = 5
 newline        = "enter"
 
+[date]
+format = "%Y%m%d"
+
+[time]
+format = "%H%M%S"
+
 [pipelines]
 cleanup = ["trim", "dedupe", "lf"]
 ```
@@ -152,6 +158,30 @@ Set `newline = "unicode"` or `"skip"` if you mostly paste into a chat client —
 with `"enter"`, a multi-line clipboard **sends** each line. An unrecognised
 value falls back to `"enter"` rather than stopping the daemon.
 ```
+
+### `[date]` / `[time]` *(both)*
+
+Output format of `press date` / `press time` (when no `+FORMAT` is given) and
+of the `date` / `time` hotkeys, so the CLI and the shortcut always agree.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `[date] format` | string | `"%Y%m%d"` | strftime format — `"%Y-%m-%d"` for `YYYY-MM-DD` |
+| `[time] format` | string | `"%H%M%S"` | strftime format — `"%H:%M:%S"` for `hh:mm:ss` |
+
+```toml
+[date]
+format = "%Y-%m-%d"   # 2026-11-06
+
+[time]
+format = "%H:%M"      # 21:14
+```
+
+The format syntax is that of GNU `date +FORMAT` (table of common formats:
+{doc}`cli`). An empty format, a non-string value, or a directive Windows does
+not support (`%-d`, `%Q`) is an **error** reported by `press config validate`
+— not a silent fallback to the default, because the format is the output.
+The daemon reads it at start; run `press daemon restart` after editing.
 
 ### `[pipelines]` *(both)*
 

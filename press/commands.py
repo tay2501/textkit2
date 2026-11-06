@@ -514,6 +514,15 @@ SPECIAL_COMMANDS: tuple[SpecialCommand, ...] = (
     # aliases: m,u mutes and u,n,m unmutes.  Default binding shift+m mutes.
     SpecialCommand("notify-off", ("mute",), hotkey=True),
     SpecialCommand("notify-on", ("unmute",), hotkey=True),
+    # Current date/time generators (press.clock).  Names follow cmd.exe's
+    # `date /t` / `time /t`; flags follow GNU date (+FORMAT, -u).  Unlike
+    # uuid they are hotkey-reachable: the format comes from config.toml, the
+    # overwritten clipboard is kept for undo, and inserting today's date is
+    # the whole point of a shortcut.  "dt" resolves in two keystrokes — "date"
+    # itself is an exact match that date-to-unix extends, so it waits for
+    # Enter; "time" is unique from "tim" on.
+    SpecialCommand("date", ("dt",), hotkey=True),
+    SpecialCommand("time", (), hotkey=True),
     # CLI-only.  Each exclusion is deliberate:
     # - genpass writes with sensitive=True, which suppresses the undo snapshot
     #   by design — a mistyped sequence would destroy the clipboard with no way

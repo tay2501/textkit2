@@ -154,6 +154,7 @@ See [Clipboard tools](docs/user/cli.md#clipboard-tools) for `drop`, `list` and `
 | `unix-to-date -u` (`ut`) | `1761436800` | `2025-10-26T00:00:00+00:00` |
 | `fix-encoding` (`fe`) | `cafÃ©` (UTF-8 read as Latin-1) | `café` |
 | `genpass` (`gp`) | — | a password, kept out of Win+V history |
+| `date` (`dt`) / `time` | — | `20261106` / `211428` (format set in `config.toml`) |
 
 Everything else — JSON, Base64, URL and HTML escapes, hashes, kana, line
 endings, sorting — is in [Transforms](docs/user/transforms.md).

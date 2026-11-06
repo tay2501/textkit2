@@ -47,12 +47,23 @@ def _register_config_commands(sub: _SubParsers) -> None:
     # the registry by test_config.TestSectionRegistry instead.
     rst_p.add_argument(
         "--section",
-        choices=["hotkeys", "sql_in", "trim", "dictionary", "ui", "hold", "type", "pipelines"],
+        choices=[
+            "hotkeys",
+            "sql_in",
+            "trim",
+            "dictionary",
+            "ui",
+            "hold",
+            "type",
+            "date",
+            "time",
+            "pipelines",
+        ],
         default=None,
         metavar="SECTION",
         help=(
-            "Section to reset (hotkeys, sql_in, trim, dictionary, ui, hold, type, pipelines); "
-            "omit to reset the entire file"
+            "Section to reset (hotkeys, sql_in, trim, dictionary, ui, hold, type, date, "
+            "time, pipelines); omit to reset the entire file"
         ),
     )
     rst_p.add_argument(

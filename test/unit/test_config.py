@@ -764,3 +764,63 @@ class TestConfigValidateEdgeCases:
         assert "simulated validation error" in msg
         assert warnings == []
         monkeypatch.setattr(cfg_mod, "load_config", original_load)
+
+
+# ---------------------------------------------------------------------------
+# [date] / [time]
+# ---------------------------------------------------------------------------
+
+
+class TestClockConfig:
+    def test_defaults_are_yyyymmdd_and_hhmmss(self) -> None:
+        cfg = PressConfig()
+        assert cfg.date.format == "%Y%m%d"
+        assert cfg.time.format == "%H%M%S"
+
+    def test_defaults_match_the_clock_module(self) -> None:
+        """One set of defaults, shared by the CLI and the daemon."""
+        from press.clock import DEFAULT_DATE_FORMAT, DEFAULT_TIME_FORMAT
+
+        cfg = PressConfig()
+        assert (cfg.date.format, cfg.time.format) == (DEFAULT_DATE_FORMAT, DEFAULT_TIME_FORMAT)
+
+    def test_formats_are_read_from_the_file(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(
+            '[date]\nformat = "%Y-%m-%d"\n[time]\nformat = "%H:%M:%S"\n', encoding="utf-8"
+        )
+        cfg = load_config(cfg_file)
+        assert (cfg.date.format, cfg.time.format) == ("%Y-%m-%d", "%H:%M:%S")
+
+    def test_non_ascii_format_round_trips(self, tmp_path: Path) -> None:
+        from press.config import DateConfig
+
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(
+            _config_to_toml(PressConfig(date=DateConfig(format="%Y年%m月%d日"))),
+            encoding="utf-8",
+        )
+        assert load_config(cfg_file).date.format == "%Y年%m月%d日"
+
+    @pytest.mark.parametrize(
+        ("section", "body"),
+        [
+            ("date", '[date]\nformat = ""\n'),
+            ("time", "[time]\nformat = 120000\n"),
+        ],
+    )
+    def test_unusable_format_is_an_error_not_a_silent_fallback(
+        self, tmp_path: Path, section: str, body: str
+    ) -> None:
+        """A format the user wrote must never quietly turn back into the default."""
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(body, encoding="utf-8")
+        with pytest.raises(ValueError, match=rf"\[{section}\] format"):
+            load_config(cfg_file)
+
+    def test_validate_reports_an_unusable_format(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text('[date]\nformat = ""\n', encoding="utf-8")
+        ok, message, _ = config_validate(cfg_file)
+        assert not ok
+        assert "[date] format" in message
