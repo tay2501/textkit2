@@ -97,7 +97,16 @@ paste.
 | A literal `%` | `%%` |
 
 `%a` / `%b` (weekday and month names) are always English, so the CLI and the
-daemon agree regardless of the Windows display language.
+daemon agree regardless of the Windows display language. For the time zone use
+`%z` (`+0900`): `%Z` prints the Windows display name (`東京 (標準時)` on a
+Japanese system), not `JST`.
+
+```{warning}
+Inside a **`.bat` / `.cmd` file**, `cmd.exe` treats `%Y%` as a variable and
+silently drops it — `press date +%Y%m%d` prints `md`. Double every `%`
+(`press date +%%Y%%m%%d`), or leave `+FORMAT` out and set the format in
+`config.toml`. The interactive prompt and PowerShell are not affected.
+```
 
 ### `genpass` / `uuid`
 

@@ -31,6 +31,7 @@ __all__ = [
     "TypeConfig",
     "UiConfig",
     "binding_shadow_warnings",
+    "clock_format_errors",
     "config_list",
     "config_reset",
     "config_validate",
@@ -233,28 +234,27 @@ def _parse_type(data: dict[str, Any]) -> TypeConfig:
     )
 
 
-def _parse_clock_format(section: str, data: dict[str, Any], default: str) -> str:
-    """Read and check a ``[date]``/``[time]`` ``format``.
+def _parse_clock_format(data: dict[str, Any], default: str) -> str:
+    """Read a ``[date]``/``[time]`` ``format`` without ever raising.
 
-    Raises ``ValueError`` instead of falling back like ``[type] newline``: the
-    format *is* the output, so silently printing the default after the user
-    wrote one would hide the mistake.  Checked with the platform's real
-    ``strftime`` (:func:`press.clock.check_format`).
+    A string is kept even when it is unusable: loading must not fail, since
+    ``load_config`` failing stops the daemon and with it every hotkey over one
+    key that only ``date``/``time`` use (the ``[type] newline`` rule).  The
+    mistake is still loud, just scoped — ``press config validate`` reports it
+    (:func:`clock_format_errors`) and the command itself fails when used
+    (:func:`press.clock.format_configured`).  A non-string cannot be carried in
+    a ``str`` field, so it falls back to *default*; validate reports that too.
     """
-    from press.clock import check_format
-
-    try:
-        return check_format(data.get("format", default))
-    except ValueError as exc:
-        raise ValueError(f"[{section}] format: {exc}") from exc
+    value = data.get("format", default)
+    return value if isinstance(value, str) else default
 
 
 def _parse_date(data: dict[str, Any]) -> DateConfig:
-    return DateConfig(format=_parse_clock_format("date", data, DateConfig().format))
+    return DateConfig(format=_parse_clock_format(data, DateConfig().format))
 
 
 def _parse_time(data: dict[str, Any]) -> TimeConfig:
-    return TimeConfig(format=_parse_clock_format("time", data, TimeConfig().format))
+    return TimeConfig(format=_parse_clock_format(data, TimeConfig().format))
 
 
 def _parse_pipelines(data: dict[str, Any]) -> dict[str, tuple[str, ...]]:
@@ -487,7 +487,7 @@ def config_validate(path: Path) -> tuple[bool, str, list[str]]:
         config = load_config(path)
     except ValueError as exc:
         return False, str(exc), []
-    errors = pipeline_errors(config)
+    errors = clock_format_errors(raw) + pipeline_errors(config)
     if errors:
         return False, "; ".join(errors), []
     return True, f"{path}: valid (schema_version={schema})", binding_shadow_warnings(config)
@@ -503,6 +503,27 @@ def binding_shadow_warnings(config: PressConfig) -> list[str]:
     from press.commands import hotkey_binding_shadow_warnings
 
     return hotkey_binding_shadow_warnings(config.hotkeys.bindings, config.pipelines)
+
+
+def clock_format_errors(raw: dict[str, Any]) -> list[str]:
+    """Check the ``[date]``/``[time]`` formats exactly as written in the file.
+
+    Reads the raw TOML rather than :class:`PressConfig`, because the loader
+    replaces a non-string with the default (see ``_parse_clock_format``) and
+    validation must still report it.
+    """
+    from press.clock import check_format
+
+    errors: list[str] = []
+    for section in ("date", "time"):
+        table = raw.get(section)
+        if not isinstance(table, dict) or "format" not in table:
+            continue
+        try:
+            check_format(table["format"])
+        except ValueError as exc:
+            errors.append(f"[{section}] format: {exc}")
+    return errors
 
 
 def pipeline_errors(config: PressConfig) -> list[str]:

@@ -92,7 +92,15 @@ class TestFormat:
         assert _run("date") == 1
         captured = capsys.readouterr()
         assert captured.out == ""
-        assert "press date: error:" in captured.err
+        assert "press date: error: [date] format in config.toml: format is empty" in captured.err
+
+    def test_bad_date_format_does_not_break_time(
+        self, _appdata: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """A broken [date] key is scoped to date, not to every config reader."""
+        _write_config(_appdata, '[date]\nformat = ""\n')
+        assert _run("time") == 0
+        assert re.fullmatch(r"\d{6}\n", capsys.readouterr().out)
 
     def test_quiet_suppresses_the_error(
         self, _appdata: Path, capsys: pytest.CaptureFixture[str]

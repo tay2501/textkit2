@@ -179,9 +179,11 @@ format = "%H:%M"      # 21:14
 
 The format syntax is that of GNU `date +FORMAT` (table of common formats:
 {doc}`cli`). An empty format, a non-string value, or a directive Windows does
-not support (`%-d`, `%Q`) is an **error** reported by `press config validate`
-— not a silent fallback to the default, because the format is the output.
-The daemon reads it at start; run `press daemon restart` after editing.
+not support (`%-d`, `%Q`) is reported by `press config validate`. It never
+stops the daemon — the other hotkeys keep working — but `press date` exits
+with `error: [date] format in config.toml: …` and the `date` hotkey shows the
+same message as an error notification, leaving the clipboard untouched. The
+daemon reads the file at start; run `press daemon restart` after editing.
 
 ### `[pipelines]` *(both)*
 

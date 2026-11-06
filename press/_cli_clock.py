@@ -62,24 +62,25 @@ def _configured_format(name: str) -> str:
     return config.date.format if name == "date" else config.time.format
 
 
-def _resolve_format(name: str, raw: str | None) -> str:
-    """Turn the ``+FORMAT`` argument (or its absence) into a strftime format.
+def _format_value(name: str, raw: str | None, *, utc: bool) -> str:
+    """Format the current time from ``+FORMAT``, or from config.toml without it.
 
     Raises:
-        ValueError: For a missing ``+``, or an unreadable ``config.toml``.
+        ValueError: For a missing ``+``, an unusable format, or an unreadable
+            ``config.toml`` (the message then names the key to fix).
     """
+    from press import clock
+
     if raw is None:
-        return _configured_format(name)
+        return clock.format_configured(name, _configured_format(name), utc=utc)
     if not raw.startswith("+"):
         raise ValueError(f"format must start with '+' (as in GNU date), got {raw!r}")
-    return raw[1:]
+    return clock.format_now(raw[1:], utc=utc)
 
 
 def _run_clock(name: str, a: argparse.Namespace) -> int:
-    from press import clock
-
     try:
-        value = clock.format_now(_resolve_format(name, a.format), utc=a.utc)
+        value = _format_value(name, a.format, utc=a.utc)
     except ValueError as exc:
         return report_error(name, exc, quiet=a.quiet)
     sys.stdout.write(value + "\n")

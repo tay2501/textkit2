@@ -186,6 +186,23 @@ class TestCommandDispatcherClock:
             d.dispatch("undo")
         assert mock_set.call_args_list[-1].args == ("old",)
 
+    def test_unusable_format_notifies_and_leaves_the_clipboard_alone(self) -> None:
+        """A bad [date] format fails the one command, never the daemon."""
+        from press.config import DateConfig, PressConfig
+        from press.daemon import CommandDispatcher
+
+        d = CommandDispatcher(PressConfig(date=DateConfig(format="")))
+        with (
+            patch("press.clipboard.get_clipboard_text", return_value="old"),
+            patch("press.clipboard.set_clipboard_text") as mock_set,
+            patch.object(d, "_notify_error") as mock_err,
+        ):
+            d.dispatch("date")
+        mock_set.assert_not_called()
+        command, message = mock_err.call_args.args
+        assert command == "date"
+        assert message.startswith("[date] format in config.toml:")
+
     def test_empty_clipboard_does_not_block_the_write(self) -> None:
         """Nothing to snapshot is fine — the date must still be written."""
         from press.config import PressConfig

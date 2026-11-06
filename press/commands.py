@@ -400,7 +400,10 @@ PARAMETRIC_COMMANDS: tuple[ParametricCommand, ...] = (
         "date-to-unix",
         "press.transforms.timestamp",
         "date_to_unix",
-        (),
+        # "to unix": keeps the hotkey at two strokes now that the `date`
+        # generator owns the d,a,t,e prefix.  Not du (disk usage) or d2u
+        # (dos2unix) — both are other tools' names.
+        ("tu",),
         "Convert ISO 8601 date (per line) to Unix time in seconds",
         cli_args=(
             CliArg(
@@ -751,10 +754,23 @@ def validate_pipelines(pipelines: dict[str, tuple[str, ...]]) -> list[str]:
     shadow a registry command or alias, steps that are not registry commands,
     and steps that reference another pipeline (nesting is unsupported).
     """
+    hotkey_specials = {
+        alias: cmd.name
+        for cmd in SPECIAL_COMMANDS
+        if cmd.hotkey
+        for alias in (cmd.name, *cmd.aliases)
+    }
     errors: list[str] = []
     for name, steps in pipelines.items():
         if is_registry_command(name):
             errors.append(f"pipeline {name!r} shadows a command name — rename it")
+        elif name in hotkey_specials:
+            # `press chain <name>` still works, but the hotkey resolves the
+            # name to the special command first, so the pipeline is unreachable.
+            errors.append(
+                f"pipeline {name!r} is hidden from hotkeys by the "
+                f"{hotkey_specials[name]!r} command — rename it"
+            )
         if not steps:
             errors.append(f"pipeline {name!r} has no steps")
         for step in steps:

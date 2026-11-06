@@ -212,10 +212,12 @@ class CommandDispatcher:
         held is kept for undo, exactly like a transform's input.
         """
         from press.clipboard import get_clipboard_text, set_clipboard_text
-        from press.clock import format_now
+        from press.clock import format_configured
 
         fmt = self._config.date.format if command == "date" else self._config.time.format
-        value = format_now(fmt)
+        # An unusable format raises here, before the clipboard is touched;
+        # dispatch() turns it into an error notification naming the key.
+        value = format_configured(command, fmt)
         # An empty or non-text clipboard has nothing to snapshot; the write
         # itself must still go ahead (same rule as _clear_clipboard).
         with contextlib.suppress(OSError, RuntimeError):

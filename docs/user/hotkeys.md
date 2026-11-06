@@ -118,6 +118,7 @@ it). The format is `[date]` / `[time]` in `config.toml` — `20261106` and
 
 - Typing the full `date` waits for `Enter` or the 2 s timeout, because
   `date-to-unix` starts with the same letters; `dt` fires at once.
+  `date-to-unix` itself is `t`,`u` ("to unix").
 - What the clipboard held is kept for undo (`Shift+Z`), as with any transform.
 - For one keystroke, bind it: `"shift+t" = "date"` under `[hotkeys.bindings]`.
 

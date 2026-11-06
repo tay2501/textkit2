@@ -41,6 +41,7 @@ class TestSequenceResolution:
             ("dt", "date"),  # today's date — two keys; "date" alone is pending
             ("tim", "time"),  # current time — "ti" is shared with title
             ("date-", "date-to-unix"),  # the longer name still completes
+            ("tu", "date-to-unix"),  # "to unix" — two keys, as "da" was before date
         ],
     )
     def test_sequence_dispatches(self, typed: str, expected: str) -> None:

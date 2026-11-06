@@ -160,6 +160,23 @@ class TestPipelineErrors:
         errors = pipeline_errors(config)
         assert any("shadows a command name" in e for e in errors)
 
+    @pytest.mark.parametrize(
+        ("name", "command"), [("date", "date"), ("dt", "date"), ("ty", "type")]
+    )
+    def test_name_hidden_by_a_hotkey_special_command_reported(
+        self, name: str, command: str
+    ) -> None:
+        """The hotkey resolves these to the special command; the pipeline is unreachable."""
+        config = PressConfig(pipelines={name: ("upper",)})
+        assert pipeline_errors(config) == [
+            f"pipeline {name!r} is hidden from hotkeys by the {command!r} command — rename it"
+        ]
+
+    def test_cli_only_special_names_are_not_reported(self) -> None:
+        """genpass/uuid are not hotkey candidates, so nothing is hidden."""
+        config = PressConfig(pipelines={"uuid": ("upper",)})
+        assert pipeline_errors(config) == []
+
     def test_empty_pipeline_reported(self) -> None:
         config = PressConfig(pipelines={"empty": ()})
         errors = pipeline_errors(config)

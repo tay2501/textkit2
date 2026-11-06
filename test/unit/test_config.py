@@ -802,25 +802,41 @@ class TestClockConfig:
         )
         assert load_config(cfg_file).date.format == "%Y年%m月%d日"
 
+    def test_unusable_string_format_is_kept_so_loading_never_fails(self, tmp_path: Path) -> None:
+        """One bad key must not stop the daemon — the command fails when used instead."""
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text('[date]\nformat = ""\n[trim]\ntrailing = true\n', encoding="utf-8")
+        cfg = load_config(cfg_file)
+        assert cfg.date.format == ""
+        assert cfg.trim.trailing is True
+
+    def test_non_string_format_falls_back_to_the_default(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text("[time]\nformat = 120000\n", encoding="utf-8")
+        assert load_config(cfg_file).time.format == "%H%M%S"
+
     @pytest.mark.parametrize(
-        ("section", "body"),
+        ("body", "expected"),
         [
-            ("date", '[date]\nformat = ""\n'),
-            ("time", "[time]\nformat = 120000\n"),
+            ('[date]\nformat = ""\n', "[date] format: format is empty"),
+            ("[time]\nformat = 120000\n", "[time] format: format must be a string, got int"),
+            ('[date]\nformat = "a\\u0000b"\n', "[date] format: format contains a NUL character"),
         ],
     )
-    def test_unusable_format_is_an_error_not_a_silent_fallback(
-        self, tmp_path: Path, section: str, body: str
+    def test_validate_reports_an_unusable_format(
+        self, tmp_path: Path, body: str, expected: str
     ) -> None:
-        """A format the user wrote must never quietly turn back into the default."""
+        """validate reads the raw file, so even the fallen-back non-string is reported."""
         cfg_file = tmp_path / "config.toml"
         cfg_file.write_text(body, encoding="utf-8")
-        with pytest.raises(ValueError, match=rf"\[{section}\] format"):
-            load_config(cfg_file)
-
-    def test_validate_reports_an_unusable_format(self, tmp_path: Path) -> None:
-        cfg_file = tmp_path / "config.toml"
-        cfg_file.write_text('[date]\nformat = ""\n', encoding="utf-8")
         ok, message, _ = config_validate(cfg_file)
         assert not ok
-        assert "[date] format" in message
+        assert message == expected
+
+    def test_validate_accepts_good_formats(self, tmp_path: Path) -> None:
+        cfg_file = tmp_path / "config.toml"
+        cfg_file.write_text(
+            '[date]\nformat = "%Y-%m-%d"\n[time]\nformat = "%H:%M"\n', encoding="utf-8"
+        )
+        ok, _, _ = config_validate(cfg_file)
+        assert ok

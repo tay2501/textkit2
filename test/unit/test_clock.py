@@ -7,7 +7,13 @@ from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
-from press.clock import DEFAULT_DATE_FORMAT, DEFAULT_TIME_FORMAT, check_format, format_now
+from press.clock import (
+    DEFAULT_DATE_FORMAT,
+    DEFAULT_TIME_FORMAT,
+    check_format,
+    format_configured,
+    format_now,
+)
 
 JST = timezone(timedelta(hours=9))
 NOW = datetime(2026, 11, 6, 9, 5, 7, tzinfo=JST)
@@ -61,6 +67,15 @@ class TestFormatNow:
             format_now("", now=NOW)
 
 
+class TestFormatConfigured:
+    def test_valid_format_is_formatted(self) -> None:
+        assert len(format_configured("date", "%Y")) == 4
+
+    def test_error_names_the_config_key(self) -> None:
+        with pytest.raises(ValueError, match=r"^\[time\] format in config\.toml: format is empty"):
+            format_configured("time", "")
+
+
 class TestCheckFormat:
     @pytest.mark.parametrize("fmt", ["%Y%m%d", "%H%M%S", "%Y-%m-%d", "%Y年%m月%d日"])
     def test_valid_formats_are_returned(self, fmt: str) -> None:
@@ -74,6 +89,11 @@ class TestCheckFormat:
     def test_non_string_is_rejected(self, value: object) -> None:
         with pytest.raises(ValueError, match="string"):
             check_format(value)
+
+    def test_nul_is_rejected(self) -> None:
+        """CF_UNICODETEXT stops at NUL, so the clipboard would differ from stdout."""
+        with pytest.raises(ValueError, match="NUL"):
+            check_format("a\0b")
 
     def test_literal_only_format_is_allowed(self) -> None:
         """A format without directives is odd but well-defined — not an error."""
