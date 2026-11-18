@@ -26,7 +26,10 @@ import time
 import pytest
 
 _MAX_VERSION_WALL_SECONDS = 2.0  # ROADMAP v0.6.0 / SPEC §4.1 target
-_MAX_TRANSFORM_FILE_OPENS = 60  # Windows 2026-10: 32 on 3.13, 49 on 3.14 (argparse loads dataclasses); was 108 before lazy --version/argcomplete
+# Windows 2026-11: 36 on 3.14 (its argparse loads dataclasses via _colorize;
+# 3.13 and 3.15 open fewer).  Was 49 before the single-command parser and the
+# shutil-free help formatter, and 108 before lazy --version/argcomplete.
+_MAX_TRANSFORM_FILE_OPENS = 48
 
 _AUDIT_SNIPPET = """\
 import sys
