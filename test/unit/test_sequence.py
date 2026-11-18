@@ -112,6 +112,34 @@ class TestSequenceResolution:
         assert _type(_resolver(), typed) == ("dispatch", expected)
 
 
+class TestPendingState:
+    """``pending`` tells the listener to switch to the short commit wait."""
+
+    @pytest.mark.parametrize("typed", ["cr", "dict", "st"])
+    def test_exact_match_extended_by_another_command_is_pending(self, typed: str) -> None:
+        resolver = _resolver()
+        assert _type(resolver, typed) is None
+        assert resolver.pending
+
+    @pytest.mark.parametrize("typed", ["", "c", "ha"])
+    def test_prefix_without_an_exact_match_is_not_pending(self, typed: str) -> None:
+        resolver = _resolver()
+        assert _type(resolver, typed) is None
+        assert not resolver.pending
+
+    def test_typing_past_the_exact_match_clears_pending(self) -> None:
+        resolver = _resolver()
+        _type(resolver, "st")
+        assert _type(resolver, "r") is None  # "str": strip-commas / strip-newlines
+        assert not resolver.pending
+
+    def test_reset_clears_pending(self) -> None:
+        resolver = _resolver()
+        _type(resolver, "cr")
+        resolver.reset()
+        assert not resolver.pending
+
+
 class TestDescribeUnresolved:
     """The notification text for a sequence that resolved to no command."""
 

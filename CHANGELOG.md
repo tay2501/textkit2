@@ -82,6 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Reliable `GetLastError` via ctypes**: Win32 helpers now load kernel32 with `WinDLL(use_last_error=True)` and read `ctypes.get_last_error()` per the official ctypes guidance, and declare `CreateMutexW`/HANDLE return types as `c_void_p` so 64-bit handles are not truncated
 
 ### Changed
+- **Hotkey names that a longer name extends run after 1 s, not 2 s**: `cr` (vs `crlf`), `dict` (vs `dict-reverse`) and `st` (vs `strip-…`) used to wait the full 2 s inactivity timeout unless `Enter` was pressed. A complete name now commits after 1 s without a key — the default of Vim's `timeoutlen`, which resolves the same ambiguity — while an unfinished prefix and the first key keep the 2 s. Measured on an EDR-monitored PC, the rest of the hotkey path takes about 1 ms, so this wait was the only perceptible delay left on it
 - **BREAKING — command names, aliases and flags follow de facto tools.** press has no production users yet, so the old spellings are removed rather than deprecated. Every name now borrows the spelling of the widely used tool that does the same job, and an alias that equals a well-known tool's name must mean what that tool does. Review record: `internal note 20261021_232556_コマンド設計レビュー.md (unpublished)`.
   - **Renamed commands:**
     - `normalize`/`norm` → `collapse-whitespace`.
