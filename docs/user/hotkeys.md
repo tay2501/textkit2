@@ -45,7 +45,8 @@ with it (`cr` vs `crlf`), press waits instead of guessing. Finish the longer
 name, or confirm the short one:
 
 - press `Enter` to run the short command immediately, or
-- simply pause — after the timeout the short command runs.
+- simply pause — after 1 s without a key the short command runs (the same
+  wait as Vim's `timeoutlen` default).
 
 ### Editing keys
 
@@ -208,7 +209,8 @@ shadows a sequence:
   (Task Manager, UAC) — a Windows restriction that also blocks `type` there.
 - Keys typed after the prefix are **consumed, not delivered** until a command
   fires. After an accidental prefix, press `Esc`; otherwise the sequence ends
-  after **2 s** without a key or **10 s** in total.
+  after **2 s** without a key (**1 s** once a complete name such as `cr` is
+  waiting for `crlf`) or **10 s** in total.
 - The prefix chord still **reaches the focused application**, so pick one
   that your applications leave unbound. `Ctrl+Alt+Space` is a poor choice:
   Claude Desktop opens its quick-entry box on it, and the VS Code extension
