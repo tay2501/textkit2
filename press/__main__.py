@@ -40,7 +40,44 @@ class _Parser(argparse.ArgumentParser):
 
     def __init__(self, **kwargs: Any) -> None:
         kwargs.setdefault("allow_abbrev", False)
+        kwargs.setdefault("formatter_class", _HelpFormatter)
         super().__init__(**kwargs)
+
+
+def _terminal_columns() -> int:
+    """Return the terminal width exactly as ``shutil.get_terminal_size()`` does.
+
+    Re-derived from ``os`` because importing ``shutil`` costs 9 file opens
+    (fnmatch, bz2, lzma, compression.*) on every CLI run, each one a scan for
+    an endpoint security agent.  ``test_cli_help_format.py`` pins the two
+    derivations together.
+    """
+    try:
+        columns = int(os.environ["COLUMNS"])
+    except (KeyError, ValueError):
+        columns = 0
+    stdout = sys.__stdout__  # None under pythonw / a windowless launcher
+    if columns <= 0 and stdout is not None:
+        try:
+            columns = os.get_terminal_size(stdout.fileno()).columns
+        except (ValueError, OSError):
+            # stdout is closed or not a terminal (pipe, redirect).
+            columns = 0
+    return columns if columns > 0 else 80
+
+
+class _HelpFormatter(argparse.HelpFormatter):
+    """HelpFormatter that is handed its width instead of looking it up.
+
+    ``argparse.HelpFormatter`` imports ``shutil`` only when *width* is
+    ``None``, and argparse builds a formatter while registering every option
+    (to validate it), so the import happened on each run rather than only
+    for ``--help``.  The width is the one argparse computes itself.
+    """
+
+    def __init__(self, prog: str, **kwargs: Any) -> None:
+        kwargs.setdefault("width", _terminal_columns() - 2)
+        super().__init__(prog, **kwargs)
 
 
 class _LazyVersionAction(argparse.Action):
@@ -369,6 +406,49 @@ def make_parser() -> argparse.ArgumentParser:
     return _build_parser()[0]
 
 
+def _new_parser() -> tuple[argparse.ArgumentParser, _SubParsers]:
+    """Return the top-level parser and its (still empty) COMMAND subparsers."""
+    parser = _Parser(
+        prog="press",
+        description="Clipboard text transformation tool",
+    )
+    parser.add_argument(
+        "--version",
+        action=_LazyVersionAction,
+        nargs=0,
+        help="show program's version number and exit",
+    )
+    # The action builds _Parser instances; the registration helpers only need
+    # ArgumentParser, and _SubParsersAction is invariant in its parser type.
+    sub = cast("_SubParsers", parser.add_subparsers(dest="command", metavar="COMMAND"))
+    return parser, sub
+
+
+def _transform_parser(argv: Sequence[str]) -> argparse.ArgumentParser | None:
+    """Return a parser that knows only the transform named by ``argv[0]``.
+
+    ``press upper`` needs one subparser, not all of them: building the full
+    tree creates 87 parsers and imports every ``_cli_*`` module before a
+    single character is transformed.  Anything that is not a registry
+    transform — an option, a command group, an unknown name — returns
+    ``None`` and takes the full parser, which is also the only one that can
+    list every command (``--help``, the unknown-command listing, completion).
+
+    The subparser is registered by the same function as in the full parser,
+    so its options, help and errors are identical.
+    """
+    if not argv or "_ARGCOMPLETE" in os.environ:
+        return None
+    from press.commands import resolve_spec
+
+    spec = resolve_spec(argv[0])
+    if spec is None:
+        return None
+    parser, sub = _new_parser()
+    _register_transform_command(sub, spec)
+    return parser
+
+
 def _build_parser() -> tuple[argparse.ArgumentParser, CommandCatalog]:
     """Build the top-level parser and the category listing of its commands.
 
@@ -386,19 +466,7 @@ def _build_parser() -> tuple[argparse.ArgumentParser, CommandCatalog]:
     from press._cli_trace import _register_trace_commands
     from press.commands import PARAMETRIC_COMMANDS, SIMPLE_COMMANDS, TRANSFORM_CATEGORIES
 
-    parser = _Parser(
-        prog="press",
-        description="Clipboard text transformation tool",
-    )
-    parser.add_argument(
-        "--version",
-        action=_LazyVersionAction,
-        nargs=0,
-        help="show program's version number and exit",
-    )
-    # The action builds _Parser instances; the registration helpers only need
-    # ArgumentParser, and _SubParsersAction is invariant in its parser type.
-    sub = cast("_SubParsers", parser.add_subparsers(dest="command", metavar="COMMAND"))
+    parser, sub = _new_parser()
 
     # (category, first command name, registration step).  Transform parsers
     # and handlers are generated from the registry; each special-purpose
@@ -445,21 +513,8 @@ def _build_parser() -> tuple[argparse.ArgumentParser, CommandCatalog]:
 # ---------------------------------------------------------------------------
 
 
-def main() -> None:
-    """Parse arguments and dispatch to the appropriate handler."""
-    # Ensure UTF-8 I/O; disable newline translation on output (preserves CR/CRLF transforms)
-    if hasattr(sys.stdin, "reconfigure"):
-        sys.stdin.reconfigure(encoding="utf-8")
-    # Set locale once at startup so sort_lines / locale.strxfrm use the user's environment locale.
-    # Falls back silently to codepoint order if the user's locale is unavailable (e.g. broken
-    # Windows "Region for non-Unicode programs" setting).
-    with contextlib.suppress(locale.Error):
-        locale.setlocale(locale.LC_COLLATE, "")
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", newline="")
-    if hasattr(sys.stderr, "reconfigure"):
-        sys.stderr.reconfigure(encoding="utf-8")
-
+def _full_parser() -> argparse.ArgumentParser:
+    """Build the parser for every command, handling completion and unknown names."""
     parser, catalog = _build_parser()
     # argcomplete is only needed when the shell-completion hook invokes us,
     # which it signals via _ARGCOMPLETE; skip the import on normal startup.
@@ -475,6 +530,27 @@ def main() -> None:
             from press._cli_catalog import exit_unknown_command
 
             exit_unknown_command(parser, first, catalog)
+    return parser
+
+
+def main() -> None:
+    """Parse arguments and dispatch to the appropriate handler."""
+    # Ensure UTF-8 I/O; disable newline translation on output (preserves CR/CRLF transforms)
+    if hasattr(sys.stdin, "reconfigure"):
+        sys.stdin.reconfigure(encoding="utf-8")
+    # Set locale once at startup so sort_lines / locale.strxfrm use the user's environment locale.
+    # Falls back silently to codepoint order if the user's locale is unavailable (e.g. broken
+    # Windows "Region for non-Unicode programs" setting).
+    with contextlib.suppress(locale.Error):
+        locale.setlocale(locale.LC_COLLATE, "")
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", newline="")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
+
+    parser = _transform_parser(sys.argv[1:])
+    if parser is None:
+        parser = _full_parser()
     args = parser.parse_args()
 
     if args.command is None:
