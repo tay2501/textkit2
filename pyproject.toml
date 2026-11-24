@@ -35,7 +35,7 @@ daemon = [
     "pystray==0.19.5",
     "pynput>=1.8.2",
     "pywin32>=312; sys_platform == 'win32'",
-    "Pillow>=12.3.0",
+    "Pillow>=13.0.0",
     "psutil>=7.2.2",
 ]
 
@@ -72,7 +72,7 @@ dev = [
 ]
 
 [build-system]
-requires      = ["hatchling>=1.32.4"]  # 1.27+ implements PEP 639 license expressions
+requires      = ["hatchling>=1.33.0"]  # 1.27+ implements PEP 639 license expressions
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
