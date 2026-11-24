@@ -70,6 +70,15 @@ class SequenceResolver:
         """The characters typed so far (diagnostics and tests)."""
         return self._buffer
 
+    @property
+    def pending(self) -> bool:
+        """True while an exact match waits for :meth:`confirm` or a timeout.
+
+        The listener commits this state sooner than an unfinished prefix: the
+        user has already typed a whole command name.
+        """
+        return self._pending is not None
+
     def press(self, char: str, *, shift: bool = False) -> Resolution:
         """Feed one normalized key name; *char* is never a bare modifier.
 

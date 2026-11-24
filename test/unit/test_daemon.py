@@ -617,6 +617,65 @@ class TestLeaderKeyListenerTimeout:
         assert ll._listener is None  # suppression actually released
 
 
+class TestLeaderPendingTimeout:
+    """A pending exact match (``cr`` vs ``crlf``) commits after the short wait.
+
+    Only that state is shortened: before the first key, and while a prefix
+    still fits several commands, the user is still choosing what to type.
+    """
+
+    def _make_listener(self, *, timeout: float, pending_timeout: float) -> tuple[Any, Any]:
+        from press.commands import hotkey_sequence_candidates
+        from press.daemon import LeaderKeyListener
+
+        q: queue.Queue[tuple[str, ...]] = queue.Queue()
+        ll = LeaderKeyListener(
+            {}, hotkey_sequence_candidates(), q, timeout=timeout, pending_timeout=pending_timeout
+        )
+        return ll, q
+
+    def _type(self, ll: Any, text: str) -> None:
+        from pynput import keyboard as kb
+
+        for ch in text:
+            ll._on_press(kb.KeyCode.from_char(ch))
+
+    def test_pending_match_commits_after_pending_timeout(self) -> None:
+        ll, q = self._make_listener(timeout=30.0, pending_timeout=0.1)
+        with patch("pynput.keyboard.Listener") as MockListener:
+            MockListener.return_value.start.return_value = None
+            ll.start()
+            self._type(ll, "cr")
+            time.sleep(0.4)
+        assert q.get_nowait() == ("dispatch", "cr")
+
+    @pytest.mark.parametrize(
+        "typed",
+        [
+            "ha",  # halfwidth / hash: nothing to commit yet
+            "str",  # past "st": two strip-* names remain, the user is still typing
+        ],
+    )
+    def test_non_pending_buffer_keeps_the_full_timeout(self, typed: str) -> None:
+        from pynput import keyboard as kb
+
+        ll, q = self._make_listener(timeout=30.0, pending_timeout=0.05)
+        with patch("pynput.keyboard.Listener") as MockListener:
+            MockListener.return_value.start.return_value = None
+            ll.start()
+            self._type(ll, typed)
+            time.sleep(0.3)
+            assert q.empty()
+            ll._on_press(kb.Key.esc)
+        assert q.get_nowait() == ("timeout",)
+
+    def test_default_pending_wait_follows_vim_timeoutlen(self) -> None:
+        """Vim's ``timeoutlen`` (1000 ms) is the de facto wait for this case."""
+        import press.daemon._hotkeys as hk
+
+        assert hk._PENDING_TIMEOUT <= 1.0 < hk._LEADER_TIMEOUT
+
+
 class TestLeaderEventFilter:
     """The ``win32_event_filter`` that replaced pynput's blanket ``suppress=True``.
 

@@ -125,5 +125,6 @@ text. How to read it: {doc}`edr-environments`.
 
 - Hotkeys do not reach an elevated (administrator) window — Task Manager, UAC.
 - Keys typed after the prefix are swallowed until a command fires, `Esc` is
-  pressed, 2 s pass without a key, or 10 s pass in total.
+  pressed, 2 s pass without a key (1 s after a complete name such as `cr`),
+  or 10 s pass in total.
 - `genpass`, `uuid`, and `chain` are CLI-only ({doc}`hotkeys`).

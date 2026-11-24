@@ -22,6 +22,10 @@ if TYPE_CHECKING:
     from press.daemon._dispatch import CommandDispatcher
 
 _LEADER_TIMEOUT = 2.0  # seconds of inactivity before the sequence is committed
+# Shorter wait once the buffer is a complete name that a longer one extends
+# (``cr`` vs ``crlf``, ``dict`` vs ``dict-reverse``).  Vim resolves the same
+# ambiguity after ``timeoutlen``, 1000 ms by default (``:help timeoutlen``).
+_PENDING_TIMEOUT = 1.0
 # Absolute cap on how long the suppressing listener may hold the keyboard,
 # whatever the user types.  Unlike _LEADER_TIMEOUT this is never re-armed.
 _LEADER_HARD_LIMIT = 10.0
@@ -94,8 +98,10 @@ class LeaderKeyListener:
         candidates: Mapping of typeable sequence → dispatchable command,
             from :func:`press.commands.hotkey_sequence_candidates`.
         work_queue: Queue shared with the worker thread.
-        timeout: Seconds of inactivity before the pending match (or a
-            timeout) is emitted.
+        timeout: Seconds of inactivity before the sequence ends.
+        pending_timeout: Seconds of inactivity before a pending exact match
+            (``cr`` while ``crlf`` is still reachable) is committed; capped at
+            *timeout*.
     """
 
     def __init__(
@@ -104,11 +110,13 @@ class LeaderKeyListener:
         candidates: dict[str, str],
         work_queue: queue.Queue[tuple[str, ...]],
         timeout: float = _LEADER_TIMEOUT,
+        pending_timeout: float = _PENDING_TIMEOUT,
     ) -> None:
         self._resolver = SequenceResolver(candidates, bindings)
         self._suppression = KeySuppression()
         self._queue = work_queue
         self._timeout = timeout
+        self._pending_timeout = min(pending_timeout, timeout)
         self._listener: KeyListener | None = None
         # The listener that has been asked to stop but may not have exited yet.
         self._stopping: KeyListener | None = None
@@ -117,6 +125,10 @@ class LeaderKeyListener:
         self._hard_deadline = 0.0
         self._done = threading.Event()
         self._finish_lock = threading.Lock()
+        # Guards _deadline and wakes the watcher when a keypress moves it:
+        # a pending match moves it *earlier*, which a plain timed wait on
+        # _done would only notice once the old, later deadline had passed.
+        self._wake = threading.Condition()
 
     def start(self) -> None:
         """Begin listening for the key sequence."""
@@ -142,14 +154,17 @@ class LeaderKeyListener:
         """Release the keyboard once either deadline passes.
 
         Waits for the time actually remaining instead of polling, re-reading
-        ``_deadline`` each round because :meth:`_on_press` pushes it back from
-        the listener thread.
+        ``_deadline`` each round because :meth:`_on_press` moves it — later
+        on an ordinary key, earlier on a pending match — from the listener
+        thread and notifies :attr:`_wake`.
         """
-        while True:
-            remaining = min(self._deadline, self._hard_deadline) - time.monotonic()
-            if remaining <= 0:
-                break
-            if self._done.wait(timeout=remaining):
+        with self._wake:
+            while not self._done.is_set():
+                remaining = min(self._deadline, self._hard_deadline) - time.monotonic()
+                if remaining <= 0:
+                    break
+                self._wake.wait(timeout=remaining)
+            else:
                 return  # resolved by a keypress
         if time.monotonic() >= self._hard_deadline:
             self._finish(("timeout",))  # safety valve: drop any pending match
@@ -167,6 +182,8 @@ class LeaderKeyListener:
             if self._done.is_set():
                 return
             self._done.set()
+        with self._wake:
+            self._wake.notify_all()  # let the watcher exit now
         self._stop()
         self._queue.put(item)
 
@@ -181,10 +198,15 @@ class LeaderKeyListener:
         if char is None or char in _IGNORED_MODIFIERS:
             return
 
-        self._deadline = time.monotonic() + self._timeout  # re-arm per key
         resolution = self._resolver.press(char, shift=self._shift_held)
         if resolution is not None:
             self._finish(resolution)
+            return
+        # Re-arm per key; a complete name that a longer one extends commits sooner.
+        wait = self._pending_timeout if self._resolver.pending else self._timeout
+        with self._wake:
+            self._deadline = time.monotonic() + wait
+            self._wake.notify_all()
 
     def _on_release(self, key: object) -> None:
         if is_shift_key(key):
