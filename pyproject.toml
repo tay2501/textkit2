@@ -24,10 +24,10 @@ classifiers = [
 requires-python = ">=3.13,<3.16"
 dependencies = [
     "jaconv>=0.5.0",
-    "argcomplete>=3.7.2",
+    "argcomplete>=3.8.0",
     # 3.5.0 also removes the cascade codec imports 3.4.7 paid at import time,
     # which lands directly on the CLI startup budget.
-    "charset-normalizer>=3.5.2",
+    "charset-normalizer>=3.5.3",
 ]
 
 [project.optional-dependencies]
@@ -54,21 +54,21 @@ build = [
     "pyinstaller>=6.22.3",
 ]
 docs = [
-    "sphinx>=9.1",
+    "sphinx>=9.2",
     "furo>=2025.12.19",
-    "myst-parser>=5.1.0",
+    "myst-parser>=5.2.0",
     "sphinx-copybutton>=0.5.2",
     "sphinx-autobuild>=2025.8.25",
 ]
 dev = [
-    "pytest>=9.1.1",
-    "pytest-mock>=3.16.0",
-    "pytest-benchmark>=5.3.0",
+    "pytest>=9.2.0",
+    "pytest-mock>=3.17.0",
+    "pytest-benchmark>=5.3.1",
     "pytest-cov>=7.1.0",
-    "hypothesis>=6.168.3",
+    "hypothesis>=6.170.17",
     "pip-audit>=2.10.1",
-    "ruff>=0.16.10",
-    "mypy>=2.4.0",
+    "ruff>=0.17.6",
+    "mypy>=2.4.1",
 ]
 
 [build-system]

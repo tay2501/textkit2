@@ -29,8 +29,8 @@ jobs:
          # MIT-CMU is Pillow's license_expression on PyPI (a permissive
          # MIT-style license); it went unchecked until a lock bump changed Pillow.
          allow-licenses: MIT, MIT-CMU, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MPL-2.0, PSF-2.0
-         # Two packages are excluded from the license check (purl format, and
-         # only ever by exception — both are classification artefacts, not real
+         # Four packages are excluded from the license check (purl format, and
+         # only ever by exception — all are classification artefacts, not real
          # copyleft dependencies):
          #   pyinstaller       — PyPI metadata reads "GPLv2-or-later with a
          #                       special exception which allows to use
@@ -44,7 +44,18 @@ jobs:
          #                       derives a composite expression from the bundled
          #                       CPython LICENSE text and reports a stray
          #                       GPL-1.0-or-later term from it.
-         allow-dependencies-licenses: pkg:pypi/pyinstaller, pkg:pypi/typing-extensions
+         #   pyinstaller-hooks-contrib — officially dual-licensed: build-time
+         #                       hooks GPL-2.0-or-later (same exception model
+         #                       as pyinstaller), runtime hooks — the only part
+         #                       bundled into the .exe — Apache-2.0.  `build`
+         #                       group only.  The graph reports the union.
+         #   docutils          — `docs` group only, never shipped.  The project
+         #                       is public domain / BSD; the GPL terms come
+         #                       from scanning auxiliary tool files.
+         # Both declare the same PyPI classifiers in the versions locked before
+         # and after the 2026-11 refresh; the check only fired because that
+         # refresh was the first PR to change them.
+         allow-dependencies-licenses: pkg:pypi/pyinstaller, pkg:pypi/typing-extensions, pkg:pypi/pyinstaller-hooks-contrib, pkg:pypi/docutils
          # Comment on PR with summary
          comment-summary-in-pr: always
          # Warn on dependencies without licenses
