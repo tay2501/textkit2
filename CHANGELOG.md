@@ -180,6 +180,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump myst-parser to `>=5.1.0`
 - Bump pyinstaller to `>=6.21.0`
 - Lockfile refresh (2026-11): raise the ruff floor to `>=0.17.6`, mypy `>=2.4.1`, pytest `>=9.2.0`, pytest-mock `>=3.17.0`, pytest-benchmark `>=5.3.1`, hypothesis `>=6.170.17`, argcomplete `>=3.8.0`, charset-normalizer `>=3.5.3`, sphinx `>=9.2`, myst-parser `>=5.2.0`. ruff 0.17's breaking changes do not reach this project: the new default rule set and default `target-version` are overridden by the explicit `select` and `requires-python`, and the pragma-aware line-length change produced no formatting diff. pytest 9.2 makes `parametrize(indirect=, ids=, scope=)` keyword-only and warns on `@classmethod` fixtures; the suite uses neither and passes with `-W error::DeprecationWarning`. argcomplete 3.8 only changes completion output and stays off the transform path (imported only under `_ARGCOMPLETE`). Transitive: evdev 2.0 (Linux-only pynput backend; the APIs pynput calls are unchanged), sphinxcontrib-jsmath 2.0, docutils 0.23, pyobjc 13 (macOS-only)
+- `dependency-review` license check: `docutils` (docs group) and `pyinstaller-hooks-contrib` (build group) added to `allow-dependencies-licenses`. Both are classification artefacts like the existing `pyinstaller` exception — their declared licenses are unchanged, the check first saw them when the 2026-11 refresh changed their versions
 
 ---
 
